@@ -35,6 +35,21 @@ def _clear_tokens():
 def is_authenticated() -> bool:
     return bool(st.session_state.get("authenticated"))
 
+def check_auth():
+    """
+    Unified auth guard for all pages.
+    - If authenticated: return immediately (no-op)
+    - If not: redirect to Home (login) and stop execution
+    """
+    if is_authenticated():
+        return
+    # Redirect to Home login
+    try:
+        st.switch_page("Home.py")
+    except Exception:
+        # Fallback: render inline guidance if switch_page not available
+        st.warning("⚠️ Please sign in to continue.")
+    st.stop()
 
 def show_login_page():
     """
@@ -45,35 +60,45 @@ def show_login_page():
     if is_authenticated():
         return True
     
-    st.title("🔐 Sign in to Compliance Assistant")
+    st.title("🔐 Agentic Compliance Assistant – Demo Login")
     st.markdown("""
     <p style='font-size: 1.1rem; text-align: center; color: #475569; margin-bottom: 1.25rem;'>
-    Enter your credentials to continue
+    This is a demo environment. No real data is stored.
     </p>
     """, unsafe_allow_html=True)
+    
+    # Session expiry notice (one-time)
+    if st.session_state.get("session_expired"):
+        st.warning("Your session expired. Please log in again.")
+        del st.session_state["session_expired"]
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            username = st.text_input("Username", placeholder="acme.user")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            username = st.text_input("Username", placeholder="demo")
+            password = st.text_input("Password", type="password", placeholder="demo123")
             submit = st.form_submit_button("🔓 Sign In", use_container_width=True, type="primary")
             
             if submit:
                 if not username or not password:
                     st.error("Please enter both username and password.")
                 else:
-                    try:
-                        ok, access, refresh, err = auth_client.login(username, password, timeout=10)
-                        if ok and access and refresh:
-                            _set_tokens(access, refresh, username=username)
-                            st.session_state["authenticated"] = True
-                            st.success("✅ Login successful! Redirecting...")
-                            st.rerun()
-                        else:
-                            st.error(err or "Login failed. Please try again.")
-                    except Exception as e:
-                        st.error(f"Cannot connect to backend. {e}")
+                    with st.spinner("Signing in..."):
+                        try:
+                            ok, access, refresh, err = auth_client.login(username, password, timeout=10)
+                            if ok and access and refresh:
+                                _set_tokens(access, refresh, username=username)
+                                st.session_state["authenticated"] = True
+                                st.success("✅ Login successful! Redirecting...")
+                                # Ensure a hard rerun to refresh sidebar/pages
+                                try:
+                                    st.experimental_rerun()
+                                except Exception:
+                                    st.rerun()
+                            else:
+                                st.error("Invalid demo credentials")
+                        except Exception as e:
+                            st.error(f"Cannot connect to backend. {e}")
     
     return False
 
@@ -81,12 +106,9 @@ def show_login_page():
 def require_auth():
     """
     Require authentication to access a page.
-    If not authenticated, render login page once and stop.
+    Delegates to check_auth() so all pages use the same guard.
     """
-    if is_authenticated():
-        return
-    if not show_login_page():
-        st.stop()
+    check_auth()
 
 
 def get_auth_headers() -> Dict[str, str]:

@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from src.core.config.config_provider import get_settings
+from src.config import settings
 
 
 def create_database_engine():
@@ -14,20 +14,14 @@ def create_database_engine():
     Returns:
         SQLAlchemy engine with proper connection pooling
     """
-    settings = get_settings()
-    
     # Build connection args
     connect_args = {}
-    if "sqlite" in settings.database_url:
+    if "sqlite" in settings.DATABASE_URL:
         connect_args["check_same_thread"] = False
     
     # Create engine with connection pooling
     engine = create_engine(
-        settings.database_url,
-        pool_size=settings.db_pool_size,
-        max_overflow=settings.db_max_overflow,
-        pool_timeout=settings.db_pool_timeout,
-        pool_recycle=settings.db_pool_recycle,
+        settings.DATABASE_URL,
         pool_pre_ping=True,  # Verify connections before using
         connect_args=connect_args,
     )

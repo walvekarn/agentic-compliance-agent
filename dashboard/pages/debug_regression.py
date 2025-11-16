@@ -23,6 +23,21 @@ from components.ui_helpers import multiselect_with_select_all
 # Page config
 st.set_page_config(page_title="Regression Tests", page_icon="🧪", layout="wide")
 
+# Quick connectivity checks (unprotected + auth cycle)
+from components.constants import API_BASE_URL
+st.markdown("### 🔌 Connectivity Checks")
+checks = []
+# Health
+try:
+    r = requests.get(f"{API_BASE_URL}/health", timeout=5)
+    checks.append(("Health", r.status_code == 200, r.status_code))
+except Exception as e:
+    checks.append(("Health", False, str(e)))
+cols = st.columns(len(checks) or 1)
+for i, (name, ok, meta) in enumerate(checks):
+    with cols[i]:
+        st.success(f"✓ {name}") if ok else st.error(f"✗ {name} ({meta})")
+
 # Authentication
 require_auth()
 

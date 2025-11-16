@@ -149,8 +149,24 @@ EXAMPLE_FORM_VALUES = {
 # ============================================================================
 
 import os
+import socket
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+def _detect_lan_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+# Prefer BACKEND_URL if provided, then API_BASE_URL; else fallback to LAN IP
+_env_backend = os.getenv("BACKEND_URL") or os.getenv("API_BASE_URL")
+if _env_backend and _env_backend.strip():
+    API_BASE_URL = _env_backend.rstrip("/")
+else:
+    API_BASE_URL = f"http://{_detect_lan_ip()}:8000"
 API_TIMEOUT = int(os.getenv("API_TIMEOUT", "30"))
 
 # ============================================================================

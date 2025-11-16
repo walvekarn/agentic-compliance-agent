@@ -180,6 +180,19 @@ Your AI agent for compliance decisions — autonomous, transparent, and always l
 </p>
 """, unsafe_allow_html=True)
 
+# Onboarding panel
+with st.container():
+    st.markdown("### 🚀 Get Started")
+    ob_col1, ob_col2 = st.columns([1, 1])
+    with ob_col1:
+        st.info("Start with a sample task to see how analysis works.")
+        if st.button("🎯 Start with a sample task", key="demo_task_btn", use_container_width=True, type="primary"):
+            # Provide a demo hint for Analyze Task page (non-invasive)
+            st.session_state["demo_task_text"] = "Review privacy policy updates for a new feature rollout across US/EU."
+            st.switch_page("pages/1_Analyze_Task.py")
+    with ob_col2:
+        st.caption("Or generate a full compliance calendar using the 'Plan All Tasks' section below.")
+
 # Check API connection (health endpoint is unprotected)
 api = APIClient()
 health = api.health_check()

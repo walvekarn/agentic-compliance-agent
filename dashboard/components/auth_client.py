@@ -1,8 +1,21 @@
 import os
+import socket
 import requests
 from typing import Optional, Tuple
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+def _detect_lan_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+_env_backend = os.getenv("BACKEND_URL") or os.getenv("API_BASE_URL")
+API_BASE_URL = (_env_backend.rstrip("/") if _env_backend and _env_backend.strip()
+                else f"http://{_detect_lan_ip()}:8000")
 
 
 def login(username: str, password: str, timeout: int = 10) -> Tuple[bool, Optional[str], Optional[str], Optional[str]]:

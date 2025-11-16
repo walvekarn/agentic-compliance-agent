@@ -28,8 +28,8 @@ help:
 	@echo "  4. Access API docs: http://localhost:8000/docs"
 
 backend:
-	@echo "$(GREEN)🚀 Starting FastAPI backend on port 8000...$(NC)"
-	@python3 main.py
+	@echo "$(GREEN)🚀 Starting FastAPI backend on 0.0.0.0:8000...$(NC)"
+	@uvicorn main:app --host 0.0.0.0 --port 8000
 
 dashboard:
 	@echo "$(GREEN)🎨 Starting Streamlit dashboard on port 8501...$(NC)"
@@ -39,7 +39,7 @@ start:
 	@echo "$(GREEN)🚀 Starting backend and dashboard...$(NC)"
 	@echo "$(YELLOW)Note: Backend will start in background, dashboard in foreground$(NC)"
 	@echo ""
-	@python3 main.py > backend.log 2>&1 & echo $$! > .backend.pid
+	@uvicorn main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 & echo $$! > .backend.pid
 	@sleep 3
 	@echo "$(GREEN)✅ Backend started (PID: $$(cat .backend.pid))$(NC)"
 	@echo "$(GREEN)📊 Starting dashboard...$(NC)"
