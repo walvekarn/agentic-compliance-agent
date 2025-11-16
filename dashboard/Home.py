@@ -5,7 +5,6 @@ Get instant guidance on compliance decisions - no training needed!
 """
 
 import streamlit as st
-import requests
 from datetime import datetime
 import sys
 from pathlib import Path
@@ -15,7 +14,8 @@ dashboard_dir = Path(__file__).parent
 sys.path.insert(0, str(dashboard_dir))
 
 from components.chat_assistant import render_chat_panel
-from components.auth_utils import show_login_page
+from components.auth_utils import show_login_page, is_authenticated, logout
+from components.api_client import APIClient, display_api_error
 
 # Page configuration
 st.set_page_config(
@@ -26,10 +26,17 @@ st.set_page_config(
 )
 
 # ============================================================================
-# AUTHENTICATION - Centralized authentication
+# AUTHENTICATION - JWT via backend
 # ============================================================================
+# Top-right logout
+hdr_c1, hdr_c2 = st.columns([6, 1])
+with hdr_c2:
+    if is_authenticated():
+        if st.button("Logout", use_container_width=True):
+            logout()
+
 if not show_login_page():
-    st.stop()  # Stop execution here if not authenticated
+    st.stop()
 # ============================================================================
 
 # Enhanced CSS for maximum readability
@@ -165,11 +172,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# API Configuration
-import os
-
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-
 # Header
 st.title("🛡️ AI Agentic Compliance Assistant")
 st.markdown("""
@@ -178,22 +180,13 @@ Your AI agent for compliance decisions — autonomous, transparent, and always l
 </p>
 """, unsafe_allow_html=True)
 
-# Check API connection
-try:
-    response = requests.get(f"{API_BASE_URL}/health", timeout=5)
-    if response.status_code == 200:
-        st.success("✅ System is ready and connected")
-    else:
-        st.warning(f"⚠️ System is not available: Backend returned status {response.status_code}")
-        st.info(f"💡 Trying to reach: {API_BASE_URL}/health")
-        st.info("💡 **For IT Support:** The system requires the backend service to be running. Start it with `make start` or `python3 main.py`")
-        test_btn = st.button("🔄 Test Connection Again")
-        if test_btn:
-            st.rerun()
-except Exception as e:
-    st.error(f"❌ Cannot connect to: {API_BASE_URL}")
-    st.info(f"💡 Trying to reach: {API_BASE_URL}/health")
-    st.info("💡 **For IT Support:** The system requires the backend service to be running. Start it with `make start` or `python3 main.py`")
+# Check API connection (health endpoint is unprotected)
+api = APIClient()
+health = api.health_check()
+if health.success:
+    st.success("✅ System is ready and connected")
+else:
+    display_api_error(health)
     test_btn = st.button("🔄 Test Connection Again")
     if test_btn:
         st.rerun()
@@ -304,9 +297,9 @@ These metrics show how the AI has helped you:
 """)
 
 try:
-    stats_response = requests.get(f"{API_BASE_URL}/api/v1/audit/statistics", timeout=5)
-    if stats_response.status_code == 200:
-        stats = stats_response.json()
+    stats_resp = api.get("/api/v1/audit/statistics")
+    if stats_resp.success and isinstance(stats_resp.data, dict):
+        stats = stats_resp.data
         total = stats.get("total_decisions", 0)
         
         # Decision Performance Metrics
@@ -348,16 +341,16 @@ try:
             st.metric("Careful Decision Rate", f"{escalation_rate:.0f}%",
                      help="When uncertain, the AI recommends expert review. This shows the AI is being cautious to protect you.")
         
-except:
+except Exception:
     st.info("💡 Agent activity metrics will appear here once the backend is connected and decisions are made.")
 
 # Human Feedback & AI Accuracy
 st.markdown("### 👤 Human Feedback & AI Accuracy")
 
 try:
-    feedback_response = requests.get(f"{API_BASE_URL}/api/v1/feedback/stats", timeout=5)
-    if feedback_response.status_code == 200:
-        feedback_stats = feedback_response.json()
+    feedback_resp = api.get("/api/v1/feedback/stats")
+    if feedback_resp.success and isinstance(feedback_resp.data, dict):
+        feedback_stats = feedback_resp.data
         
         if feedback_stats.get('total_feedback_count', 0) > 0:
             col1, col2, col3 = st.columns(3)
@@ -393,7 +386,7 @@ try:
         
         Your feedback creates a learning loop that makes the AI smarter over time.
         """)
-except:
+except Exception:
     st.info("""
     💬 **No Feedback Yet**
     

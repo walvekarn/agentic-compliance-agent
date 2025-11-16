@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from io import BytesIO
-import requests
+from .api_client import APIClient, display_api_error
 
 # Initialize session state for export history
 def initialize_export_history():
@@ -300,20 +300,13 @@ def render_export_section(
                         }
                         
                         # Send via API
-                        response = requests.post(
-                            email_api_endpoint,
-                            json=email_payload,
-                            timeout=10
-                        )
+                        api = APIClient()
+                        response = api.post(email_api_endpoint.replace(APIClient().base_url, "") if email_api_endpoint.startswith(APIClient().base_url) else email_api_endpoint, email_payload, timeout=10)
                         
-                        if response.status_code == 200:
+                        if response.success:
                             st.success(f"✅ Report sent to {recipient_email}!")
                         else:
-                            st.error(f"❌ Failed to send email: {response.status_code}")
-                    except requests.exceptions.Timeout:
-                        st.error("⏱️ Email request timed out. Please try again.")
-                    except requests.exceptions.ConnectionError:
-                        st.error("❌ Cannot connect to email service. Please contact support.")
+                            display_api_error(response)
                     except Exception as e:
                         st.error(f"❌ Error sending email: {str(e)}")
 

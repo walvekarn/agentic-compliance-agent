@@ -9,8 +9,9 @@ from datetime import datetime
 
 from src.db.base import get_db
 from src.db.models import FeedbackLog
+from src.auth.security import get_current_user
 
-router = APIRouter()
+router = APIRouter(tags=["Feedback", "Protected"], dependencies=[Depends(get_current_user)])
 
 
 # Request/Response Models

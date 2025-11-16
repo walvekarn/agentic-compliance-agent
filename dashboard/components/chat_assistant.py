@@ -5,12 +5,12 @@ Reusable chat interface for asking questions about compliance decisions.
 """
 
 import streamlit as st
-import requests
 from datetime import datetime
 import os
 
 # API Configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+from .api_client import APIClient, display_api_error
 
 
 def initialize_chat_state():
@@ -302,17 +302,18 @@ def render_chat_panel(context_data=None):
         # Call API
         with st.spinner("🤔 AI is thinking..."):
             try:
-                response = requests.post(
-                    f"{API_BASE_URL}/api/v1/query",
-                    json={
+                client = APIClient()
+                response = client.post(
+                    "/api/v1/query",
+                    {
                         "query": enhanced_query,
                         "chat_history": chat_history if chat_history else None
                     },
                     timeout=30
                 )
                 
-                if response.status_code == 200:
-                    result = response.json()
+                if response.success:
+                    result = response.data or {}
                     ai_response = result.get("response", "No response received")
                     
                     # Add AI response to chat with page tag
@@ -328,70 +329,14 @@ def render_chat_panel(context_data=None):
                     with st.chat_message("assistant"):
                         st.markdown(ai_response)
                         st.caption(f"_{timestamp} • 📍 {current_page}_")
-                elif response.status_code == 504:
-                    # Timeout from backend
-                    try:
-                        error_detail = response.json().get("detail", "Request timed out")
-                    except:
-                        error_detail = "Request timed out"
-                    error_msg = f"⏱️ {error_detail}"
-                    st.warning(error_msg)
-                    # Add error to chat with page tag
-                    st.session_state.chat_messages.append({
-                        "role": "assistant",
-                        "content": error_msg,
-                        "timestamp": datetime.now().strftime("%I:%M %p"),
-                        "page": current_page
-                    })
-                elif response.status_code == 500:
-                    # Server error
-                    try:
-                        error_detail = response.json().get("detail", "Internal server error")
-                    except:
-                        error_detail = "Internal server error"
-                    error_msg = f"❌ Server error: {error_detail}"
-                    st.error(error_msg)
-                    # Add error to chat with page tag
-                    st.session_state.chat_messages.append({
-                        "role": "assistant",
-                        "content": error_msg,
-                        "timestamp": datetime.now().strftime("%I:%M %p"),
-                        "page": current_page
-                    })
                 else:
-                    # Other error
-                    try:
-                        error_detail = response.json().get("detail", f"Status {response.status_code}")
-                    except:
-                        error_detail = f"Status {response.status_code}"
-                    error_msg = f"❌ Error: {error_detail}"
-                    st.error(error_msg)
-                    # Add error to chat with page tag
+                    display_api_error(response)
                     st.session_state.chat_messages.append({
                         "role": "assistant",
-                        "content": error_msg,
+                        "content": response.error or "❌ Error",
                         "timestamp": datetime.now().strftime("%I:%M %p"),
                         "page": current_page
                     })
-                    
-            except requests.exceptions.ConnectionError:
-                error_msg = "❌ Cannot connect to backend. Please ensure the API is running."
-                st.error(error_msg)
-                st.session_state.chat_messages.append({
-                    "role": "assistant",
-                    "content": error_msg,
-                    "timestamp": datetime.now().strftime("%I:%M %p"),
-                    "page": current_page
-                })
-            except requests.exceptions.Timeout:
-                error_msg = "⏱️ Request timed out. Please try again."
-                st.error(error_msg)
-                st.session_state.chat_messages.append({
-                    "role": "assistant",
-                    "content": error_msg,
-                    "timestamp": datetime.now().strftime("%I:%M %p"),
-                    "page": current_page
-                })
             except Exception as e:
                 error_msg = f"❌ Unexpected error: {str(e)}"
                 st.error(error_msg)

@@ -5,7 +5,6 @@ Generate a complete compliance calendar for any organization.
 """
 
 import streamlit as st
-import requests
 import pandas as pd
 from datetime import datetime
 import json
@@ -19,7 +18,7 @@ sys.path.insert(0, str(dashboard_dir))
 from components.chat_assistant import render_chat_panel
 from components.auth_utils import require_auth
 from components.export_utils import render_export_section, render_export_history
-from components.constants import API_BASE_URL
+from components.api_client import APIClient, display_api_error
 
 st.set_page_config(page_title="Compliance Calendar", page_icon="📋", layout="wide")
 
@@ -417,12 +416,8 @@ if submitted:
                     "previous_violations": previous_violations_value
                 }
                 
-                response = requests.post(
-                    f"{API_BASE_URL}/api/v1/entity/analyze",
-                    json=payload,
-                    timeout=30
-                )
-                response.raise_for_status()  # Raise exception for bad status codes
+                api = APIClient()
+                response = api.post("/api/v1/entity/analyze", payload, timeout=30)
                 
                 # Stage 5: Prioritizing
                 with progress_container.container():
@@ -436,8 +431,11 @@ if submitted:
                 progress_container.empty()
                 steps_container.empty()
                 
-                # If we get here, status is 200
-                result = response.json()
+                if not response.success:
+                    display_api_error(response)
+                    st.stop()
+                
+                result = response.data or {}
                 
                 # Add timestamp for data freshness tracking if not present
                 if "last_updated" not in result:
@@ -1072,44 +1070,6 @@ HIGH PRIORITY TASKS (Due in 7 days or less)
                 
                 st.caption("💾 Files download immediately. Check your browser's downloads folder.")
             
-            except requests.exceptions.ConnectionError:
-                st.error("❌ **Cannot connect to backend API**")
-                st.markdown("---")
-                st.info("💡 **Solution:** Run `make start` to start the backend")
-                st.code("# Terminal command:\nmake start", language="bash")
-                st.markdown("### What to do:")
-                st.markdown("1. 🔌 **Check your network** - Make sure you're connected")
-                st.markdown("2. 🔄 **Start the backend** - Run `make start` or `python main.py` in a terminal")
-                st.markdown("3. 🔄 **Refresh and try again** - Press F5 and resubmit")
-                st.markdown("4. 📞 **Still offline?** - Contact IT support")
-                st.warning("⚠️ **For IT Support**: Backend API may not be running. Start with `python main.py`")
-                if st.button("🔄 Test Connection"):
-                    st.rerun()
-            except requests.exceptions.Timeout:
-                st.error("⏱️ **Request Timed Out**")
-                st.markdown("---")
-                st.warning("The calendar generation is taking longer than expected. This usually means the AI is processing complex data.")
-                st.markdown("### What to do:")
-                st.markdown("1. ⏱️ **Wait 10-15 seconds** - The system might be processing other requests")
-                st.markdown("2. 🔄 **Try again** - Click 'Generate Calendar'")
-                st.markdown("3. 📞 **If it times out again** - Contact IT support as the system may need attention")
-                st.info("💡 **No need to re-enter**: Your form data is saved above.")
-                if st.button("🔄 Try Again"):
-                    st.rerun()
-            except requests.exceptions.HTTPError as e:
-                st.error(f"❌ **Calendar Generation Failed (Status {response.status_code})**")
-                st.markdown("---")
-                st.warning("The backend returned an error. Check the details below.")
-                st.markdown("### What to do:")
-                st.markdown("1. ✅ **Check your information** - Review the fields above and try again")
-                st.markdown("2. 🔄 **Try again** - Click 'Generate Calendar'")
-                st.markdown("3. 📞 **Need help?** - Contact IT support")
-                with st.expander("🔍 API Response"):
-                    try:
-                        st.json(response.json() if response.text else {"error": "No response body"})
-                    except:
-                        st.code(response.text[:500] if response.text else "No response body")
-                st.info("💡 Your information has been saved above.")
             except Exception as e:
                 st.error(f"❌ **Calendar Generation Error: {type(e).__name__}**")
                 st.markdown("---")

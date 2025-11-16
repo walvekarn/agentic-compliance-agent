@@ -11,19 +11,21 @@ from src.agent.risk_models import (
     EntityContext,
     TaskContext,
     DecisionAnalysis,
-    RiskLevel,
-    ActionDecision
+    # Unused direct enums removed to reduce lints
 )
 from src.db.base import get_db
+from src.auth.security import get_current_user
 from src.db.models import ComplianceQuery, EntityHistory
+from src.api.rate_limit import limiter, AUTH_RATE
 
-router = APIRouter(prefix="/decision", tags=["Decision Engine"])
+router = APIRouter(prefix="/decision", tags=["Decision Engine", "Protected"], dependencies=[Depends(get_current_user)])
 
 # Initialize decision engine
 decision_engine = DecisionEngine()
 
 
 @router.post("/analyze", response_model=DecisionAnalysis)
+@limiter.limit(AUTH_RATE)
 async def analyze_compliance_decision(
     entity: EntityContext,
     task: TaskContext,

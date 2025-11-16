@@ -8,9 +8,11 @@ from datetime import datetime
 
 from src.agent.audit_service import AuditService
 from src.db.base import get_db
+from src.auth.security import get_current_user
 from pydantic import BaseModel, Field
+from src.api.rate_limit import limiter, AUTH_RATE
 
-router = APIRouter(prefix="/audit", tags=["Audit Trail"])
+router = APIRouter(prefix="/audit", tags=["Audit Trail", "Protected"], dependencies=[Depends(get_current_user)])
 
 
 class AuditQueryParams(BaseModel):
@@ -274,6 +276,7 @@ async def get_available_filters(db: Session = Depends(get_db)):
 
 
 @router.get("/recent")
+@limiter.limit(AUTH_RATE)
 async def get_recent_decisions(
     limit: int = Query(default=10, ge=1, le=100, description="Number of recent decisions to return"),
     db: Session = Depends(get_db)

@@ -5,7 +5,6 @@ View and filter all past compliance decisions.
 """
 
 import streamlit as st
-import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import json
@@ -19,7 +18,7 @@ sys.path.insert(0, str(dashboard_dir))
 from components.chat_assistant import render_chat_panel
 from components.auth_utils import require_auth
 from components.export_utils import render_export_section, render_export_history
-from components.constants import API_BASE_URL
+from components.api_client import APIClient, display_api_error
 
 st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 
@@ -166,15 +165,13 @@ try:
     if date_filter:
         params["start_date"] = date_filter
     
-    response = requests.get(
-        f"{API_BASE_URL}/api/v1/audit/entries",
-        params=params,
-        timeout=10
-    )
-    response.raise_for_status()  # Raise exception for bad status codes
+    api = APIClient()
+    response = api.get("/api/v1/audit/entries", params=params)
+    if not response.success:
+        display_api_error(response)
+        st.stop()
     
-    # If we get here, status is 200
-    data = response.json()
+    data = response.data or {}
     entries = data.get("entries", [])
     
     # Filter by decision and risk
@@ -408,38 +405,6 @@ Agent: {entry["agent_type"]}
     else:
         st.warning("No audit records match these filters. Try expanding the time period or selecting additional decision types above.")
 
-except requests.exceptions.ConnectionError:
-    st.error("❌ **Cannot connect to backend API**")
-    st.markdown("---")
-    st.info("💡 **Solution:** Run `make start` to start the backend")
-    st.code("# Terminal command:\nmake start", language="bash")
-    st.markdown("### What to do:")
-    st.markdown("1. 🔌 **Check your network** - Make sure you're connected")
-    st.markdown("2. 🔄 **Start the backend** - Run `make start` or `python main.py` in a terminal")
-    st.markdown("3. 🔄 **Refresh and try again** - Press F5 and resubmit")
-    st.markdown("4. 📞 **Still offline?** - Contact IT support")
-    st.warning("⚠️ **For IT Support**: Backend API may not be running. Start with `python main.py`")
-    if st.button("🔄 Test Connection"):
-        st.rerun()
-except requests.exceptions.Timeout:
-    st.error("⏱️ **Request Timed Out**")
-    st.markdown("---")
-    st.warning("The request is taking longer than expected.")
-    st.markdown("### What to do:")
-    st.markdown("1. ⏱️ **Wait 10-15 seconds** - The system might be processing other requests")
-    st.markdown("2. 🔄 **Try again** - Click 'Refresh Data'")
-    st.markdown("3. 📞 **If it times out again** - Contact IT support")
-    if st.button("🔄 Try Again"):
-        st.rerun()
-except requests.exceptions.HTTPError as e:
-    st.error(f"❌ **API Error: {response.status_code}**")
-    st.markdown("---")
-    st.warning(f"Backend returned an error. Check the details below.")
-    with st.expander("🔍 Technical Details"):
-        try:
-            st.json(response.json() if response.text else {"error": "No response body"})
-        except:
-            st.code(response.text[:500] if response.text else "No response body")
 except Exception as e:
     st.error(f"❌ **Unexpected Error: {type(e).__name__}**")
     st.markdown("---")
@@ -457,9 +422,9 @@ st.markdown("---")
 st.markdown("### 📈 Overall Statistics")
 
 try:
-    stats_response = requests.get(f"{API_BASE_URL}/api/v1/audit/statistics")
-    if stats_response.status_code == 200:
-        stats = stats_response.json()
+    stats_response = APIClient().get("/api/v1/audit/statistics")
+    if stats_response.success and isinstance(stats_response.data, dict):
+        stats = stats_response.data
         
         col1, col2, col3, col4 = st.columns(4)
         

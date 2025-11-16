@@ -17,6 +17,8 @@ help:
 	@echo "  $(YELLOW)make restart$(NC)    - Kill and restart both services"
 	@echo "  $(YELLOW)make test$(NC)       - Run test suite"
 	@echo "  $(YELLOW)make clean$(NC)      - Clean up cache and temp files"
+	@echo "  $(YELLOW)make migrate$(NC)    - Run Alembic upgrade to head"
+	@echo "  $(YELLOW)make revision message=\"<msg>\"$(NC) - Create Alembic revision"
 	@echo "  $(YELLOW)make help$(NC)       - Show this help message"
 	@echo ""
 	@echo "$(BLUE)Quick Start:$(NC)"
@@ -79,3 +81,17 @@ clean:
 	@rm -rf htmlcov/ 2>/dev/null || true
 	@rm -f .backend.pid backend.log dashboard.log 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
+
+migrate:
+	@echo "$(GREEN)📦 Applying database migrations...$(NC)"
+	@DATABASE_URL=$$(python3 -c "from src.config import settings; print(settings.DATABASE_URL)"); \
+	alembic -x database_url=$$DATABASE_URL upgrade head
+
+revision:
+	@if [ -z "$(message)" ]; then \
+		echo "$(YELLOW)Please provide a revision message: make revision message=\"Add table\"$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)📝 Creating revision: $(message)$(NC)"; \
+	DATABASE_URL=$$(python3 -c "from src.config import settings; print(settings.DATABASE_URL)"); \
+	alembic -x database_url=$$DATABASE_URL revision -m "$(message)"

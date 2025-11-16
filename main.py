@@ -5,7 +5,6 @@ import traceback
 import json
 
 try:
-    import os
     from dotenv import load_dotenv
     
     # Load environment variables FIRST before any imports that might need them
@@ -23,6 +22,18 @@ try:
     from src.api.feedback_routes import router as feedback_router
     from src.api.agentic_routes import router as agentic_router
     from src.db.base import engine, Base
+    from src.auth.auth_router import router as auth_router
+    from src.auth.security import get_current_user
+    from src.config import settings
+    from src.api.error_handlers import register_exception_handlers
+    from src.api.rate_limit import limiter, rate_limit_handler
+    from slowapi.middleware import SlowAPIMiddleware
+    from slowapi.errors import RateLimitExceeded
+    import jwt
+    import logging
+    import os
+    from pathlib import Path
+    import uuid
 except Exception as e:
     print(f"❌ STARTUP ERROR: Failed to import dependencies")
     print(f"Error: {e}")
@@ -35,16 +46,14 @@ def validate_environment():
     errors = []
     
     # Check OpenAI API Key
-    openai_key = os.getenv("OPENAI_API_KEY")
+    openai_key = settings.OPENAI_API_KEY
     if not openai_key:
         errors.append("OPENAI_API_KEY is missing")
-    elif openai_key == "your-openai-api-key-here":
-        errors.append("OPENAI_API_KEY is still set to placeholder value")
-    elif not openai_key.startswith("sk-"):
+    elif not str(openai_key).startswith("sk-"):
         errors.append("OPENAI_API_KEY appears invalid (should start with 'sk-')")
     
     # Check Secret Key
-    secret_key = os.getenv("SECRET_KEY")
+    secret_key = settings.SECRET_KEY
     if not secret_key:
         errors.append("SECRET_KEY is missing")
     elif len(secret_key) < 32:
@@ -77,7 +86,7 @@ async def lifespan(app: FastAPI):
     # Startup: Create database tables
     try:
         print("Starting up application...")
-        print(f"Database URL: {os.getenv('DATABASE_URL', 'sqlite:///./compliance.db')}")
+        print(f"Database URL: {settings.DATABASE_URL}")
         Base.metadata.create_all(bind=engine)
         print("✅ Database initialized successfully")
     except Exception as e:
@@ -89,22 +98,56 @@ async def lifespan(app: FastAPI):
     print("Shutting down application...")
 
 
-# Initialize FastAPI app
+# Initialize FastAPI app (disable docs in production)
+docs_kwargs = {}
+if not settings.DEBUG:
+    docs_kwargs = {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(
     title="Agentic Compliance Agent",
     description="AI-powered compliance agent using OpenAI GPT-4o-mini via LangChain",
     version="0.1.0",
     lifespan=lifespan,
+    **docs_kwargs,
 )
 
-# Configure CORS - SECURITY FIX: Using json.loads instead of eval
-cors_origins_str = os.getenv("CORS_ORIGINS", '["http://localhost:3000", "http://localhost:8501", "http://127.0.0.1:8501", "http://0.0.0.0:8501"]')
-try:
-    allow_origins_list = json.loads(cors_origins_str) if isinstance(cors_origins_str, str) else cors_origins_str
-except json.JSONDecodeError:
-    # Fallback to safe default if JSON parsing fails
-    allow_origins_list = ["http://localhost:8501"]
-    print(f"⚠️ Warning: Could not parse CORS_ORIGINS, using default: {allow_origins_list}")
+# -----------------------------------------------------------------------------
+# Logging configuration
+# -----------------------------------------------------------------------------
+logs_dir = Path("logs")
+logs_dir.mkdir(parents=True, exist_ok=True)
+log_file = logs_dir / "backend.log"
+
+logging.basicConfig(
+    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ],
+)
+logger = logging.getLogger("backend")
+logger.info("Logging initialized")
+
+# -----------------------------------------------------------------------------
+# Request ID middleware for traceability
+# -----------------------------------------------------------------------------
+@app.middleware("http")
+async def add_request_id(request, call_next):
+    request.state.request_id = str(uuid.uuid4())
+    response = await call_next(request)
+    # Attach request id to response headers for correlation
+    response.headers["X-Request-ID"] = request.state.request_id
+    return response
+
+# -----------------------------------------------------------------------------
+# Rate limiting
+# -----------------------------------------------------------------------------
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Configure CORS from settings
+allow_origins_list = settings.BACKEND_CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,14 +157,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
-app.include_router(api_router, prefix="/api/v1")
-app.include_router(decision_router, prefix="/api/v1")
-app.include_router(audit_router, prefix="/api/v1")
-app.include_router(entity_analysis_router, prefix="/api/v1")
-app.include_router(feedback_router, prefix="/api/v1")
-app.include_router(agentic_router, prefix="/api/v1/agentic")
+# Include Auth routes
+app.include_router(auth_router, prefix="/auth")
 
+# Include API routes (protected)
+from fastapi import Depends
+app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(decision_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(audit_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(entity_analysis_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(feedback_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(agentic_router, prefix="/api/v1/agentic", dependencies=[Depends(get_current_user)])
+
+# Register global exception handlers
+register_exception_handlers(app)
+
+# JWT specific exception mapping to 401 JSON
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(jwt.ExpiredSignatureError)
+async def expired_jwt_handler(request, exc):
+    return JSONResponse(
+        status_code=401,
+        content={"success": False, "error": {"type": "JWTExpired", "message": "Token expired", "details": None}},
+    )
+
+@app.exception_handler(jwt.InvalidTokenError)
+async def invalid_jwt_handler(request, exc):
+    return JSONResponse(
+        status_code=401,
+        content={"success": False, "error": {"type": "JWTInvalid", "message": "Invalid token", "details": None}},
+    )
 
 @app.get("/")
 async def root():
@@ -146,14 +212,15 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8000"))
-    debug = os.getenv("DEBUG", "True").lower() == "true"
+    host = settings.API_HOST
+    port = int(settings.API_PORT)
+    debug = bool(settings.DEBUG)
     
     uvicorn.run(
         "main:app",
         host=host,
         port=port,
         reload=debug,
+        server_header=False,
     )
 

@@ -5,7 +5,6 @@ Visualize agent performance, patterns, and learning progress.
 """
 
 import streamlit as st
-import requests
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -20,6 +19,7 @@ sys.path.insert(0, str(dashboard_dir))
 
 from components.chat_assistant import render_chat_panel
 from components.auth_utils import require_auth
+from components.api_client import APIClient, display_api_error
 
 st.set_page_config(
     page_title="Agent Insights",
@@ -110,11 +110,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# API Configuration
-import os
-
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-
 # Header
 st.title("📊 Agent Insights Dashboard")
 st.markdown("""
@@ -124,13 +119,10 @@ Analyze agent performance, patterns, and learning progress over time
 """, unsafe_allow_html=True)
 
 # Check API connection
-try:
-    health_check = requests.get(f"{API_BASE_URL}/health", timeout=5)
-    if health_check.status_code != 200:
-        st.error("⚠️ Backend API is not responding. Please ensure the backend is running.")
-        st.stop()
-except:
-    st.error("❌ Cannot connect to backend API. Please start the backend with `python3 main.py`")
+api = APIClient()
+health = api.health_check()
+if not health.success:
+    display_api_error(health)
     st.stop()
 
 # Fetch data from API
@@ -138,9 +130,9 @@ except:
 def fetch_audit_data():
     """Fetch audit trail data"""
     try:
-        response = requests.get(f"{API_BASE_URL}/api/v1/audit/entries?limit=1000", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
+        resp = api.get("/api/v1/audit/entries", params={"limit": 1000}, timeout=10)
+        if resp.success:
+            data = resp.data or {}
             return data.get("entries", [])
         return []
     except Exception as e:
@@ -151,9 +143,9 @@ def fetch_audit_data():
 def fetch_feedback_data():
     """Fetch human feedback data"""
     try:
-        response = requests.get(f"{API_BASE_URL}/api/v1/feedback?limit=1000", timeout=10)
-        if response.status_code == 200:
-            return response.json()
+        resp = api.get("/api/v1/feedback", params={"limit": 1000}, timeout=10)
+        if resp.success:
+            return resp.data
         return []
     except Exception as e:
         st.error(f"Error fetching feedback data: {e}")
@@ -163,9 +155,9 @@ def fetch_feedback_data():
 def fetch_feedback_stats():
     """Fetch feedback statistics"""
     try:
-        response = requests.get(f"{API_BASE_URL}/api/v1/feedback/stats", timeout=10)
-        if response.status_code == 200:
-            return response.json()
+        resp = api.get("/api/v1/feedback/stats", timeout=10)
+        if resp.success:
+            return resp.data
         return {}
     except Exception as e:
         st.error(f"Error fetching feedback stats: {e}")

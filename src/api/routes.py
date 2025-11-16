@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from src.agent.openai_agent import ComplianceAgent
 from src.db.base import get_db
 from src.db.models import ComplianceQuery, ComplianceRule
+from src.auth.security import get_current_user
 
-router = APIRouter()
+router = APIRouter(tags=["Compliance API", "Protected"], dependencies=[Depends(get_current_user)])
 
 
 # Request/Response Models

@@ -1,3 +1,96 @@
+## AI Agentic Compliance Assistant
+
+An end‑to‑end demo that helps teams assess compliance tasks. The agent scores risk, recommends an action (proceed, review, escalate), and writes an auditable trail. It ships with a Streamlit dashboard, FastAPI backend, and a small “agentic” module for deeper analysis.
+
+Built to be readable, testable, and deployable—with enough sophistication to show real-world thinking without being over-engineered.
+
+---
+
+## Architecture (at a glance)
+
+```mermaid
+graph LR
+  UI[Streamlit Dashboard] --> API[FastAPI]
+  API --> Engine[Decision Engine + Agentic Analysis]
+  Engine --> DB[(SQLAlchemy ORM)]
+  API --> Audit[Audit Trail / Feedback]
+  subgraph External
+    OpenAI[OpenAI]
+  end
+  Engine --> OpenAI
+```
+
+---
+
+## How it works (short)
+- You describe a task and entity context in the dashboard.
+- The backend scores risk across a few factors and recommends: AUTONOMOUS, REVIEW_REQUIRED, or ESCALATE.
+- Every decision (and reasoning) is logged to an audit trail.
+- Optional “agentic” path runs a deeper, multi-step analysis for complex cases.
+
+---
+
+## Quick Start (5 steps)
+1) Clone and set up venv
+```bash
+git clone https://github.com/yourusername/agentic-compliance-agent.git
+cd agentic-compliance-agent
+python3 -m venv venv && source venv/bin/activate
+```
+2) Install deps
+```bash
+pip install -r requirements.txt
+pip install -r dashboard/requirements.txt
+```
+3) Configure environment
+```bash
+cp .env.example .env
+# set OPENAI_API_KEY and other values as needed
+```
+4) Initialize database (or run migrations)
+```bash
+make migrate
+```
+5) Start services
+```bash
+make start
+# Dashboard: http://localhost:8501  |  API: http://localhost:8000/health
+```
+
+---
+
+## Screenshots
+- Dashboard Home  
+  ![Dashboard Home](docs/screenshots/dashboard_home.png)
+- Analyze Task  
+  ![Task Analysis](docs/screenshots/analyze_task.png)
+- Audit Trail  
+  ![Audit Trail](docs/screenshots/audit_trail.png)
+
+---
+
+## Tech stack (short)
+- Backend: FastAPI, SQLAlchemy, Pydantic, Alembic
+- Frontend: Streamlit, Plotly, Pandas
+- AI: OpenAI (optional agentic module)
+- Infra/Other: Uvicorn, Makefile, Pytest, SlowAPI rate limiting
+
+---
+
+## Roadmap (practical)
+- Security: Harden auth flows, add RBAC, improve audit export controls
++- Data: Postgres option, better indexes, background jobs for heavy analysis
++- Agentic: Expand toolset, configurable iteration limits, memory persistence
++- UX: Inline explanations, keyboard-friendly forms, export presets
++- Ops: Dockerfile, CI checks, basic observability (metrics/logs)
+
+---
+
+## Contact
+- Nikita Walvekar
+- Email: walvekarn@gmail.com
+- LinkedIn: https://www.linkedin.com/in/nikitawalvekar
+- License: MIT (see LICENSE)
 <div align="center">
 
 # 🤖 AI Agentic Compliance Assistant

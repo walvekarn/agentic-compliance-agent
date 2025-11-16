@@ -1,6 +1,6 @@
 """API routes for the experimental agentic AI engine"""
 
-import os
+from src.config import settings
 import asyncio
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
@@ -17,8 +17,9 @@ from src.agentic_engine.testing.benchmark_runner import BenchmarkRunner
 from src.agentic_engine.testing.benchmark_cases import BenchmarkLevel
 from src.agentic_engine.testing.health_check import SystemHealthCheck
 from src.db.base import get_db
+from src.auth.security import get_current_user
 
-router = APIRouter(tags=["Agentic AI Engine"])
+router = APIRouter(tags=["Agentic AI Engine", "Protected"], dependencies=[Depends(get_current_user)])
 
 
 # Request/Response Models
@@ -396,7 +397,7 @@ async def get_agentic_engine_status():
         - Version: {version}
         - Phase: PHASE 2 Complete - PHASE 3 Pending
         - Components: Orchestrator, Agent Loop, Reasoning Engine, Tools
-        - OpenAI Available: {os.getenv("OPENAI_API_KEY") is not None}
+        - OpenAI Available: {settings.OPENAI_API_KEY is not None}
         
         Provide a brief status summary (2-3 sentences) focusing on system readiness and key capabilities.
         """
@@ -438,7 +439,7 @@ async def get_agentic_engine_status():
         "integration_complete": True,
             "architecture_hardened": True,
             "dependency_injection": True,
-            "openai_available": os.getenv("OPENAI_API_KEY") is not None,
+            "openai_available": settings.OPENAI_API_KEY is not None,
             "status_summary": status_summary,
         "next_steps": [
             "PHASE 3: Implement memory systems (EpisodicMemory, SemanticMemory)",

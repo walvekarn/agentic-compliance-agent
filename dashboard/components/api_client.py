@@ -1,263 +1,212 @@
 """
 API Client
 ==========
-Centralized API client with consistent error handling.
+Unified API client for Streamlit dashboard with:
+- Auth header injection
+- Auto-refresh on 401 (and logout on failure)
+- Retry with exponential backoff
+- Connection/timeout handling
+- Structured APIResponse
 """
 
+from typing import Dict, Any, Optional, Tuple, Union
+import time
 import requests
 import streamlit as st
-from typing import Dict, Any, Optional, Tuple
 from .constants import API_BASE_URL, API_TIMEOUT
+from .auth_utils import get_auth_headers, refresh_tokens_if_needed, logout
 
 
 class APIResponse:
     """Standardized API response wrapper"""
-    
-    def __init__(self, success: bool, data: Optional[Dict[str, Any]] = None, 
-                 error: Optional[str] = None, status_code: Optional[int] = None):
+    def __init__(
+        self,
+        success: bool,
+        data: Optional[Union[Dict[str, Any], list]] = None,
+        error: Optional[str] = None,
+        status_code: Optional[int] = None
+    ):
         self.success = success
         self.data = data
         self.error = error
         self.status_code = status_code
-    
+
     def __bool__(self):
         return self.success
 
 
 class APIClient:
-    """Centralized API client with consistent error handling"""
-    
-    def __init__(self, base_url: str = API_BASE_URL, timeout: int = API_TIMEOUT):
-        self.base_url = base_url
-        self.timeout = timeout
-    
-    def _get_error_message(self, status_code: int, response_text: str) -> str:
-        """Get user-friendly error message based on status code"""
-        error_messages = {
-            400: "❌ **Invalid Request**: The information provided couldn't be processed. Please check all fields.",
-            401: "🔐 **Authentication Error**: You need to be logged in to use this feature.",
-            403: "🚫 **Access Denied**: You don't have permission to perform this action.",
-            404: "🔍 **Not Found**: The requested resource doesn't exist.",
-            422: "❌ **Validation Error**: Some of the information you provided is invalid. Please review your entries.",
-            429: "⏱️ **Too Many Requests**: You're making requests too quickly. Please wait a moment and try again.",
-            500: "❌ **Server Error**: Something went wrong on our end. Please try again in a moment.",
-            502: "🔌 **Bad Gateway**: The server is having trouble connecting. Please try again.",
-            503: "🔧 **Service Unavailable**: The service is temporarily down. Please try again later.",
-            504: "⏱️ **Timeout**: The request took too long. Please try again.",
-        }
-        
-        return error_messages.get(status_code, f"❌ **Error {status_code}**: An unexpected error occurred.")
-    
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> APIResponse:
-        """Make HTTP request with error handling"""
-        url = f"{self.base_url}{endpoint}"
-        
-        # Use custom timeout if provided, otherwise use default
-        timeout = kwargs.pop('timeout', self.timeout)
-        
-        try:
-            response = requests.request(
-                method,
-                url,
-                timeout=timeout,
-                **kwargs
-            )
-            
-            # Success
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    return APIResponse(success=True, data=data, status_code=200)
-                except ValueError:
-                    return APIResponse(
-                        success=False,
-                        error="Server returned invalid JSON",
-                        status_code=response.status_code
-                    )
-            
-            # HTTP Error
-            error_msg = self._get_error_message(response.status_code, response.text)
-            return APIResponse(
-                success=False,
-                error=error_msg,
-                status_code=response.status_code
-            )
-        
-        except requests.exceptions.Timeout:
-            return APIResponse(
-                success=False,
-                error="⏱️ **Timeout**: The AI is taking too long to respond. Please try again.",
-                status_code=504
-            )
-        
-        except requests.exceptions.ConnectionError:
-            return APIResponse(
-                success=False,
-                error="🔌 **Connection Error**: Cannot connect to the backend. Is it running?\n\n💡 Start the backend with: `make start`",
-                status_code=None
-            )
-        
-        except Exception as e:
-            return APIResponse(
-                success=False,
-                error=f"❌ **Unexpected Error**: {str(e)}",
-                status_code=None
-            )
-    
-    def analyze_decision(self, payload: Dict[str, Any]) -> APIResponse:
-        """
-        Call decision analysis endpoint
-        
-        Args:
-            payload: Dictionary with 'entity' and 'task' keys
-            
-        Returns:
-            APIResponse with analysis result or error
-        """
-        return self._make_request(
-            "POST",
-            "/api/v1/decision/analyze",
-            json=payload
-        )
-    
-    def submit_feedback(self, payload: Dict[str, Any]) -> APIResponse:
-        """
-        Submit feedback to API
-        
-        Args:
-            payload: Feedback data dictionary
-            
-        Returns:
-            APIResponse indicating success or failure
-        """
-        return self._make_request(
-            "POST",
-            "/api/v1/feedback",
-            json=payload
-        )
-    
-    def get_audit_entries(self, limit: int = 100, **filters) -> APIResponse:
-        """
-        Get audit trail entries
-        
-        Args:
-            limit: Maximum number of entries
-            **filters: Additional query parameters
-            
-        Returns:
-            APIResponse with audit entries or error
-        """
-        params = {"limit": limit, **filters}
-        return self._make_request(
-            "GET",
-            "/api/v1/audit",
-            params=params
-        )
-    
-    def health_check(self) -> APIResponse:
-        """
-        Check if backend is healthy
-        
-        Returns:
-            APIResponse indicating backend health
-        """
-        return self._make_request("GET", "/health")
+    """Centralized API client with consistent auth, retries, and error handling."""
 
-    def post(self, endpoint: str, payload: Dict[str, Any], timeout: Optional[int] = None) -> APIResponse:
-        """
-        Make a POST request to the API
-        
-        Args:
-            endpoint: API endpoint (e.g., "/api/v1/agentic/analyze")
-            payload: Request payload dictionary
-            timeout: Optional timeout in seconds (overrides default)
-            
-        Returns:
-            APIResponse with result or error
-        """
-        kwargs = {"json": payload}
+    def __init__(self, base_url: str = API_BASE_URL, timeout: int = API_TIMEOUT, max_retries: int = 3, backoff_base: float = 0.4):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.backoff_base = backoff_base
+
+    def _build_url(self, endpoint: str) -> str:
+        if endpoint.startswith("http://") or endpoint.startswith("https://"):
+            return endpoint
+        if not endpoint.startswith("/"):
+            endpoint = f"/{endpoint}"
+        return f"{self.base_url}{endpoint}"
+
+    def _get_error_message(self, status_code: int, response_text: str) -> str:
+        error_messages = {
+            400: "❌ Invalid Request",
+            401: "🔐 Authentication Error",
+            403: "🚫 Access Denied",
+            404: "🔍 Not Found",
+            422: "❌ Validation Error",
+            429: "⏱️ Too Many Requests",
+            500: "❌ Server Error",
+            502: "🔌 Bad Gateway",
+            503: "🔧 Service Unavailable",
+            504: "⏱️ Timeout",
+        }
+        return error_messages.get(status_code, f"❌ Error {status_code}")
+
+    def _should_retry(self, method: str, status_code: Optional[int], exception: Optional[Exception]) -> bool:
+        if exception is not None:
+            return True  # connection issues/timeouts
+        if status_code is None:
+            return True
+        if status_code in (502, 503, 504, 429, 500):
+            return True
+        return False
+
+    def _sleep_backoff(self, attempt: int):
+        delay = self.backoff_base * (2 ** attempt)
+        time.sleep(min(delay, 5.0))
+
+    def _request_once(self, method: str, url: str, inject_auth: bool, timeout: int, **kwargs) -> requests.Response:
+        headers = kwargs.pop("headers", {}) or {}
+        if inject_auth:
+            headers = {**headers, **get_auth_headers()}
+        return requests.request(method, url, headers=headers, timeout=timeout, **kwargs)
+
+    def _make_request(self, method: str, endpoint: str, inject_auth: bool = True, **kwargs) -> APIResponse:
+        url = self._build_url(endpoint)
+        timeout = kwargs.pop("timeout", self.timeout)
+
+        # Attempt with retries
+        last_exception: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = self._request_once(method, url, inject_auth=inject_auth and not endpoint.startswith("/auth"), timeout=timeout, **kwargs)
+
+                # Attempt token refresh on 401 once (no retry loop explosion)
+                if resp.status_code == 401 and inject_auth and not endpoint.startswith("/auth"):
+                    if refresh_tokens_if_needed():
+                        # Retry the same request with fresh token (single immediate retry)
+                        resp = self._request_once(method, url, inject_auth=True, timeout=timeout, **kwargs)
+                    else:
+                        # Logout user safely if refresh fails
+                        logout()
+                        return APIResponse(success=False, error="🔐 Session expired. Please sign in again.", status_code=401)
+
+                # Successful JSON response
+                if 200 <= resp.status_code < 300:
+                    try:
+                        data = resp.json()
+                    except ValueError:
+                        data = None
+                    return APIResponse(success=True, data=data, status_code=resp.status_code)
+
+                # Non-success - possibly retry
+                if self._should_retry(method, resp.status_code, None) and attempt < self.max_retries:
+                    self._sleep_backoff(attempt)
+                    continue
+
+                # Return structured error
+                return APIResponse(
+                    success=False,
+                    error=self._get_error_message(resp.status_code, resp.text),
+                    status_code=resp.status_code
+                )
+
+            except requests.exceptions.Timeout as e:
+                last_exception = e
+                if attempt < self.max_retries:
+                    self._sleep_backoff(attempt)
+                    continue
+                return APIResponse(success=False, error="⏱️ Timeout", status_code=504)
+            except requests.exceptions.ConnectionError as e:
+                last_exception = e
+                if attempt < self.max_retries:
+                    self._sleep_backoff(attempt)
+                    continue
+                return APIResponse(success=False, error="Backend offline", status_code=None)
+            except Exception as e:
+                last_exception = e
+                break
+
+        return APIResponse(success=False, error=f"❌ Unexpected Error: {str(last_exception) if last_exception else 'Unknown'}", status_code=None)
+
+    # Convenience HTTP verbs
+    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> APIResponse:
+        kwargs: Dict[str, Any] = {}
+        if params:
+            kwargs["params"] = params
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return self._make_request("GET", endpoint, **kwargs)
+
+    def post(self, endpoint: str, payload: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> APIResponse:
+        kwargs: Dict[str, Any] = {}
+        if payload is not None:
+            kwargs["json"] = payload
         if timeout is not None:
             kwargs["timeout"] = timeout
         return self._make_request("POST", endpoint, **kwargs)
-    
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> APIResponse:
-        """
-        Make a GET request to the API
-        
-        Args:
-            endpoint: API endpoint (e.g., "/api/v1/agentic/status")
-            params: Optional query parameters
-            
-        Returns:
-            APIResponse with result or error
-        """
-        return self._make_request("GET", endpoint, params=params or {})
+
+    def put(self, endpoint: str, payload: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> APIResponse:
+        kwargs: Dict[str, Any] = {}
+        if payload is not None:
+            kwargs["json"] = payload
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return self._make_request("PUT", endpoint, **kwargs)
+
+    def delete(self, endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> APIResponse:
+        kwargs: Dict[str, Any] = {}
+        if params:
+            kwargs["params"] = params
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return self._make_request("DELETE", endpoint, **kwargs)
+
+    # Domain helpers
+    def analyze_decision(self, payload: Dict[str, Any]) -> APIResponse:
+        return self.post("/api/v1/decision/analyze", payload)
+
+    def submit_feedback(self, payload: Dict[str, Any]) -> APIResponse:
+        return self.post("/api/v1/feedback", payload)
+
+    def get_audit_entries(self, limit: int = 100, **filters) -> APIResponse:
+        params = {"limit": limit, **filters}
+        return self.get("/api/v1/audit/entries", params=params)
+
+    def health_check(self) -> APIResponse:
+        return self.get("/health")
 
 
 def parseAgenticResponse(response: APIResponse) -> Tuple[str, Optional[Dict[str, Any]], Optional[str], Optional[str]]:
-    """
-    Parse standardized agentic API response format.
-    
-    Handles response format: {status, results, error, timestamp}
-    Supports status values: "completed", "timeout", "error"
-    
-    Args:
-        response: APIResponse from agentic endpoint
-        
-    Returns:
-        Tuple of (status, results, error, timestamp):
-        - status: "completed", "timeout", "error", or None
-        - results: Results dict if available, None otherwise
-        - error: Error message if available, None otherwise
-        - timestamp: Timestamp string if available, None otherwise
-    """
     if not response or not response.success or not response.data:
         return None, None, response.error if response else "Unknown error", None
-    
-    data = response.data
-    
-    # Check if response follows standardized format
-    if not isinstance(data, dict):
-        return None, None, "Invalid response format", None
-    
-    # Extract standardized fields
-    status = data.get("status")  # "completed", "timeout", "error"
-    results = data.get("results")  # Results dict or None
-    error = data.get("error")  # Error message or None
-    timestamp = data.get("timestamp")  # ISO timestamp string or None
-    
-    # Validate status
+    data = response.data if isinstance(response.data, dict) else {}
+    status = data.get("status")
+    results = data.get("results")
+    error = data.get("error")
+    timestamp = data.get("timestamp")
     if status not in ["completed", "timeout", "error"]:
         return None, None, f"Invalid status: {status}", timestamp
-    
     return status, results, error, timestamp
 
 
 def display_api_error(response: APIResponse):
-    """Display standardized error message to user"""
-    st.error(response.error)
-    
-    if response.status_code in [400, 422]:
-        st.markdown("### What to do:")
-        st.markdown("1. 👀 **Review your entries** - Check all required fields marked with *")
-        st.markdown("2. 🔄 **Try again** - Click the submit button to resubmit")
-        st.info("💡 **Good news**: Your information has been saved - you won't need to re-enter it.")
-    
-    elif response.status_code == 504 or (response.error and "Timeout" in response.error):
-        st.markdown("### What to do:")
-        st.markdown("1. ⏱️ **Wait a moment** - The AI might be busy")
-        st.markdown("2. 🔄 **Try again** - Click the submit button to retry")
-        st.markdown("3. ✂️ **Simplify** - Try with a shorter task description")
-    
-    elif response.status_code is None and "Connection Error" in response.error:
-        st.markdown("### What to do:")
-        st.markdown("1. 🖥️ **Start the backend** - Run `make start` in your terminal")
-        st.markdown("2. ⏳ **Wait 10 seconds** - Let it fully start")
-        st.markdown("3. 🔄 **Refresh this page** - Press F5 or reload your browser")
-    
-    else:
-        st.markdown("### What to do:")
-        st.markdown("1. 🔄 **Try submitting again**")
-        st.markdown("2. 🌐 **Refresh if needed** - Press F5")
-        st.markdown("3. 📞 **Contact support** - If the issue persists")
+    if response and response.error == "Backend offline":
+        st.error("Backend offline")
+        return
+    st.error(response.error or "❌ Unknown error")
 

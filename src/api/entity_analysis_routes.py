@@ -17,8 +17,9 @@ from src.agent.risk_models import (
     TaskCategory
 )
 from src.db.base import get_db
+from src.auth.security import get_current_user
 
-router = APIRouter(tags=["Entity Analysis"])
+router = APIRouter(tags=["Entity Analysis", "Protected"], dependencies=[Depends(get_current_user)])
 
 
 # Request/Response Models
