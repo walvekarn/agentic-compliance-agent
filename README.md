@@ -1,96 +1,3 @@
-## AI Agentic Compliance Assistant
-
-An end‑to‑end demo that helps teams assess compliance tasks. The agent scores risk, recommends an action (proceed, review, escalate), and writes an auditable trail. It ships with a Streamlit dashboard, FastAPI backend, and a small “agentic” module for deeper analysis.
-
-Built to be readable, testable, and deployable—with enough sophistication to show real-world thinking without being over-engineered.
-
----
-
-## Architecture (at a glance)
-
-```mermaid
-graph LR
-  UI[Streamlit Dashboard] --> API[FastAPI]
-  API --> Engine[Decision Engine + Agentic Analysis]
-  Engine --> DB[(SQLAlchemy ORM)]
-  API --> Audit[Audit Trail / Feedback]
-  subgraph External
-    OpenAI[OpenAI]
-  end
-  Engine --> OpenAI
-```
-
----
-
-## How it works (short)
-- You describe a task and entity context in the dashboard.
-- The backend scores risk across a few factors and recommends: AUTONOMOUS, REVIEW_REQUIRED, or ESCALATE.
-- Every decision (and reasoning) is logged to an audit trail.
-- Optional “agentic” path runs a deeper, multi-step analysis for complex cases.
-
----
-
-## Quick Start (5 steps)
-1) Clone and set up venv
-```bash
-git clone https://github.com/yourusername/agentic-compliance-agent.git
-cd agentic-compliance-agent
-python3 -m venv venv && source venv/bin/activate
-```
-2) Install deps
-```bash
-pip install -r requirements.txt
-pip install -r dashboard/requirements.txt
-```
-3) Configure environment
-```bash
-cp .env.example .env
-# set OPENAI_API_KEY and other values as needed
-```
-4) Initialize database (or run migrations)
-```bash
-make migrate
-```
-5) Start services
-```bash
-make start
-# Dashboard: http://localhost:8501  |  API: http://localhost:8000/health
-```
-
----
-
-## Screenshots
-- Dashboard Home  
-  ![Dashboard Home](docs/screenshots/dashboard_home.png)
-- Analyze Task  
-  ![Task Analysis](docs/screenshots/analyze_task.png)
-- Audit Trail  
-  ![Audit Trail](docs/screenshots/audit_trail.png)
-
----
-
-## Tech stack (short)
-- Backend: FastAPI, SQLAlchemy, Pydantic, Alembic
-- Frontend: Streamlit, Plotly, Pandas
-- AI: OpenAI (optional agentic module)
-- Infra/Other: Uvicorn, Makefile, Pytest, SlowAPI rate limiting
-
----
-
-## Roadmap (practical)
-- Security: Harden auth flows, add RBAC, improve audit export controls
-+- Data: Postgres option, better indexes, background jobs for heavy analysis
-+- Agentic: Expand toolset, configurable iteration limits, memory persistence
-+- UX: Inline explanations, keyboard-friendly forms, export presets
-+- Ops: Dockerfile, CI checks, basic observability (metrics/logs)
-
----
-
-## Contact
-- Nikita Walvekar
-- Email: walvekarn@gmail.com
-- LinkedIn: https://www.linkedin.com/in/nikitawalvekar
-- License: MIT (see LICENSE)
 <div align="center">
 
 # 🤖 AI Agentic Compliance Assistant
@@ -132,16 +39,28 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 graph TB
     subgraph "User Interface Layer"
         USER[👤 User]
-        DASH[Streamlit Dashboard<br/>4 Pages + Chat]
+        DASH[Streamlit Dashboard<br/>9 Pages + Chat]
+        HOME[Home Dashboard]
+        ANALYZE[Analyze Task]
+        CALENDAR[Compliance Calendar]
+        AUDIT[Audit Trail]
+        INSIGHTS[Agent Insights]
+        AGENTIC[Agentic Analysis]
+        TEST[Test Suite]
+        RECOVERY[Error Recovery]
+        BENCHMARKS[Benchmarks]
     end
     
-    subgraph "API Gateway"
+    subgraph "API Gateway Layer"
         API[FastAPI Backend<br/>:8000]
-        AUTH[Request Validation<br/>Pydantic]
+        AUTH[JWT Authentication]
+        RATE[Rate Limiting]
+        CORS[CORS Middleware]
     end
     
     subgraph "Agentic Decision Engine"
-        ORCH[🤖 AI Agent<br/>Orchestrator]
+        ORCH[🤖 AI Orchestrator]
+        LOOP[Agent Loop<br/>Plan-Execute-Reflect]
         
         subgraph "6-Factor Risk Engine"
             R1[Jurisdiction 15%]
@@ -152,6 +71,10 @@ graph TB
             R6[Impact 10%]
         end
         
+        REASON[Reasoning Engine<br/>LLM-based]
+        TOOLS[Tool Registry<br/>Entity/Calendar/Task/HTTP]
+        MEMORY[Memory Store<br/>Episodic/Semantic]
+        
         DECISION[Decision Algorithm<br/>AUTONOMOUS | REVIEW | ESCALATE]
     end
     
@@ -160,11 +83,12 @@ graph TB
         FEED[🔄 Feedback Loop<br/>Learning System]
         PROACT[💡 Proactive Suggestions<br/>Predictive Alerts]
         COUNTER[🔍 Counterfactual<br/>What-If Analysis]
+        WHATIF[What-If Engine]
     end
     
     subgraph "External Services"
-        OPENAI[OpenAI API<br/>LangChain]
-        KB[Knowledge Base<br/>Regulations]
+        OPENAI[OpenAI API<br/>GPT-4o-mini]
+        MOCK[Mock Mode<br/>No API Key Required]
     end
     
     subgraph "Data Layer"
@@ -172,49 +96,132 @@ graph TB
         AUDIT[Audit Trail]
         ENTITIES[Entity History]
         FEEDBACK[Feedback Log]
+        MEMORY_DB[Memory Records]
     end
     
     USER --> DASH
+    DASH --> HOME & ANALYZE & CALENDAR & AUDIT & INSIGHTS & AGENTIC & TEST & RECOVERY & BENCHMARKS
     DASH --> API
-    API --> AUTH
+    API --> AUTH & RATE & CORS
+    
+    ORCH --> LOOP
+    LOOP --> REASON
+    REASON --> OPENAI
+    REASON --> MOCK
+    LOOP --> TOOLS
+    LOOP --> MEMORY
     
     ORCH --> R1 & R2 & R3 & R4 & R5 & R6
     R1 & R2 & R3 & R4 & R5 & R6 --> DECISION
     
-    ORCH --> MEM & FEED & PROACT & COUNTER
+    ORCH --> MEM & FEED & PROACT & COUNTER & WHATIF
     ORCH --> OPENAI
-    OPENAI --> KB
+    OPENAI --> MOCK
     
     DECISION --> AUDIT
     MEM --> ENTITIES
     FEED --> FEEDBACK
+    MEMORY --> MEMORY_DB
     
-    AUDIT & ENTITIES & FEEDBACK --> DB
+    AUDIT & ENTITIES & FEEDBACK & MEMORY_DB --> DB
     
     style ORCH fill:#4CAF50,stroke:#2E7D32,stroke-width:3px
+    style LOOP fill:#2196F3,stroke:#1565C0,stroke-width:2px
     style DECISION fill:#FF9800,stroke:#E65100,stroke-width:2px
     style DB fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px
-    style OPENAI fill:#2196F3,stroke:#1565C0,stroke-width:2px
+    style OPENAI fill:#00BCD4,stroke:#0097A7,stroke-width:2px
+    style MOCK fill:#FFC107,stroke:#F57C00,stroke-width:2px
 ```
 
-### Decision Flow
+### Agentic Workflow
 
+The system implements a sophisticated **Plan-Execute-Reflect** agentic loop:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard
+    participant API
+    participant Orchestrator
+    participant AgentLoop
+    participant ReasoningEngine
+    participant Tools
+    participant Memory
+    participant OpenAI
+
+    User->>Dashboard: Submit compliance task
+    Dashboard->>API: POST /api/v1/agentic/analyze
+    API->>Orchestrator: Initialize analysis
+    
+    Orchestrator->>AgentLoop: Start execution
+    AgentLoop->>ReasoningEngine: Generate plan (3-7 steps)
+    
+    alt Mock Mode (No API Key)
+        ReasoningEngine-->>AgentLoop: Return mock plan
+    else Real Mode (API Key Present)
+        ReasoningEngine->>OpenAI: LLM planning request
+        OpenAI-->>ReasoningEngine: JSON plan steps
+        ReasoningEngine-->>AgentLoop: Validated plan
+    end
+    
+    loop For each plan step
+        AgentLoop->>Tools: Execute step with tools
+        Tools-->>AgentLoop: Step results
+        
+        AgentLoop->>ReasoningEngine: Reflect on step quality
+        alt Mock Mode
+            ReasoningEngine-->>AgentLoop: Mock reflection scores
+        else Real Mode
+            ReasoningEngine->>OpenAI: Reflection request
+            OpenAI-->>ReasoningEngine: Quality assessment
+            ReasoningEngine-->>AgentLoop: Reflection results
+        end
+        
+        alt Quality < 0.75
+            AgentLoop->>ReasoningEngine: Replan step
+            ReasoningEngine-->>AgentLoop: Revised plan
+        end
+    end
+    
+    AgentLoop->>Memory: Store execution context
+    AgentLoop->>Orchestrator: Final results
+    Orchestrator->>API: Complete analysis
+    API->>Dashboard: Response with plan, outputs, reflection
+    Dashboard->>User: Display results
 ```
-1. Input → Entity context + compliance task
-2. Memory Lookup → Load entity history & risk profile
-3. Risk Analysis → 6-factor weighted assessment
-4. AI Reasoning → OpenAI generates recommendations
-5. Decision → AUTONOMOUS (< 0.4) | REVIEW (0.4-0.7) | ESCALATE (> 0.7)
-6. Proactive Check → Generate preventive suggestions
-7. Audit Log → Store complete reasoning chain
-8. Feedback Loop → Learn from human corrections
-```
+
+**Key Workflow Steps:**
+
+1. **Planning Phase**
+   - LLM breaks task into 3-7 strategic steps
+   - Each step includes description, rationale, expected outcome
+   - Tool suggestions for each step
+
+2. **Execution Phase**
+   - Execute each step sequentially
+   - Use tools (Entity, Calendar, Task, HTTP) as needed
+   - Collect outputs and findings
+
+3. **Reflection Phase**
+   - Evaluate step quality (correctness, completeness)
+   - Detect hallucinations and missing data
+   - Generate improvement suggestions
+
+4. **Replanning (if needed)**
+   - If quality score < 0.75, replan the step
+   - Iterate until quality threshold met or max steps reached
+
+5. **Final Output**
+   - Complete plan (original + revisions)
+   - All tool outputs
+   - Reflection summaries
+   - Risk assessment
+   - Final recommendation
+   - Audit-ready JSON
 
 ---
 
 ## ✨ Core Agentic Features
-
-The system implements **five advanced agentic AI capabilities** that enable autonomous operation with human oversight:
 
 ### 1. 🎯 6-Factor Risk Assessment Engine
 
@@ -234,41 +241,27 @@ Evaluates compliance tasks across six weighted dimensions to determine autonomy 
 - Risk 0.4-0.7 → **REVIEW_REQUIRED** ⚠️ (Human approval needed)
 - Risk > 0.7 → **ESCALATE** 🚨 (Expert involvement required)
 
----
-
 ### 2. 🧠 Entity Memory System
 
 Maintains persistent memory of every organization's compliance journey:
-
 - **Compliance History** — All past decisions and outcomes
 - **Violation Records** — Previous failures with remediation tracking
 - **Risk Evolution** — Score progression over time
 - **Trend Analysis** — Improving vs. declining compliance patterns
 - **Personalized Adjustments** — Entity-specific risk calibration
 
-**Impact:** Decisions become increasingly accurate with each interaction.
-
----
-
 ### 3. 🔄 Human Feedback Loop
 
 Continuous learning mechanism that improves from human corrections:
-
 - **Decision Overrides** — Track when humans change AI decisions
 - **Factor Corrections** — Capture specific risk factor adjustments
 - **Pattern Recognition** — Identify systematic assessment gaps
 - **Threshold Tuning** — Auto-adjust autonomy thresholds based on accuracy
-- **Learning Velocity** — Measure improvement rate
-
-**Results:** Override rate decreased from 15% → 3% in 90 days during testing.
-
----
+- **Memory Updates** — Store feedback for future reference
 
 ### 4. 💡 Proactive Suggestion Engine
 
 Shifts compliance from reactive to predictive:
-
-**Suggestion Types:**
 
 | Type | Trigger | Example |
 |------|---------|---------|
@@ -276,54 +269,23 @@ Shifts compliance from reactive to predictive:
 | **Regulatory Changes** | New law published | "GDPR amendments effective March 2025" |
 | **Risk Patterns** | Multiple similar incidents | "3 data breaches in 30 days - suggest training" |
 | **Preventive Actions** | Rising risk trend | "Entity risk up 25% - schedule audit" |
+| **Violations** | Recent violations detected | "2 violations in 60 days - escalate review" |
 
-**Value:** Prevents issues before they occur, reduces reactive workload.
-
----
-
-### 5. 🔍 Counterfactual Reasoning
+### 5. 🔍 Counterfactual Reasoning (What-If Analysis)
 
 Generates "what-if" scenarios to explain decision boundaries:
+- **Factor Deltas** — Shows how changing one factor affects the score
+- **Decision Boundaries** — Identifies threshold values that change decisions
+- **Scenario Comparison** — Compare multiple scenarios side-by-side
+- **Transparency** — Explains why decisions were made
 
-**Examples:**
-- "What if employee count was 10,000 instead of 50?" → Decision changes from AUTONOMOUS to REVIEW
-- "What if jurisdiction included EU regulations?" → Triggers multi-jurisdictional complexity
-- "What if entity had 2 previous violations?" → Escalates to ESCALATE
-
-**Purpose:** Transparency, education, decision robustness testing, auditor explanations.
-
----
-
-## 🛠️ Tech Stack
-
-### Backend
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Python** | 3.11+ | Core language with modern type hints |
-| **FastAPI** | 0.104+ | Async REST API with auto-documentation |
-| **LangChain** | 0.3+ | LLM orchestration and prompt management |
-| **OpenAI API** | 1.10+ | GPT-4o-mini for AI reasoning |
-| **SQLAlchemy** | 2.0+ | Database ORM with async support |
-| **Pydantic** | 2.7+ | Data validation and settings |
-| **Uvicorn** | 0.24+ | ASGI server for production |
-
-### Frontend
-
-| Technology | Purpose |
-|------------|---------|
-| **Streamlit** | Business dashboard framework |
-| **Pandas** | Data manipulation and analytics |
-| **Plotly** | Interactive charts and visualizations |
-
-### Testing & DevOps
-
-| Tool | Purpose |
-|------|---------|
-| **Pytest** | Test framework (84 tests, 90%+ coverage) |
-| **Black** | Code formatting (PEP 8) |
-| **MyPy** | Static type checking |
-| **Make** | Build automation |
+**Example:**
+```
+Original: Small startup (50 employees) → AUTONOMOUS (score: 0.35)
+What-If: "What if 10,000 employees?"
+Result: REVIEW_REQUIRED (score: 0.65)
+Changed Factors: [regulatory_oversight +0.3, impact_severity +0.2]
+```
 
 ---
 
@@ -332,7 +294,7 @@ Generates "what-if" scenarios to explain decision boundaries:
 ### Prerequisites
 
 - **Python 3.11 or higher** ([Download](https://www.python.org/downloads/))
-- **OpenAI API key** ([Get one here](https://platform.openai.com/api-keys))
+- **OpenAI API key** (optional - system works in mock mode without it)
 - **Terminal/Command Prompt** access
 - **10 minutes** of your time
 
@@ -357,11 +319,8 @@ venv\Scripts\activate     # On Windows
 #### Step 2: Install Dependencies
 
 ```bash
-# Install backend dependencies
+# Install dependencies
 pip install -r requirements.txt
-
-# Install dashboard dependencies
-pip install -r dashboard/requirements.txt
 ```
 
 #### Step 3: Configure Environment Variables
@@ -370,46 +329,21 @@ pip install -r dashboard/requirements.txt
 # Copy example environment file
 cp .env.example .env
 
-# Edit .env and add your OpenAI API key
+# Edit .env and add your OpenAI API key (optional)
 # Use any text editor:
 nano .env  # or vim, notepad, VS Code, etc.
 
-# Add this line to .env:
+# Add this line to .env (optional - system works without it):
 OPENAI_API_KEY=sk-proj-your-actual-key-here
 ```
 
-**Important:** Replace `sk-proj-your-actual-key-here` with your real OpenAI API key!
-
-##### 🧪 Agentic System (Experimental) - Additional Configuration
-
-If you want to use the **experimental agentic AI engine** (Option A - Advanced Reasoning), add these additional environment variables to your `.env` file:
-
-```bash
-# Agentic System Configuration (Experimental)
-OPENAI_API_KEY=sk-proj-your-actual-key-here
-OPENAI_MODEL=gpt-4o-mini
-BACKEND_URL=http://localhost:8000
-```
-
-**Note:** The agentic system requires:
-- ✅ Valid OpenAI API key
-- ✅ OpenAI model specification (default: `gpt-4o-mini`)
-- ✅ Backend URL for API communication
-
-**Status:** PHASE 2 complete (implementation + integration), PHASE 3 pending (memory + scoring extensions)
+**Note:** The system works in **mock mode** without an API key for testing and demos. Real API key enables full LLM-powered agentic features.
 
 #### Step 4: Initialize Database
 
 ```bash
-python scripts/setup_database.py
-```
-
-**Expected output:**
-```
-📊 Setting up database...
-✅ Database tables created successfully
-📁 Database location: sqlite:///compliance.db
-📋 Created tables: audit_trail, entity_history, feedback_log
+# Database will auto-initialize on first run, or manually:
+python -c "from src.db.base import Base, engine; from src.db import models; Base.metadata.create_all(bind=engine)"
 ```
 
 #### Step 5: Start the System
@@ -423,12 +357,14 @@ make start
 
 Terminal 1 - Backend:
 ```bash
-uvicorn main:app --port 8000
+cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
+uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Terminal 2 - Dashboard:
 ```bash
-streamlit run dashboard/Home.py
+cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
+streamlit run dashboard/Home.py --server.port 8501
 ```
 
 ### ✅ Verify Installation
@@ -437,29 +373,42 @@ streamlit run dashboard/Home.py
    ```bash
    curl http://localhost:8000/health
    ```
-   Should return: `{"status":"healthy","version":"1.0.0"}`
+   Should return:
+   ```json
+   {
+     "status": "healthy",
+     "version": "1.0.0",
+     "timestamp": "2025-01-XX...",
+     "components": {
+       "database": {"status": "healthy", "type": "sqlite"},
+       "openai": {"status": "not_configured", "key_present": false, "note": "Agentic features will use mock mode"},
+       "auth": {"status": "development_mode", "warning": "Using default JWT secret"}
+     }
+   }
+   ```
 
 2. **Open Dashboard:**
    Navigate to http://localhost:8501 in your browser
 
 3. **Login:**
-   Password: `demo123`
+   - Default credentials: `demo123` (or check your auth configuration)
 
 4. **Run Tests (Optional):**
    ```bash
    pytest -v
    ```
-   Should show: `84 passed`
+   Should show: `84+ passed`
 
-### 🎯 Quick Test Drive (2 minutes)
+### 🎯 Quick Demo (2 minutes)
 
 1. **Login** with password `demo123`
-2. Click **"Check One Task"**
-3. Fill out a simple form:
+2. Click **"Analyze Task"** in the sidebar
+3. Fill out the form:
    - Entity: "Test Company"
    - Type: "Private Company"
    - Industry: "Technology"
    - Employee count: 50
+   - Task: "Review privacy policy for GDPR compliance"
 4. Click **"Analyze Task"**
 5. See AI decision in seconds! ✨
 
@@ -469,678 +418,346 @@ streamlit run dashboard/Home.py
 - **🔌 Backend API:** http://localhost:8000
 - **📚 Interactive API Docs:** http://localhost:8000/docs
 - **📖 API Reference:** http://localhost:8000/redoc
-- **🔐 Login Password:** `demo123`
-
-### 📝 Quick Commands
-
-```bash
-# Start services
-make start          # Start both backend and dashboard
-make backend        # Start FastAPI backend only
-make dashboard      # Start Streamlit dashboard only
-
-# Development
-make test           # Run full test suite (84 tests)
-make test-cov       # Run tests with coverage report
-make clean          # Clean cache and artifacts
-
-# Maintenance
-make kill           # Stop all services
-make db-reset       # Reset database
-make help           # Show all available commands
-```
-
-### 🆘 Quick Troubleshooting
-
-**Backend won't start?**
-```bash
-# Check if port 8000 is already in use
-lsof -i :8000  # macOS/Linux
-netstat -ano | findstr :8000  # Windows
-
-# Try a different port
-uvicorn main:app --port 8001
-```
-
-**Dashboard shows "Cannot connect to backend"?**
-- Ensure backend is running (check Terminal 1)
-- Verify backend at http://localhost:8000/health
-- Check firewall isn't blocking port 8000
-
-**Import errors?**
-```bash
-# Reinstall dependencies
-pip install -r requirements.txt --force-reinstall
-```
-
-**Tests failing?**
-```bash
-# Clean and retry
-make clean
-pytest --cache-clear -v
-```
-
-**Still stuck?** See full troubleshooting guide below ⬇️
+- **🔐 Login Password:** `demo123` (default)
 
 ---
 
 ## 📸 Screenshots
 
 ### Dashboard Home
-> *Main interface with 4 action cards and real-time system status*
+> *Main interface with system status, activity metrics, and quick actions*
 
 ![Dashboard Home](docs/screenshots/dashboard_home.png)
-
----
 
 ### Task Analysis Interface
 > *Form-based compliance task analysis with instant AI risk assessment*
 
 ![Task Analysis](docs/screenshots/analyze_task.png)
 
----
-
 ### Audit Trail Viewer
 > *Complete decision history with filtering and export capabilities*
 
 ![Audit Trail](docs/screenshots/audit_trail.png)
-
----
 
 ### Agent Insights Dashboard
 > *Analytics and performance metrics with interactive charts*
 
 ![Agent Insights](docs/screenshots/agent_insights.png)
 
----
+### Agentic Analysis
+> *Advanced agentic AI analysis with plan-execute-reflect workflow*
 
-## 📁 Project Structure
-
-```
-agentic-compliance-agent/
-├── 📄 README.md                      # This file
-├── 📄 LICENSE                        # MIT License
-├── 📄 requirements.txt               # Python dependencies
-├── 📄 Makefile                       # Build automation
-├── 📄 main.py                        # FastAPI application entry
-├── 📄 pytest.ini                     # Pytest configuration
-│
-├── 📂 src/                           # Core application source
-│   ├── config.py                     # Configuration management
-│   │
-│   ├── 📂 agent/                     # AI agent & decision logic
-│   │   ├── openai_agent.py           # OpenAI API orchestration
-│   │   ├── decision_engine.py        # 6-factor risk assessment
-│   │   ├── entity_analyzer.py        # Entity memory system
-│   │   ├── jurisdiction_analyzer.py  # Multi-jurisdiction support
-│   │   ├── proactive_suggestions.py  # Predictive recommendations
-│   │   ├── audit_service.py          # Audit trail logging
-│   │   └── risk_models.py            # Risk scoring algorithms
-│   │
-│   ├── 📂 🧪 agentic_engine/         # Experimental agentic AI system
-│   │   ├── orchestrator.py           # Main orchestrator
-│   │   ├── agent_loop.py             # Plan-execute-reflect loop
-│   │   ├── 📂 reasoning/             # Reasoning components
-│   │   │   ├── reasoning_engine.py   # Core reasoning logic
-│   │   │   └── 📂 prompts/           # AI prompts
-│   │   ├── 📂 tools/                 # Tool integrations
-│   │   │   ├── http_tool.py          # HTTP requests
-│   │   │   ├── calendar_tool.py      # Calendar management
-│   │   │   ├── entity_tool.py        # Entity analysis
-│   │   │   └── task_tool.py          # Task management
-│   │   ├── 📂 scoring/               # Quality scoring
-│   │   │   └── score_assistant.py    # Evaluation logic
-│   │   └── 📂 memory/                # Memory systems
-│   │       ├── memory_store.py       # Central storage
-│   │       ├── episodic_memory.py    # Event memories
-│   │       └── semantic_memory.py    # Knowledge base
-│   │
-│   ├── 📂 api/                       # FastAPI routes
-│   │   ├── routes.py                 # Main router
-│   │   ├── decision_routes.py        # Decision endpoints
-│   │   ├── entity_analysis_routes.py # Entity management
-│   │   ├── audit_routes.py           # Audit endpoints
-│   │   ├── feedback_routes.py        # Feedback endpoints
-│   │   └── agentic_routes.py         # 🧪 Agentic AI endpoints
-│   │
-│   ├── 📂 db/                        # Database layer
-│   │   ├── base.py                   # SQLAlchemy setup
-│   │   └── models.py                 # Data models
-│   │
-│   └── 📂 tests/                     # Test suite (90%+ coverage)
-│       ├── conftest.py               # Pytest fixtures
-│       ├── test_agent.py
-│       ├── test_decision_engine.py
-│       ├── test_audit_trail.py
-│       └── ... (9 test files total)
-│
-├── 📂 dashboard/                     # Streamlit UI
-│   ├── Home.py                       # Dashboard entry point
-│   ├── requirements.txt
-│   │
-│   ├── 📂 pages/                     # Multi-page app
-│   │   ├── 1_Analyze_Task.py         # Task analysis
-│   │   ├── 2_Compliance_Calendar.py  # Calendar generator
-│   │   ├── 3_Audit_Trail.py          # Audit viewer
-│   │   ├── 4_Agent_Insights.py       # Analytics
-│   │   └── 5_Agentic_Analysis.py     # 🧪 Experimental agentic AI
-│   │
-│   └── 📂 components/                # Reusable components
-│       └── chat_assistant.py         # AI chat interface
-│
-├── 📂 scripts/                       # Utility scripts
-│   ├── setup_database.py             # DB initialization
-│   ├── create_sample_data.py         # Demo data
-│   └── verify_setup.py               # Validation
-│
-├── 📂 examples/                      # Usage examples
-│   ├── decision_analysis_example.py
-│   ├── entity_analysis_example.py
-│   └── audit_trail_example.py
-│
-└── 📂 docs/                          # Documentation
-    ├── 📂 core/                      # Concepts & terminology
-    ├── 📂 architecture/              # System design
-    ├── 📂 release/                   # Release notes
-    ├── 📂 guides/                    # User guides
-    └── 📂 screenshots/               # README assets
-```
+![Agentic Analysis](docs/screenshots/agentic_analysis.png)
 
 ---
 
-## 🔌 API Endpoints Overview
+## 🔌 API Endpoints
+
+### Authentication
+
+```
+POST   /auth/login              # User login
+POST   /auth/register           # User registration (if enabled)
+POST   /auth/refresh            # Refresh JWT token
+GET    /auth/me                 # Get current user info
+```
 
 ### Decision Analysis
 
 ```
-POST   /api/v1/decision/analyze        # Analyze single task
-POST   /api/v1/decision/batch-analyze  # Batch analysis
-POST   /api/v1/decision/quick-check    # Fast risk check
-GET    /api/v1/decision/risk-levels    # Risk information
+POST   /api/v1/decision/analyze           # Analyze single compliance task
+POST   /api/v1/decision/batch-analyze     # Batch analysis (multiple tasks)
+POST   /api/v1/decision/quick-check        # Fast risk check (lightweight)
+GET    /api/v1/decision/risk-levels       # Get risk level information
+POST   /api/v1/decision/what-if           # What-if scenario analysis
+POST   /api/v1/decision/what-if/compare   # Compare multiple scenarios
+POST   /api/v1/decision/triggers/check    # Check proactive suggestion triggers
 ```
 
-### 🧪 Agentic AI Engine (Experimental)
+### Agentic AI Engine
 
 ```
-POST   /api/v1/agentic/analyze         # Advanced agentic analysis with plan-execute-reflect
-GET    /api/v1/agentic/status          # Agentic engine status and phase info
+POST   /api/v1/agentic/analyze            # Advanced agentic analysis (plan-execute-reflect)
+GET    /api/v1/agentic/status            # Agentic engine status and configuration
+GET    /api/v1/agentic/health/full        # Comprehensive health check
+POST   /api/v1/agentic/testSuite          # Run test suite
+POST   /api/v1/agentic/benchmarks        # Run benchmark suite
+POST   /api/v1/agentic/recovery           # Error recovery simulation
 ```
 
-**Features:**
+**Agentic Analysis Features:**
 - 🎯 Strategic task planning (3-7 steps)
-- ⚙️ Tool-augmented execution
+- ⚙️ Tool-augmented execution (Entity, Calendar, Task, HTTP)
 - 🔍 Quality reflection and iteration
-- 🧠 Memory systems (PHASE 3)
+- 🧠 Memory systems integration
 - 💡 Transparent reasoning chains
+- 🔄 Replanning on low quality scores
 
 ### Entity Management
 
 ```
-POST   /api/v1/entity/analyze          # Analyze entity + generate calendar
-GET    /api/v1/entity/history/{id}     # Entity compliance history
-GET    /api/v1/entity/risk-profile/{id}# Current risk profile
+POST   /api/v1/entity/analyze             # Analyze entity + generate compliance calendar
+GET    /api/v1/entity/history/{entity}     # Entity compliance history
+GET    /api/v1/audit_log/{task_id}        # Get audit log for specific task
 ```
 
 ### Audit Trail
 
 ```
-GET    /api/v1/audit/recent            # Recent audit entries
-GET    /api/v1/audit/entries           # Filtered entries
-GET    /api/v1/audit/export/json       # Export audit trail
-GET    /api/v1/audit/statistics        # Audit statistics
+GET    /api/v1/audit/entries              # Get audit entries (with filters)
+GET    /api/v1/audit/entries/{audit_id}   # Get specific audit entry
+GET    /api/v1/audit/statistics           # Audit statistics and metrics
+GET    /api/v1/audit/export/json          # Export audit trail as JSON
+GET    /api/v1/audit/filters              # Get available filter options
+GET    /api/v1/audit/recent               # Get recent audit entries
+GET    /api/v1/audit/entity/{entity_name} # Get audit entries for entity
 ```
+
+**Filter Parameters:**
+- `limit`, `offset` - Pagination
+- `agent_type` - Filter by agent type
+- `entity_name` - Filter by entity
+- `decision_outcome` - Filter by decision (AUTONOMOUS/REVIEW_REQUIRED/ESCALATE)
+- `risk_level` - Filter by risk (LOW/MEDIUM/HIGH)
+- `task_category` - Filter by task category
+- `start_date`, `end_date` - Date range filter
 
 ### Feedback & Learning
 
 ```
-POST   /api/v1/feedback/submit         # Submit decision feedback
-GET    /api/v1/feedback/corrections    # View corrections
-GET    /api/v1/feedback/patterns       # Learning patterns
+POST   /api/v1/feedback                    # Submit decision feedback
+GET    /api/v1/feedback                    # Get all feedback entries
+GET    /api/v1/feedback/stats              # Feedback statistics
+GET    /api/v1/feedback/{feedback_id}      # Get specific feedback entry
+GET    /api/v1/feedback/overrides          # Get override tracking statistics
+```
+
+### Compliance Chat
+
+```
+POST   /api/v1/query                       # Natural language compliance query
+GET    /api/v1/queries                     # Get query history
+POST   /api/v1/rules                       # Add compliance rule
+GET    /api/v1/rules                       # Get all rules
+GET    /api/v1/rules/{rule_id}             # Get specific rule
 ```
 
 ### System
 
 ```
-GET    /health                         # Health check
-GET    /docs                           # Swagger UI
-GET    /redoc                          # ReDoc
+GET    /health                             # Health check (basic)
+GET    /docs                               # Swagger UI (interactive API docs)
+GET    /redoc                              # ReDoc (alternative API docs)
 ```
 
-**Interactive Documentation:** Visit http://localhost:8000/docs for full API playground
+**Interactive Documentation:** Visit http://localhost:8000/docs for full API playground with request/response examples.
 
 ---
 
-## 🧠 Core Intelligence Features
+## 🧪 Demo Instructions
 
-### 1. Intelligent Risk Assessment
+### Basic Demo (5 minutes)
 
-The **6-factor weighted model** evaluates:
-- Jurisdiction complexity (15%)
-- Entity risk profile (15%)
-- Task complexity (20%)
-- Data sensitivity (20%)
-- Regulatory oversight (20%)
-- Impact severity (10%)
+**Goal:** Show core risk assessment and decision-making
 
-**Example Calculation:**
-```python
-Risk Score = (0.20 × 0.15) + (0.15 × 0.15) + (0.10 × 0.20) + 
-             (0.10 × 0.20) + (0.20 × 0.20) + (0.10 × 0.10)
-           = 0.1425 → AUTONOMOUS ✅
-```
+1. **Start System**
+   ```bash
+   make start
+   ```
 
----
+2. **Navigate to Dashboard**
+   - Open http://localhost:8501
+   - Login with `demo123`
 
-### 2. Persistent Memory
+3. **Analyze a Simple Task**
+   - Go to "Analyze Task" page
+   - Enter:
+     - Entity: "Demo Corp"
+     - Type: "Private Company"
+     - Industry: "Technology"
+     - Employees: 50
+     - Task: "Review privacy policy"
+   - Click "Analyze Task"
+   - **Show:** Risk score, decision, rationale
 
-Every entity interaction creates/updates a memory record:
+4. **View Audit Trail**
+   - Go to "Audit Trail" page
+   - **Show:** Complete decision history
+   - Filter by entity or decision type
 
-```json
-{
-  "entity_id": "tech_corp_123",
-  "first_seen": "2024-01-15",
-  "interactions": 47,
-  "decisions": {
-    "autonomous": 35,
-    "review": 10,
-    "escalate": 2
-  },
-  "risk_evolution": [
-    {"date": "2024-01", "score": 0.35},
-    {"date": "2025-01", "score": 0.42}
-  ],
-  "trajectory": "IMPROVING"
-}
-```
+5. **Check Agent Insights**
+   - Go to "Agent Insights" page
+   - **Show:** Analytics, charts, metrics
 
----
+### Advanced Demo (10 minutes)
 
-### 3. Learning from Feedback
+**Goal:** Show agentic AI capabilities
 
-Human reviewers can correct AI decisions:
+1. **Agentic Analysis**
+   - Go to "Agentic Analysis" page
+   - Enter same task as above
+   - Click "Run Agentic Analysis"
+   - **Show:**
+     - Plan generation (3-7 steps)
+     - Tool execution
+     - Reflection scores
+     - Final recommendation
 
-```json
-{
-  "original_decision": "AUTONOMOUS",
-  "correct_decision": "REVIEW_REQUIRED",
-  "reason": "Underestimated stakeholder impact",
-  "factor_corrections": {
-    "impact_severity": {
-      "ai_score": 0.30,
-      "correct_score": 0.70
-    }
-  }
-}
-```
+2. **What-If Analysis**
+   - Go to "Analyze Task" page
+   - After analysis, use "What-If" feature
+   - Change employee count from 50 to 10,000
+   - **Show:** How decision changes
 
-System learns and improves accuracy over time.
+3. **Proactive Suggestions**
+   - Go to "Compliance Calendar" page
+   - Analyze an entity with multiple jurisdictions
+   - **Show:** Proactive deadline alerts
 
----
+4. **Feedback Loop**
+   - Go to "Analyze Task" page
+   - After analysis, provide feedback
+   - **Show:** How feedback updates memory
 
-### 4. Proactive Intelligence
+### Mock Mode Demo (No API Key Required)
 
-**Deadline Alert Example:**
-```json
-{
-  "type": "UPCOMING_DEADLINE",
-  "priority": "HIGH",
-  "deadline": "2025-02-15",
-  "days_remaining": 14,
-  "message": "SOX 404 internal controls assessment due in 14 days",
-  "actions": [
-    "Schedule management review",
-    "Prepare documentation",
-    "Engage external auditors"
-  ]
-}
-```
+The system works in **mock mode** without an OpenAI API key:
 
----
+1. **Start without API key**
+   ```bash
+   # Don't set OPENAI_API_KEY in .env
+   make start
+   ```
 
-### 5. Counterfactual Explanations
+2. **Run Agentic Analysis**
+   - System uses mock responses
+   - Shows complete workflow
+   - Demonstrates architecture
 
-**What-If Analysis:**
-```
-Original: Small startup (50 employees) → AUTONOMOUS
-Counterfactual: "What if 10,000 employees?"
-Result: REVIEW_REQUIRED (regulatory oversight triggered)
-Changed Factors: [regulatory_oversight +0.3, impact_severity +0.2]
-```
+3. **Benefits:**
+   - No API costs
+   - Fast execution
+   - Perfect for demos
+   - Shows system architecture
 
 ---
 
-## 🧪 Testing
+## ⚠️ Disclaimers
 
-Comprehensive test suite with 84%+ coverage:
+### MVP Scope
 
-```bash
-# Run all tests
-pytest -v
+This is a **Minimum Viable Product (MVP)** with the following scope:
 
-# Run with coverage report
-pytest --cov=src --cov-report=html
+**✅ Included:**
+- Core 6-factor risk assessment engine
+- Basic agentic AI workflow (plan-execute-reflect)
+- Entity memory system
+- Human feedback loop
+- Proactive suggestions
+- What-if analysis
+- Complete audit trail
+- Streamlit dashboard (9 pages)
+- FastAPI backend with JWT auth
+- SQLite database (PostgreSQL-ready)
+- Comprehensive test suite (90%+ coverage)
+- Mock mode for testing without API key
 
-# Run specific test category
-pytest src/tests/test_decision_engine.py -v
+**❌ Not Included (Future Roadmap):**
+- Production-grade security hardening
+- Role-based access control (RBAC)
+- Multi-tenant architecture
+- Advanced memory persistence
+- Fine-tuned compliance models
+- Document upload/analysis
+- Third-party integrations (Slack, Teams, etc.)
+- Email notifications
+- Calendar sync
+- Docker containerization
+- CI/CD pipelines
+- Advanced observability (metrics, tracing)
 
-# Run dashboard tests
-python3 tests/test_auth_module.py
-python3 tests/test_chat_assistant.py
-python3 tests/test_dashboard_pages.py
+### Security Notice
 
-# View coverage report
-open htmlcov/index.html  # macOS
-```
+**⚠️ This is a demonstration/portfolio project.**
 
-**Test Statistics:**
-- **84 automated tests**
-- **84% code coverage**
-- **Decision engine:** 96% coverage
-- **Audit service:** 95% coverage
-- **Risk models:** 99% coverage
-- **Average execution:** <4 seconds
-- **Pass rate:** 100%
+**Current Security Status:**
+- ✅ JWT authentication implemented
+- ✅ Password hashing (bcrypt)
+- ✅ Rate limiting (SlowAPI)
+- ✅ CORS configuration
+- ⚠️ Default JWT secret (change in production)
+- ⚠️ No RBAC (all users have same permissions)
+- ⚠️ No input sanitization for all endpoints
+- ⚠️ No API key rotation
+- ⚠️ No audit log encryption
 
-**Complete Testing Guide:** See [TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md) for comprehensive verification steps.
+**For Production Use:**
+1. Change all default secrets
+2. Implement RBAC
+3. Add input validation/sanitization
+4. Enable audit log encryption
+5. Set up proper secret management
+6. Add API key rotation
+7. Implement rate limiting per user
+8. Add security headers
+9. Enable HTTPS only
+10. Regular security audits
 
----
+### Data Privacy
 
-## 🔧 Troubleshooting
+- **Database:** SQLite by default (file-based, local)
+- **No external data sharing:** All data stays local
+- **Audit logs:** Stored locally, not transmitted
+- **OpenAI API:** Only sends task descriptions (no PII in prompts)
+- **Compliance:** Follows data minimization principles
 
-### Common Issues & Solutions
+### Limitations
 
-#### 🚨 Backend Issues
+1. **AI Accuracy:** Decisions are AI-generated and should be reviewed by humans
+2. **Regulatory Coverage:** Supports major frameworks but not exhaustive
+3. **Scalability:** SQLite suitable for small-medium deployments; PostgreSQL recommended for large scale
+4. **Performance:** Agentic analysis can take 30-90 seconds (LLM calls)
+5. **Mock Mode:** Limited functionality without real API key
+6. **Browser Support:** Tested on Chrome, Firefox, Safari (latest versions)
 
-##### "ModuleNotFoundError: No module named 'fastapi'"
-**Cause:** Dependencies not installed  
-**Solution:**
-```bash
-pip install -r requirements.txt
-```
+### License
 
-##### "Port 8000 is already in use"
-**Cause:** Another process using port 8000  
-**Solution:**
-```bash
-# Find and kill the process
-lsof -i :8000  # macOS/Linux
-netstat -ano | findstr :8000  # Windows
-
-# Or use a different port
-uvicorn main:app --port 8001
-```
-
-##### "OPENAI_API_KEY not found in environment"
-**Cause:** .env file missing or API key not set  
-**Solution:**
-```bash
-# Create .env file
-cp .env.example .env
-
-# Edit .env and add:
-OPENAI_API_KEY=sk-proj-your-key-here
-
-# Verify
-cat .env | grep OPENAI_API_KEY
-```
-
-##### "Database table not found"
-**Cause:** Database not initialized  
-**Solution:**
-```bash
-python scripts/setup_database.py
-```
-
-##### "Health endpoint returns 500"
-**Cause:** Backend startup error  
-**Solution:**
-1. Check backend console for errors
-2. Verify all dependencies installed
-3. Check `backend.log` for details
-4. Restart backend
-
-#### 🎨 Dashboard Issues
-
-##### "Cannot connect to backend"
-**Cause:** Backend not running or wrong port  
-**Solution:**
-```bash
-# Verify backend is running
-curl http://localhost:8000/health
-
-# Should return: {"status":"healthy","version":"1.0.0"}
-
-# If not, start backend:
-uvicorn main:app --port 8000
-```
-
-##### "Login page not showing"
-**Cause:** Browser cache or session issue  
-**Solution:**
-```bash
-# Clear browser cache: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (macOS)
-# Or use incognito/private window
-```
-
-##### "Task analysis hangs/times out"
-**Possible Causes:**
-1. **API key issue** - Check OPENAI_API_KEY is valid
-2. **Network issue** - Check internet connection
-3. **API rate limit** - Wait a minute and retry
-4. **Backend overloaded** - Restart backend
-
-**Solution:**
-```bash
-# Check backend logs
-tail -f backend.log
-
-# Test API key
-curl -X POST http://localhost:8000/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "test"}'
-```
-
-##### "Charts not rendering in Agent Insights"
-**Cause:** Plotly not installed or browser compatibility  
-**Solution:**
-```bash
-# Reinstall dashboard dependencies
-pip install -r dashboard/requirements.txt --force-reinstall
-
-# Try different browser (Chrome recommended)
-```
-
-#### 🧪 Test Issues
-
-##### "Tests fail with import errors"
-**Cause:** Test dependencies missing  
-**Solution:**
-```bash
-pip install pytest pytest-cov pytest-asyncio
-```
-
-##### "Tests pass but coverage is 0%"
-**Cause:** Coverage not tracking properly  
-**Solution:**
-```bash
-pytest --cov=src --cov-report=term-missing
-```
-
-##### "Specific test fails intermittently"
-**Cause:** Database state or timing issue  
-**Solution:**
-```bash
-# Clean and retry
-make clean
-rm compliance.db
-python scripts/setup_database.py
-pytest -v
-```
-
-#### 🗄️ Database Issues
-
-##### "Database is locked"
-**Cause:** Multiple processes accessing SQLite  
-**Solution:**
-```bash
-# Stop all services
-make kill
-
-# Delete and recreate database
-rm compliance.db
-python scripts/setup_database.py
-
-# Restart services
-make start
-```
-
-##### "Corrupted database"
-**Cause:** Unclean shutdown or disk error  
-**Solution:**
-```bash
-# Backup and recreate
-mv compliance.db compliance.db.backup
-python scripts/setup_database.py
-```
-
-#### 🔐 Authentication Issues
-
-##### "Password not working"
-**Cause:** Using wrong password or session issue  
-**Solution:**
-- Default password is: `demo123`
-- Clear browser cookies
-- Use incognito/private window
-- Check dashboard/components/auth_utils.py for configured password
-
-#### 🌐 Network Issues
-
-##### "CORS errors in browser console"
-**Cause:** Cross-origin request blocking  
-**Impact:** Usually auto-resolved by Streamlit  
-**Solution:** This is a warning, not an error. Ignore if app works.
-
-##### "Connection refused"
-**Cause:** Backend not running or firewall blocking  
-**Solution:**
-```bash
-# Verify services
-lsof -i :8000  # Backend
-lsof -i :8501  # Dashboard
-
-# Check firewall settings
-# Allow ports 8000 and 8501
-```
-
-### 🔍 Diagnostic Commands
-
-```bash
-# Check Python version
-python3 --version  # Should be 3.11+
-
-# Check installed packages
-pip list | grep -E "fastapi|streamlit|langchain"
-
-# Verify database
-ls -lh compliance.db
-sqlite3 compliance.db ".tables"
-
-# Check environment variables
-python3 -c "from dotenv import load_dotenv; load_dotenv(); import os; print('API Key present:', 'OPENAI_API_KEY' in os.environ)"
-
-# Run verification script
-python3 scripts/verify_setup.py
-
-# Check ports
-lsof -i :8000  # Backend
-lsof -i :8501  # Dashboard
-```
-
-### 📚 Additional Resources
-
-- **Known Issues:** See [KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for documented bugs
-- **Testing Checklist:** See [TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md)
-- **Version Status:** See [VERSION.md](docs/VERSION.md)
-- **Dashboard Testing:** See [Complete Repository Validation Report](docs/audits/COMPLETE_REPOSITORY_VALIDATION_REPORT.md)
-- **All Test Reports:** See [docs/audits/](docs/audits/) for comprehensive test documentation
-
-### 🆘 Still Need Help?
-
-1. **Check existing issues:** [GitHub Issues](https://github.com/yourusername/agentic-compliance-agent/issues)
-2. **Review documentation:** See `docs/` folder
-3. **Run diagnostics:** `python3 scripts/verify_setup.py`
-4. **Check logs:** `tail -f backend.log`
-5. **Email support:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📋 Recent Updates (Jan 2025)
+## 🛠️ Tech Stack
 
-### ✅ All Critical Bugs Fixed
+### Backend
 
-1. ✅ Audit Trail crash resolved
-2. ✅ Dropdown visibility (3 modes available)
-3. ✅ Risk sections now populate correctly
-4. ✅ Date field immediately editable
-5. ✅ Form no longer resets unexpectedly
-6. ✅ Feedback confirmation added
-7. ✅ Chat endpoint timeout protection
-8. ✅ Source citations (GDPR, CCPA, etc.)
-9. ✅ Visual confidence indicators
-10. ✅ AI thinking progress (7 stages)
-11. ✅ Calendar priority sorting fixed
-12. ✅ Chat context clarity (page tags)
-13. ✅ Export enhancements (4 formats)
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Python** | 3.11+ | Core language with modern type hints |
+| **FastAPI** | 0.104+ | Async REST API with auto-documentation |
+| **LangChain** | 0.3+ | LLM orchestration and prompt management |
+| **OpenAI API** | 1.10+ | GPT-4o-mini for AI reasoning (optional) |
+| **SQLAlchemy** | 2.0+ | Database ORM with async support |
+| **Pydantic** | 2.7+ | Data validation and settings |
+| **Uvicorn** | 0.24+ | ASGI server for production |
+| **JWT** | 2.8+ | Authentication tokens |
+| **bcrypt** | 4.0+ | Password hashing |
 
-**See [RELEASE_NOTES_v1.0.0.md](docs/release/RELEASE_NOTES_v1.0.0.md) for full details.**
+### Frontend
 
----
+| Technology | Purpose |
+|------------|---------|
+| **Streamlit** | Business dashboard framework |
+| **Pandas** | Data manipulation and analytics |
+| **Plotly** | Interactive charts and visualizations |
 
-## 🌍 Multi-Jurisdiction Support
+### Testing & DevOps
 
-Built-in support for major regulatory frameworks:
-
-| Region | Regulations |
-|--------|-------------|
-| **United States** | Federal, California (CCPA), New York, state laws |
-| **European Union** | GDPR with Article-specific guidance |
-| **United Kingdom** | UK GDPR, Data Protection Act 2018 |
-| **Canada** | PIPEDA (Personal Information Protection) |
-| **Asia-Pacific** | Framework support for APAC regulations |
-
----
-
-## 🗺️ Future Roadmap
-
-### v1.1.0 (Q1 2025) - Security & Performance
-- [ ] JWT-based user authentication
-- [ ] Role-based access control (RBAC)
-- [ ] API rate limiting per user
-- [ ] PostgreSQL migration guide
-- [ ] Redis caching layer
-- [ ] Docker containerization
-
-### v1.2.0 (Q2 2025) - Advanced AI
-- [ ] Fine-tuned compliance model on domain data
-- [ ] Multi-language support (5+ languages)
-- [ ] Document upload & analysis (PDF/DOCX)
-- [ ] Natural language query interface
-- [ ] Confidence calibration improvements
-
-### v1.3.0 (Q3 2025) - Enterprise Features
-- [ ] Slack/Teams bot integration
-- [ ] Email notification system
-- [ ] Calendar sync (Google/Outlook)
-- [ ] Jira/ServiceNow integration
-- [ ] Multi-tenant architecture
-- [ ] SSO integration (SAML/OAuth2)
-
-### v2.0.0 (Q4 2025) - Platform
-- [ ] Custom risk model tuning per organization
-- [ ] White-label branding options
-- [ ] Advanced analytics dashboard
-- [ ] Compliance scorecard generation
-- [ ] Third-party risk assessment module
+| Tool | Purpose |
+|------|---------|
+| **Pytest** | Test framework (84+ tests, 90%+ coverage) |
+| **Black** | Code formatting (PEP 8) |
+| **MyPy** | Static type checking |
+| **Make** | Build automation |
 
 ---
 
@@ -1151,27 +768,15 @@ Built-in support for major regulatory frameworks:
 - **[Feature Overview](docs/production_engine/FEATURE_INVENTORY.md)** - Detailed feature documentation
 - **[Glossary](docs/core/Glossary.md)** - Key terms and concepts
 
-### Project Information
-- **[Version Info](docs/VERSION.md)** - Current version and changelog
-- **[Known Issues](docs/KNOWN_ISSUES.md)** - Current limitations and workarounds
-- **[Release Notes](docs/release/RELEASE_NOTES_v1.0.0.md)** - Version 1.0.0 release notes
+### Agentic Engine Documentation
+- **[Agent Loop Implementation](docs/agentic_engine/AGENT_LOOP_IMPLEMENTATION.md)** - Plan-execute-reflect cycle
+- **[Reasoning Engine](docs/agentic_engine/REASONING_ENGINE_IMPLEMENTATION.md)** - LLM-based reasoning
+- **[Tools Implementation](docs/agentic_engine/TOOLS_IMPLEMENTATION.md)** - Tool registry and execution
+- **[Orchestrator](docs/agentic_engine/ORCHESTRATOR_IMPLEMENTATION.md)** - System coordination
 
 ### Testing & Quality
-- **[Testing Checklist](docs/TESTING_CHECKLIST.md)** - Complete testing procedures
-- **[Testing Reports](docs/testing/)** - Test results, health checks, and fix documentation
-  - [Backend Health Check Report](docs/testing/BACKEND_HEALTH_CHECK_REPORT.md)
-  - [Code Quality Audit](docs/testing/CODE_QUALITY_AUDIT_REPORT.md)
-  - [DateTime Timezone Fix](docs/testing/DATETIME_TIMEZONE_FIX.md)
-  - [End-to-End Test Report](docs/testing/END_TO_END_TEST_REPORT.md)
-  - [Verification Report](docs/testing/VERIFICATION_REPORT.md)
-
-### Project Docs (Final)
-- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)**
-- **[Production Readiness](docs/PRODUCTION_READINESS.md)**
-- **[Atlas Revalidation Plan](docs/ATLAS_REVALIDATION_PLAN.md)**
-- **[Full Revalidation Report](docs/FULL_REVALIDATION_REPORT.md)**
-- **[Full Regression Log](docs/FULL_REGRESSION_LOG.md)**
-- **[Acceptance Tests](docs/ACCEPTANCE_TESTS.md)**
+- **[Testing Checklist](docs/testing/TESTING_CHECKLIST.md)** - Complete testing procedures
+- **[Test Reports](docs/testing/)** - Test results and health checks
 
 ---
 
@@ -1197,30 +802,6 @@ Please ensure:
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-```
-MIT License
-
-Copyright (c) 2025 Nikita Walvekar
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
 ---
 
 ## 👤 Author
@@ -1235,33 +816,6 @@ Building intelligent systems that augment human expertise.
 - 💼 **LinkedIn:** [linkedin.com/in/nikitawalvekar](https://www.linkedin.com/in/nikitawalvekar)
 - 📧 **Email:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
 - 🐙 **GitHub:** [github.com/walvekarn](https://github.com/walvekarn)
-- 📝 **Portfolio:** [View Projects](https://your-portfolio-link.com)
-
-### 💡 Other Projects
-
-- **AI-Powered Document Processor** — Automated invoice extraction saving 20hrs/week
-- **Multi-Agent RAG System** — Enterprise knowledge base with 95% accuracy
-- **Workflow Automation Platform** — No-code builder for business processes
-
----
-
-## 🙏 Acknowledgments
-
-This project was built with:
-- **OpenAI GPT-4o-mini** for AI reasoning capabilities
-- **FastAPI** community for excellent async framework
-- **Streamlit** team for intuitive dashboard framework
-- **LangChain** project for LLM orchestration tools
-- **Open source community** for countless libraries
-
----
-
-## 📞 Support
-
-- **Documentation:** Check the [docs/](docs/) folder
-- **Issues:** [GitHub Issues](https://github.com/yourusername/agentic-compliance-agent/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/agentic-compliance-agent/discussions)
-- **Email:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
 
 ---
 

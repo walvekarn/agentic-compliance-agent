@@ -1,8 +1,8 @@
 """Tests for the decision engine"""
 
 import pytest
-from src.agent.decision_engine import DecisionEngine
-from src.agent.risk_models import (
+from backend.agent.decision_engine import DecisionEngine
+from backend.agent.risk_models import (
     EntityContext,
     TaskContext,
     EntityType,

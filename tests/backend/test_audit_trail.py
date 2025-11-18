@@ -4,9 +4,9 @@ import pytest
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from src.agent.audit_service import AuditService
-from src.agent.decision_engine import DecisionEngine
-from src.agent.risk_models import (
+from backend.agent.audit_service import AuditService
+from backend.agent.decision_engine import DecisionEngine
+from backend.agent.risk_models import (
     EntityContext,
     TaskContext,
     EntityType,
@@ -14,7 +14,7 @@ from src.agent.risk_models import (
     Jurisdiction,
     TaskCategory
 )
-from src.db.models import AuditTrail
+from backend.db.models import AuditTrail
 
 
 class TestAuditTrailModel:

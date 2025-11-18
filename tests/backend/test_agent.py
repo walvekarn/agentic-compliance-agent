@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, patch
-from src.agent.openai_agent import ComplianceAgent
+from backend.agent.openai_agent import ComplianceAgent
 
 
 @pytest.fixture

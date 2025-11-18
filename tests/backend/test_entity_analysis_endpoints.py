@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from datetime import datetime
 
 from main import app
-from src.db.base import get_db
+from backend.db.base import get_db
 
 
 @pytest.fixture(autouse=True)

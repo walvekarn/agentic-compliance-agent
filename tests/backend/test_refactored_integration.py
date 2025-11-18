@@ -5,11 +5,11 @@ Tests the new modular component architecture.
 """
 
 import pytest
-from dashboard.components.constants import (
+from frontend.components.constants import (
     TYPE_MAP, INDUSTRY_MAP, TASK_MAP, IMPACT_MAP, 
     JURISDICTION_DISPLAY_TO_CODE
 )
-from dashboard.components.analyze_task.form_validator import FormValidator
+from frontend.components.analyze_task.form_validator import FormValidator
 
 
 class TestConstantsMappings:

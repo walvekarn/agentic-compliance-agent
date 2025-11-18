@@ -9,10 +9,10 @@ from pathlib import Path
 import requests
 import json
 
-# Add dashboard to path
-# From tests/dashboard/test_chat_assistant.py -> project_root/dashboard
-dashboard_path = Path(__file__).parent.parent.parent / "dashboard"
-sys.path.insert(0, str(dashboard_path))
+# Add frontend to path
+# From tests/dashboard/test_chat_assistant.py -> project_root/frontend
+frontend_path = Path(__file__).parent.parent.parent / "frontend"
+sys.path.insert(0, str(frontend_path))
 
 print("=" * 70)
 print("TESTING CHAT ASSISTANT COMPONENT")

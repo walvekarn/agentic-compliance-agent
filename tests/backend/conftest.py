@@ -4,9 +4,9 @@ import pytest
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.db.base import Base
+from backend.db.base import Base
 # Import models to ensure they are registered with Base
-from src.db import models  # noqa: F401
+from backend.db import models  # noqa: F401
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -1,6 +1,6 @@
 """Sample test data for pytest tests"""
 
-from src.agent.risk_models import (
+from backend.agent.risk_models import (
     EntityContext,
     TaskContext,
     EntityType,

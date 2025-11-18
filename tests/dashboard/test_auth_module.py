@@ -7,10 +7,10 @@ Tests the dashboard authentication utilities.
 import sys
 from pathlib import Path
 
-# Add dashboard to path
-# From tests/dashboard/test_auth_module.py -> project_root/dashboard
-dashboard_path = Path(__file__).parent.parent.parent / "dashboard"
-sys.path.insert(0, str(dashboard_path))
+# Add frontend to path
+# From tests/dashboard/test_auth_module.py -> project_root/frontend
+frontend_path = Path(__file__).parent.parent.parent / "frontend"
+sys.path.insert(0, str(frontend_path))
 
 print("=" * 70)
 print("TESTING AUTHENTICATION MODULE")

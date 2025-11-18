@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from unittest.mock import patch, Mock, AsyncMock
 
 from main import app
-from src.db.base import Base, get_db
+from backend.db.base import Base, get_db
 
 # Create test database
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"

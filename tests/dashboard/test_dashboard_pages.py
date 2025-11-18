@@ -10,10 +10,10 @@ from pathlib import Path
 import ast
 import importlib.util
 
-# Add dashboard to path
-# From tests/dashboard/test_dashboard_pages.py -> project_root/dashboard
-dashboard_path = Path(__file__).parent.parent.parent / "dashboard"
-sys.path.insert(0, str(dashboard_path))
+# Add frontend to path
+# From tests/dashboard/test_dashboard_pages.py -> project_root/frontend
+frontend_path = Path(__file__).parent.parent.parent / "frontend"
+sys.path.insert(0, str(frontend_path))
 
 print("=" * 70)
 print("TESTING DASHBOARD PAGES")
@@ -21,11 +21,11 @@ print("=" * 70)
 print()
 
 pages_to_test = [
-    ("Home.py", dashboard_path / "Home.py"),
-    ("1_Analyze_Task.py", dashboard_path / "pages" / "1_Analyze_Task.py"),
-    ("2_Compliance_Calendar.py", dashboard_path / "pages" / "2_Compliance_Calendar.py"),
-    ("3_Audit_Trail.py", dashboard_path / "pages" / "3_Audit_Trail.py"),
-    ("4_Agent_Insights.py", dashboard_path / "pages" / "4_Agent_Insights.py"),
+    ("Home.py", frontend_path / "Home.py"),
+    ("1_Analyze_Task.py", frontend_path / "pages" / "1_Analyze_Task.py"),
+    ("2_Compliance_Calendar.py", frontend_path / "pages" / "2_Compliance_Calendar.py"),
+    ("3_Audit_Trail.py", frontend_path / "pages" / "3_Audit_Trail.py"),
+    ("4_Agent_Insights.py", frontend_path / "pages" / "4_Agent_Insights.py"),
 ]
 
 all_passed = True
@@ -147,7 +147,7 @@ if all_passed and not errors_found:
     print()
     print("Next Steps:")
     print("  1. Start backend: uvicorn main:app --port 8000")
-    print("  2. Start dashboard: streamlit run dashboard/Home.py")
+    print("  2. Start frontend: streamlit run frontend/Home.py")
     print("  3. Test in browser: http://localhost:8501")
 else:
     print("❌ SOME TESTS FAILED")
