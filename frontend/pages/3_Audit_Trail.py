@@ -94,6 +94,19 @@ def show_risk_badge(risk_level):
 def show_decision_badge(decision):
     return f"{DECISION_ICONS.get(decision, '❓')} {DECISION_NAMES.get(decision, decision.title())}"
 
+
+def get_audit_id(entry):
+    """
+    Get audit ID from entry, supporting both old and new backend fields.
+    Prefers 'id' over 'audit_id' for backwards compatibility.
+    Returns None if neither is present.
+    """
+    # Support both old/new backend fields
+    audit_id = entry.get("id", None)
+    if not audit_id:
+        audit_id = entry.get("audit_id", None)
+    return audit_id
+
 # Filters
 st.markdown("### 🔍 Filters")
 col1, col2, col3, col4 = st.columns(4)
@@ -231,8 +244,13 @@ try:
         st.markdown("### 📋 Audit Records")
         
         for entry in filtered_entries:
+            # Support both old/new backend fields
+            audit_id = get_audit_id(entry)
+            if audit_id is None:
+                continue  # skip invalid rows
+            
             with st.expander(
-                f"{entry['audit_id']} | {entry['task']['description'][:60]}... | "
+                f"{audit_id} | {entry['task']['description'][:60]}... | "
                 f"{show_decision_badge(entry['decision']['outcome'])} "
                 f"{show_risk_badge(entry['decision'].get('risk_level', 'N/A'))}"
             ):
@@ -303,6 +321,11 @@ try:
         # Prepare export data
         export_data = []
         for entry in filtered_entries:
+            # Support both old/new backend fields
+            audit_id = get_audit_id(entry)
+            if audit_id is None:
+                continue  # skip invalid rows
+            
             decision_label = DECISION_NAMES.get(entry["decision"]["outcome"], entry["decision"]["outcome"].title())
             risk_label = RISK_NAMES.get(entry["decision"].get("risk_level"), "Not set")
             # Handle None values gracefully
@@ -317,7 +340,7 @@ try:
             confidence_display = f"{(confidence_score or 0) * 100:.1f}%"
             
             export_data.append({
-                "Audit ID": entry["audit_id"],
+                "Audit ID": audit_id,
                 "Timestamp": entry["timestamp"],
                 "Entity": entry["entity"]["name"] if entry.get("entity") and entry["entity"].get("name") else "N/A",
                 "Task": entry["task"]["description"],
@@ -352,12 +375,17 @@ ENTRIES
 -------
 """
         for i, entry in enumerate(filtered_entries, 1):
+            # Support both old/new backend fields
+            audit_id = get_audit_id(entry)
+            if audit_id is None:
+                continue  # skip invalid rows
+            
             decision_label = DECISION_NAMES.get(entry["decision"]["outcome"], entry["decision"]["outcome"].title())
             risk_label = RISK_NAMES.get(entry["decision"].get("risk_level"), "Not set")
             text_report += f"""
 Entry #{i}
 ----------
-ID: {entry["audit_id"]}
+ID: {audit_id}
 Timestamp: {entry["timestamp"]}
 Entity: {entry["entity"]["name"] if entry.get("entity") and entry["entity"].get("name") else "N/A"}
 Task: {entry["task"]["description"]}

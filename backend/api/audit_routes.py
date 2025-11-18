@@ -64,7 +64,7 @@ async def get_audit_entries(
         from sqlalchemy import func
         
         # Build base query for counting total matching records
-        count_query = db.query(func.count(AuditTrail.audit_id))
+        count_query = db.query(func.count(AuditTrail.id))
         
         # Apply same filters as get_audit_trail
         if agent_type:

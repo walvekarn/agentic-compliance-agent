@@ -48,19 +48,26 @@ def multiselect_with_select_all(
     
     current_selection = st.session_state[state_key]
     
-    # Add "Select All" / "Deselect All" button
+    # Add "Select All" / "Deselect All" toggle
     select_all_col, multiselect_col = st.columns([1, 4])
     
     with select_all_col:
         all_selected = len(current_selection) == len(options) and len(options) > 0
-        if st.button("📋 Select All" if not all_selected else "✂️ Clear All", 
-                     key=f"{state_key}_select_all_btn",
-                     help="Select all options" if not all_selected else "Clear all selections"):
-            if all_selected:
-                st.session_state[state_key] = []
-            else:
+
+        # SAFE toggle for forms (checkbox instead of button)
+        toggle = st.checkbox(
+            "📋 Select All" if not all_selected else "✂️ Clear All",
+            value=all_selected,
+            key=f"{state_key}_select_all_toggle",
+            help="Select all options" if not all_selected else "Clear all selections"
+        )
+
+        # If user toggles, update state
+        if toggle != all_selected:
+            if toggle:
                 st.session_state[state_key] = options.copy()
-            st.rerun()
+            else:
+                st.session_state[state_key] = []
     
     with multiselect_col:
         # Show multiselect - always enabled to fix "No results" bug

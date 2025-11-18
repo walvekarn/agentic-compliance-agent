@@ -51,6 +51,7 @@ class AuditTrail(Base):
     
     __tablename__ = "audit_trail"
     
+    # Primary Key
     id = Column(Integer, primary_key=True, index=True)
     
     # Core identification
@@ -70,6 +71,15 @@ class AuditTrail(Base):
     confidence_score = Column(Float, nullable=False)
     risk_level = Column(String(50), nullable=True, index=True)  # LOW, MEDIUM, HIGH
     risk_score = Column(Float, nullable=True)
+    
+    # Backwards compatibility — some routes still expect audit_id
+    @property
+    def audit_id(self):
+        return self.id
+
+    @audit_id.setter
+    def audit_id(self, value):
+        self.id = value
     
     # Reasoning chain (stored as JSON array)
     reasoning_chain = Column(JSON, nullable=False)
