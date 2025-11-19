@@ -23,6 +23,10 @@ from components.constants import API_BASE_URL
 
 st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # ============================================================================
 # AUTHENTICATION CHECK
 # ============================================================================
@@ -134,7 +138,8 @@ with col2:
         options=list(decision_labels.keys()),
         default=list(decision_labels.keys()),
         key="decision_multiselect_audit",
-        help="Pick the decisions you want to review."
+        help="Pick the decisions you want to review.",
+        inside_form=False
     )
     filter_decision = [decision_labels[label] for label in decision_choices]
 
@@ -149,7 +154,8 @@ with col3:
         options=list(risk_labels.keys()),
         default=list(risk_labels.keys()),
         key="risk_multiselect_audit",
-        help="Show only records at the risk level you care about. Risk levels (LOW/MEDIUM/HIGH) indicate the potential impact of non-compliance."
+        help="Show only records at the risk level you care about. Risk levels (LOW/MEDIUM/HIGH) indicate the potential impact of non-compliance.",
+        inside_form=False
     )
     filter_risk = [risk_labels[label] for label in risk_choices]
 
@@ -446,7 +452,7 @@ Agent: {entry["agent_type"]}
         st.markdown("---")
         col1, col2, col3 = st.columns([2, 1, 2])
         with col2:
-            if st.button("🔄 Refresh Data", type="secondary", use_container_width=True):
+            if st.button("🔄 Refresh Data", type="secondary", width="stretch"):
                 st.rerun()
         
     else:

@@ -247,7 +247,7 @@ def render_chat_panel(context_data=None):
     )
     
     # Button to submit
-    submit_chat = st.button("Send", key="send_chat_btn", use_container_width=True)
+    submit_chat = st.button("Send", key="send_chat_btn", width="stretch")
     
     # Process on button click - check if there's a query in the text input
     if submit_chat and user_query and user_query.strip():
@@ -360,7 +360,7 @@ def render_chat_panel(context_data=None):
         suggestions = suggested_questions
         
         for idx, suggestion in enumerate(suggestions):
-            if st.button(suggestion, key=f"suggest_btn_{idx}", use_container_width=True):
+            if st.button(suggestion, key=f"suggest_btn_{idx}", width="stretch"):
                 # Populate the chat input with the suggestion
                 st.session_state.chat_pending_question = suggestion
                 st.rerun()
@@ -376,7 +376,7 @@ def render_chat_panel(context_data=None):
             col1, col2 = st.columns([1, 1])
             
             with col1:
-                if st.button("🗑️ Clear All History", use_container_width=True, help="Delete all chat messages from all pages", type="secondary"):
+                if st.button("🗑️ Clear All History", width="stretch", help="Delete all chat messages from all pages", type="secondary"):
                     st.session_state.chat_messages = []
                     st.session_state.chat_context = {}
                     st.success("✅ Chat history cleared!")
@@ -385,7 +385,7 @@ def render_chat_panel(context_data=None):
             with col2:
                 # Filter to current page only
                 messages_on_page = len([m for m in st.session_state.chat_messages if m.get("page") == current_page])
-                if st.button(f"🗑️ Clear {current_page} Only", use_container_width=True, help=f"Delete only messages from {current_page}", type="secondary"):
+                if st.button(f"🗑️ Clear {current_page} Only", width="stretch", help=f"Delete only messages from {current_page}", type="secondary"):
                     st.session_state.chat_messages = [
                         m for m in st.session_state.chat_messages 
                         if m.get("page") != current_page
@@ -416,7 +416,7 @@ def render_chat_panel(context_data=None):
                 data=chat_export,
                 file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain",
-                use_container_width=True,
+                width="stretch",
                 help="Download chat history as text file"
             )
 

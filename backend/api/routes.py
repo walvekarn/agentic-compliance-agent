@@ -3,7 +3,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from backend.agent.openai_agent import ComplianceAgent
@@ -292,4 +292,41 @@ def get_rule(rule_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Rule not found")
     
     return rule
+
+
+# Export email endpoint (stub implementation)
+class EmailExportRequest(BaseModel):
+    """Request model for email export"""
+    recipient: str
+    subject: str
+    body: str
+    attachment_data: Optional[Dict[str, Any]] = None
+
+
+@router.post("/export/email")
+async def export_email(
+    request: EmailExportRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Stub endpoint for email export functionality.
+    
+    Note: This is a placeholder implementation. Full email functionality
+    would require SMTP configuration and email service integration.
+    
+    Args:
+        request: EmailExportRequest with recipient, subject, body, and optional attachment
+        db: Database session
+        
+    Returns:
+        Success message (stub)
+    """
+    # Stub implementation - returns success without actually sending email
+    return {
+        "status": "success",
+        "message": "Email export functionality is not yet implemented. Please use download options instead.",
+        "recipient": request.recipient,
+        "subject": request.subject,
+        "note": "This endpoint is a placeholder. Email functionality requires SMTP configuration."
+    }
 

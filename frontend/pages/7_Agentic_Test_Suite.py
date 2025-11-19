@@ -24,6 +24,10 @@ from components.api_client import APIClient, display_api_error, parseAgenticResp
 # Page config
 st.set_page_config(page_title="Agentic Test Suite", page_icon="🧪", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -117,7 +121,7 @@ with st.expander("⚙️ Test Configuration", expanded=True):
 # Run test suite button
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    run_button = st.button("🚀 Run Test Suite", type="primary", use_container_width=True)
+    run_button = st.button("🚀 Run Test Suite", type="primary", width="stretch")
 
 if run_button or st.session_state.test_running:
     if not st.session_state.test_running:
@@ -225,73 +229,105 @@ if st.session_state.test_results:
         # Results table
         test_results = results.get("test_results", [])
         if test_results and len(test_results) > 0:
-            df = pd.DataFrame([
-                {
-                    "Scenario": r["scenario"].get("title", "Unknown"),
-                    "Status": r["status"],
-                    "Success": "✅" if r["success"] else "❌",
-                    "Execution Time (s)": f"{r['execution_time']:.2f}",
-                    "Reasoning Passes": r["reasoning_passes"],
-                    "Confidence": f"{r['confidence_score']:.2f}",
-                    "Tools Used": len(r["tools_used"]),
-                    "Errors": len(r["errors"])
-                }
-                for r in test_results
-            ])
-            st.dataframe(df, use_container_width=True)
+            try:
+                df = pd.DataFrame([
+                    {
+                        "Scenario": r.get("scenario", {}).get("title", "Unknown") if isinstance(r.get("scenario"), dict) else str(r.get("scenario", "Unknown")),
+                        "Status": r.get("status", "unknown"),
+                        "Success": "✅" if r.get("success", False) else "❌",
+                        "Execution Time (s)": f"{r.get('execution_time', 0):.2f}",
+                        "Reasoning Passes": r.get("reasoning_passes", 0),
+                        "Confidence": f"{r.get('confidence_score', 0):.2f}",
+                        "Tools Used": len(r.get("tools_used", [])),
+                        "Errors": len(r.get("errors", []))
+                    }
+                    for r in test_results if isinstance(r, dict)
+                ])
+                if not df.empty:
+                    st.dataframe(df, width="stretch")
+                else:
+                    st.warning("⚠️ **Test results data format issue**: Results are present but couldn't be parsed into a table.")
+            except Exception as e:
+                st.error(f"❌ **Error displaying test results**: {str(e)}")
+                st.info("💡 **Troubleshooting**: The test results may be in an unexpected format. Check backend logs for details.")
+                # Show raw results for debugging
+                with st.expander("🔍 Debug: Raw Test Results"):
+                    st.json(test_results[:2] if len(test_results) > 2 else test_results)
         else:
             st.info("📊 **No Test Results**: Test results will appear here once you run a test suite.")
     
     with tab2:
         # Error distribution chart
         error_dist = summary.get("error_distribution", {})
-        if error_dist:
-            error_df = pd.DataFrame([
-                {"Error Type": k, "Count": v}
-                for k, v in error_dist.items()
-            ])
-            fig = px.bar(
-                error_df,
-                x="Error Type",
-                y="Count",
-                title="Error Distribution",
-                color="Count",
-                color_continuous_scale="Reds"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        if error_dist and isinstance(error_dist, dict) and len(error_dist) > 0:
+            try:
+                error_df = pd.DataFrame([
+                    {"Error Type": str(k), "Count": int(v) if isinstance(v, (int, float)) else 0}
+                    for k, v in error_dist.items()
+                ])
+                if not error_df.empty:
+                    fig = px.bar(
+                        error_df,
+                        x="Error Type",
+                        y="Count",
+                        title="Error Distribution",
+                        color="Count",
+                        color_continuous_scale="Reds"
+                    )
+                    st.plotly_chart(fig, width="stretch")
+                else:
+                    st.info("No errors encountered in test suite.")
+            except Exception as e:
+                st.warning(f"⚠️ **Error displaying error distribution**: {str(e)}")
+                st.info("Error distribution data may be in an unexpected format.")
         else:
-            st.info("No errors encountered in test suite.")
+            st.info("✅ **No errors encountered** in test suite - all tests passed successfully!")
     
     with tab3:
         # Tool usage chart
         tool_usage = summary.get("tool_usage_counts", {})
-        if tool_usage:
-            tool_df = pd.DataFrame([
-                {"Tool": k, "Usage Count": v}
-                for k, v in tool_usage.items()
-            ])
-            fig = px.pie(
-                tool_df,
-                values="Usage Count",
-                names="Tool",
-                title="Tool Usage Distribution"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        if tool_usage and isinstance(tool_usage, dict) and len(tool_usage) > 0:
+            try:
+                tool_df = pd.DataFrame([
+                    {"Tool": str(k), "Usage Count": int(v) if isinstance(v, (int, float)) else 0}
+                    for k, v in tool_usage.items()
+                ])
+                if not tool_df.empty:
+                    fig = px.pie(
+                        tool_df,
+                        values="Usage Count",
+                        names="Tool",
+                        title="Tool Usage Distribution"
+                    )
+                    st.plotly_chart(fig, width="stretch")
+                else:
+                    st.info("No tool usage data available.")
+            except Exception as e:
+                st.warning(f"⚠️ **Error displaying tool usage**: {str(e)}")
+                st.info("Tool usage data may be in an unexpected format.")
         else:
             st.info("No tool usage data available.")
     
     with tab4:
         # Pass/Fail heatmap by complexity
-        if test_results:
-            complexity_data = {}
-            for r in test_results:
-                complexity = r["scenario"].get("complexity", "unknown")
-                if complexity not in complexity_data:
-                    complexity_data[complexity] = {"pass": 0, "fail": 0}
-                if r["success"]:
-                    complexity_data[complexity]["pass"] += 1
-                else:
-                    complexity_data[complexity]["fail"] += 1
+        if test_results and len(test_results) > 0:
+            try:
+                complexity_data = {}
+                for r in test_results:
+                    if not isinstance(r, dict):
+                        continue
+                    scenario = r.get("scenario", {})
+                    if isinstance(scenario, dict):
+                        complexity = scenario.get("complexity", "unknown")
+                    else:
+                        complexity = "unknown"
+                    
+                    if complexity not in complexity_data:
+                        complexity_data[complexity] = {"pass": 0, "fail": 0}
+                    if r.get("success", False):
+                        complexity_data[complexity]["pass"] += 1
+                    else:
+                        complexity_data[complexity]["fail"] += 1
             
             heatmap_data = []
             for complexity, counts in complexity_data.items():
@@ -310,7 +346,7 @@ if st.session_state.test_results:
                     title="Pass/Fail Heatmap by Complexity",
                     color_continuous_scale=["#dc3545", "#28a745"]
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
     
     # Detailed results
     st.markdown("## 🔍 Detailed Test Results")

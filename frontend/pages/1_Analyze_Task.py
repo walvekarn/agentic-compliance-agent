@@ -29,6 +29,10 @@ from components.ui_helpers import multiselect_with_select_all, add_tooltip, get_
 # Page config
 st.set_page_config(page_title="Check a Task", page_icon="✅", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -59,11 +63,11 @@ if SessionManager.has_results():
 # ============================================================================
 action_col1, action_col2, action_col3 = st.columns([1, 1, 3])
 with action_col1:
-    if st.button("⚡ Load Example", use_container_width=True):
+    if st.button("⚡ Load Example", width="stretch"):
         SessionManager.save_form_data(EXAMPLE_FORM_VALUES)
         st.rerun()
 with action_col2:
-    if st.button("🔄 Reset Form", use_container_width=True):
+    if st.button("🔄 Reset Form", width="stretch"):
         SessionManager.reset_form()
         st.rerun()
 
@@ -119,7 +123,8 @@ with st.form("task_check_form", clear_on_submit=False):
             options=LOCATION_OPTIONS,
             default=default_locations,
             key="locations_multiselect",
-            help="Select all locations where your organization operates. Required field."
+            help="Select all locations where your organization operates. Required field.",
+            inside_form=True
         )
         
         handles_customer_data = st.checkbox(
@@ -229,7 +234,7 @@ with st.form("task_check_form", clear_on_submit=False):
     
     submitted = st.form_submit_button(
         "🚀 Get My Answer Now", 
-        use_container_width=True, 
+        width="stretch", 
         type="primary",
         help="Submit the form to analyze your compliance task"
     )

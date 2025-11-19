@@ -24,6 +24,10 @@ from components.constants import (
 # Page config
 st.set_page_config(page_title="Agentic Analysis", page_icon="🤖", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -126,11 +130,11 @@ EXAMPLE_TASK = {
 # ============================================================================
 col1, col2, col3 = st.columns([1, 1, 3])
 with col1:
-    if st.button("⚡ Load Example", width='stretch'):
+    if st.button("⚡ Load Example", width="stretch"):
         st.session_state.agentic_form_data = {**EXAMPLE_ENTITY, **EXAMPLE_TASK}
         st.rerun()
 with col2:
-    if st.button("🔄 Reset Form", width='stretch'):
+    if st.button("🔄 Reset Form", width="stretch"):
         st.session_state.agentic_form_data = {}
         st.session_state.agentic_results = None
         st.rerun()
@@ -188,7 +192,8 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
             options=location_options,
             default=default_locations,
             key="agentic_locations_multiselect",
-            help="Select all jurisdictions where the entity operates"
+            help="Select all jurisdictions where the entity operates",
+            inside_form=True
         )
         
         # Additional context
@@ -274,7 +279,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
     st.markdown("---")
     
     # Submit button
-    submitted = st.form_submit_button("🚀 Run Agentic Analysis", width='stretch', type="primary")
+    submitted = st.form_submit_button("🚀 Run Agentic Analysis", width="stretch", type="primary")
     
     if submitted:
         # Validation
@@ -346,8 +351,33 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                         st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 120 seconds'}")
                         st.info("💡 **Tip**: Try reducing max iterations or simplifying the task description.")
                     elif status == "error":
-                        st.error(f"❌ **Error**: {error or 'Unknown error occurred'}")
-                        st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task")
+                        error_msg = error or 'Unknown error occurred'
+                        
+                        # Try to extract more details from response
+                        if isinstance(response.data, dict):
+                            error_details = response.data.get('error', {})
+                            if isinstance(error_details, dict):
+                                error_msg = error_details.get('message', error_msg)
+                                error_type = error_details.get('type', '')
+                                if error_type:
+                                    error_msg = f"{error_type}: {error_msg}"
+                            elif isinstance(error_details, str):
+                                error_msg = error_details
+                        
+                        st.error(f"❌ **Error**: {error_msg}")
+                        
+                        # Provide specific guidance based on error type
+                        error_lower = error_msg.lower()
+                        if "timeout" in error_lower or "timed out" in error_lower:
+                            st.info("💡 **This analysis takes longer than expected.** Try:\n1. Simplifying the task description\n2. Reducing max iterations (try 5-7 instead of 10)\n3. Trying again in a few moments\n4. Check backend logs if the issue persists")
+                        elif "authentication" in error_lower or "401" in error_msg or "403" in error_msg:
+                            st.info("💡 **Authentication issue.** Please:\n1. Log out and log back in\n2. Check that your session is still valid\n3. Verify you have permission to use agentic features")
+                        elif "404" in error_msg or "not found" in error_lower:
+                            st.info("💡 **Endpoint not found.** Please:\n1. Check that the backend is running and up to date\n2. Verify the agentic routes are properly registered\n3. Contact support if this is a new deployment")
+                        elif "500" in error_msg or "server error" in error_lower:
+                            st.info("💡 **Server error.** Please:\n1. Check backend logs for detailed error information\n2. Try again in a few moments\n3. Contact support if the issue persists")
+                        else:
+                            st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task\n4. Check backend logs for detailed error information\n5. Contact support if the issue persists")
                     else:
                         display_api_error(response)
                 except Exception as e:
@@ -578,7 +608,7 @@ if st.session_state.agentic_results:
                 data=json.dumps(download_data, indent=2),
                 file_name=f"agentic_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
-                width='stretch'
+                width="stretch"
             )
     
     # TAB 5: MEMORY & METRICS

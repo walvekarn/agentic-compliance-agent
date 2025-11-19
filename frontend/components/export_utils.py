@@ -182,7 +182,7 @@ def render_export_section(
         if text_report:
             filename_txt = generate_filename(prefix, entity_name, task_category, risk_level, "txt")
             
-            if st.button("📄 Download TXT", use_container_width=True, help="Plain text report"):
+            if st.button("📄 Download TXT", width="stretch", help="Plain text report"):
                 # This will trigger on next interaction
                 st.session_state.pending_export = {
                     "type": "txt",
@@ -195,7 +195,7 @@ def render_export_section(
         if dataframe is not None and not dataframe.empty:
             filename_excel = generate_filename(prefix, entity_name, task_category, risk_level, "xlsx")
             
-            if st.button("📊 Download Excel", use_container_width=True, help="Excel with formatting"):
+            if st.button("📊 Download Excel", width="stretch", help="Excel with formatting"):
                 st.session_state.pending_export = {
                     "type": "excel",
                     "data": dataframe,
@@ -207,7 +207,7 @@ def render_export_section(
         if json_data:
             filename_json = generate_filename(prefix, entity_name, task_category, risk_level, "json")
             
-            if st.button("📋 Download JSON", use_container_width=True, help="Raw JSON data"):
+            if st.button("📋 Download JSON", width="stretch", help="Raw JSON data"):
                 st.session_state.pending_export = {
                     "type": "json",
                     "data": json_data,
@@ -219,7 +219,7 @@ def render_export_section(
         if text_report:
             filename_pdf = generate_filename(prefix, entity_name, task_category, risk_level, "pdf")
             
-            if st.button("📕 Download PDF", use_container_width=True, help="PDF report"):
+            if st.button("📕 Download PDF", width="stretch", help="PDF report"):
                 st.session_state.pending_export = {
                     "type": "pdf",
                     "data": text_report,
@@ -259,7 +259,7 @@ def render_export_section(
             data=file_data,
             file_name=export_filename,
             mime=mime_type,
-            use_container_width=True,
+            width="stretch",
             type="primary"
         )
         
@@ -288,7 +288,7 @@ def render_export_section(
         
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-            if st.button("📧 Send Email", use_container_width=True, disabled=not recipient_email):
+            if st.button("📧 Send Email", width="stretch", disabled=not recipient_email):
                 with st.spinner("Sending email..."):
                     try:
                         # Prepare email data
@@ -330,7 +330,7 @@ def render_export_history():
                 st.caption(f"+ {len(st.session_state.export_history) - 5} more exports")
             
             # Clear history button
-            if st.button("🗑️ Clear Export History", use_container_width=True):
+            if st.button("🗑️ Clear Export History", width="stretch"):
                 st.session_state.export_history = []
                 st.rerun()
     else:

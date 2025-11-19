@@ -25,6 +25,10 @@ from components.constants import COMPANY_TYPE_OPTIONS, INDUSTRY_OPTIONS, LOCATIO
 # Page config
 st.set_page_config(page_title="Error Recovery Simulator", page_icon="🔧", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -74,6 +78,18 @@ st.markdown("""
 
 # Header
 st.markdown('<div class="simulator-header"><h1>🔧 Error Recovery Simulator</h1><p>Simulate failures and test error recovery capabilities</p></div>', unsafe_allow_html=True)
+
+# Feature explanation
+st.markdown("""
+<div style='background-color: #fff3cd; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 2rem;'>
+    <h3 style='margin-top: 0; color: #856404;'>❓ What is This Tool?</h3>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Purpose:</strong> Test how the AI system handles failures and recovers from errors. This helps ensure system reliability before deployment.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>When to Use:</strong> Before deploying to production, or when troubleshooting system reliability issues. Use this to verify the AI can recover from various failure scenarios.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>What It Does:</strong> Injects simulated failures (timeouts, network errors, invalid inputs, etc.) into the AI execution and measures how successfully the system recovers from each failure type.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Expected Output:</strong> A detailed report showing which failures were successfully recovered from and which caused system errors. Includes recovery timeline, success rates, and recommendations.</p>
+    <p style='color: #1e293b; margin-bottom: 0;'><strong>Time Required:</strong> 2-5 minutes per simulation, depending on complexity and failure rate settings.</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Session state
 if "simulation_results" not in st.session_state:
@@ -138,14 +154,15 @@ with st.expander("⚙️ Simulation Configuration", expanded=True):
                 options=LOCATION_OPTIONS, 
                 default=["EU"],
                 key="recovery_locations_multiselect",
-                help="Select locations for entity context"
+                help="Select locations for entity context",
+                inside_form=False
             )
             industry = st.selectbox("Industry", options=INDUSTRY_OPTIONS)
 
 # Run simulation button
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    run_button = st.button("🚀 Run Failure Simulation", type="primary", use_container_width=True)
+    run_button = st.button("🚀 Run Failure Simulation", type="primary", width="stretch")
 
 if run_button or st.session_state.simulation_running:
     if not st.session_state.simulation_running:
@@ -294,7 +311,7 @@ if st.session_state.simulation_results:
                 color="Count",
                 color_continuous_scale="Reds"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info("No failures recorded.")
     
@@ -329,7 +346,7 @@ if st.session_state.simulation_results:
                 title="Recovery Success Distribution",
                 color_discrete_map={"Successful": "#28a745", "Failed": "#dc3545"}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
     
     with tab4:
         # Taxonomy analysis
@@ -351,7 +368,7 @@ if st.session_state.simulation_results:
                 names="Category",
                 title="Failure Categories"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         
         if strategy_dist:
             st.markdown("### Retry Strategy Distribution")
@@ -367,7 +384,7 @@ if st.session_state.simulation_results:
                 color="Count",
                 color_continuous_scale="Blues"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
     
     # Detailed failure list
     st.markdown("## 🔍 Detailed Failures")

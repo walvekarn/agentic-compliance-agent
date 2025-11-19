@@ -24,6 +24,10 @@ from components.api_client import APIClient, display_api_error, parseAgenticResp
 # Page config
 st.set_page_config(page_title="Agentic Benchmark Lab", page_icon="📊", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -61,6 +65,18 @@ st.markdown("""
 # Header
 st.markdown('<div class="benchmark-header"><h1>📊 Agentic Benchmark Lab</h1><p>Evaluate performance with comprehensive benchmarks</p></div>', unsafe_allow_html=True)
 
+# Feature explanation
+st.markdown("""
+<div style='background-color: #e7f3ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 2rem;'>
+    <h3 style='margin-top: 0; color: #1e40af;'>❓ What is This Tool?</h3>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Purpose:</strong> Measure and compare AI performance across different complexity levels and scenarios. Helps evaluate how well the AI handles various compliance tasks.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>When to Use:</strong> When evaluating AI performance improvements, comparing different AI configurations, or validating system capabilities before deployment.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>What It Does:</strong> Runs standardized test cases at different complexity levels (light, medium, heavy) and measures accuracy, reasoning depth, tool precision, and reflection correction scores.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Expected Output:</strong> Performance metrics, radar diagrams showing strengths/weaknesses, comparison charts, and detailed results for each test case. Helps identify areas for improvement.</p>
+    <p style='color: #1e293b; margin-bottom: 0;'><strong>Time Required:</strong> 5-15 minutes depending on number of levels and cases selected. More cases = more accurate results but longer runtime.</p>
+</div>
+""", unsafe_allow_html=True)
+
 # Session state
 if "benchmark_results" not in st.session_state:
     st.session_state.benchmark_results = None
@@ -78,7 +94,8 @@ with st.expander("⚙️ Benchmark Configuration", expanded=True):
             options=["light", "medium", "heavy"],
             default=["light", "medium", "heavy"],
             key="benchmark_levels_multiselect",
-            help="Select complexity levels to benchmark"
+            help="Select complexity levels to benchmark",
+            inside_form=False
         )
     
     with col2:
@@ -102,7 +119,7 @@ with st.expander("⚙️ Benchmark Configuration", expanded=True):
 # Run benchmark button
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    run_button = st.button("🚀 Run Benchmark Suite", type="primary", use_container_width=True)
+    run_button = st.button("🚀 Run Benchmark Suite", type="primary", width="stretch")
 
 if run_button or st.session_state.benchmark_running:
     if not st.session_state.benchmark_running:
@@ -269,7 +286,7 @@ if st.session_state.benchmark_results:
             title="Performance Radar Diagram"
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     
     with tab2:
         # Metrics comparison chart
@@ -294,7 +311,7 @@ if st.session_state.benchmark_results:
                     title="Metrics Comparison by Case",
                     barmode="group"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
     
     with tab3:
         # Results by level
@@ -319,7 +336,7 @@ if st.session_state.benchmark_results:
                 barmode="group",
                 color_discrete_map={"Successful": "#28a745", "Failed": "#dc3545"}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
     
     with tab4:
         # Execution time analysis
@@ -342,7 +359,7 @@ if st.session_state.benchmark_results:
                     title="Execution Time Distribution by Level",
                     color="Level"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
     
     # Detailed results table
     st.markdown("## 🔍 Detailed Benchmark Results")
@@ -363,7 +380,7 @@ if st.session_state.benchmark_results:
             }
             for r in benchmark_results
         ])
-        st.dataframe(results_df, use_container_width=True)
+        st.dataframe(results_df, width="stretch")
         
         # Individual case details
         st.markdown("### 📋 Individual Case Details")

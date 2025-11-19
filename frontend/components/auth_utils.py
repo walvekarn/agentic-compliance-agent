@@ -9,6 +9,7 @@ import streamlit as st
 from typing import Optional, Dict
 import os
 from . import auth_client
+from .ui_helpers import apply_light_theme_css
 
 # Load environment variables with python-dotenv
 try:
@@ -56,10 +57,15 @@ def is_authenticated() -> bool:
     Returns:
         True if authenticated (token exists), False otherwise
     """
-    # Verify both flag and token exist
-    has_flag = bool(st.session_state.get("authenticated", False))
+    # Check token first (most reliable indicator)
     has_token = bool(st.session_state.get("token"))
-    return has_flag and has_token
+    # Also check authenticated flag for consistency
+    has_flag = bool(st.session_state.get("authenticated", False))
+    # If token exists but flag is False, sync the flag (recovery from session state)
+    if has_token and not has_flag:
+        st.session_state["authenticated"] = True
+        st.session_state["auth"] = True
+    return has_token  # Token is the source of truth
 
 
 def check_auth():
@@ -99,6 +105,9 @@ def show_login_page():
     if is_authenticated():
         return True
     
+    # Apply light theme CSS for login page
+    apply_light_theme_css()
+    
     st.title("🔐 Agentic Compliance Assistant – Demo Login")
     st.markdown("""
     <p style='font-size: 1.1rem; text-align: center; color: #475569; margin-bottom: 1.25rem;'>
@@ -136,9 +145,9 @@ def show_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            username = st.text_input("Username", placeholder="demo")
-            password = st.text_input("Password", type="password", placeholder="demo123")
-            submit = st.form_submit_button("🔓 Sign In", use_container_width=True, type="primary")
+            username = st.text_input("Username", value="demo", placeholder="demo")
+            password = st.text_input("Password", type="password", value="demo123", placeholder="demo123")
+            submit = st.form_submit_button("🔓 Sign In", width="stretch", type="primary")
             
             if submit:
                 if not username or not password:
@@ -154,9 +163,6 @@ def show_login_page():
                                 # Clear redirect flag on successful login
                                 st.session_state["auth_redirect_in_progress"] = False
                                 # Ensure a hard rerun to refresh sidebar/pages
-                                try:
-                                    st.experimental_rerun()
-                                except Exception:
                                     st.rerun()
                             else:
                                 # Surface backend status or error to aid diagnosis (minimal, targeted)
@@ -250,5 +256,5 @@ def show_logout_button(container=None):
         username = st.session_state.get("username", "User")
         target.markdown("---")
         target.markdown(f"**Logged in as:** {username}")
-        if target.button("🚪 Logout", use_container_width=True, key="logout_btn"):
+        if target.button("🚪 Logout", width="stretch", key="logout_btn"):
             logout()

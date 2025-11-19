@@ -23,6 +23,10 @@ from components.constants import API_BASE_URL
 
 st.set_page_config(page_title="Compliance Calendar", page_icon="📋", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # ============================================================================
 # AUTHENTICATION CHECK
 # ============================================================================
@@ -158,7 +162,7 @@ if "calendar_form_defaults" not in st.session_state:
 # Load Example and Reset Form buttons (outside form)
 action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
 with action_col1:
-    if st.button("📝 Load Example", width='stretch', help="Pre-fill the form with sample data"):
+    if st.button("📝 Load Example", width="stretch", help="Pre-fill the form with sample data"):
         st.session_state.calendar_form_defaults = {
             "entity_name": "TechCorp Demo",
             "entity_type": "Private company",
@@ -172,7 +176,7 @@ with action_col1:
         }
         st.rerun()
 with action_col2:
-    if st.button("🔄 Reset Form", width='stretch', help="Clear all fields"):
+    if st.button("🔄 Reset Form", width="stretch", help="Clear all fields"):
         st.session_state.calendar_form_defaults = {
             "entity_name": "",
             "entity_type": "-- Select organization type --",
@@ -242,7 +246,8 @@ with st.form("calendar_form"):
             options=location_options,
             default=defaults.get("locations", []),
             key="calendar_operating_locations",
-            help="Select every location where your organization operates (Required)"
+            help="Select every location where your organization operates (Required)",
+            inside_form=True
         )
         
         industry_options = [
@@ -304,7 +309,7 @@ with st.form("calendar_form"):
         )
     
     st.markdown("---")
-    submitted = st.form_submit_button("📋 Generate Calendar", width='stretch', type="primary")
+    submitted = st.form_submit_button("📋 Generate Calendar", width="stretch", type="primary")
 
 if submitted:
     errors = []
@@ -468,27 +473,45 @@ if submitted:
                 st.markdown("## 📊 Summary")
                 
                 summary = result["summary"]
+                
+                # Calculate priority breakdown for summary
+                high_priority_count = len([t for t in result["tasks"] if days_until_deadline(t) <= 7 or (t.get("risk_level") == "HIGH" and days_until_deadline(t) <= 30)])
+                medium_priority_count = len([t for t in result["tasks"] if (8 <= days_until_deadline(t) <= 60) or (t.get("risk_level") in ["HIGH", "MEDIUM"] and 8 <= days_until_deadline(t) <= 90)])
+                low_priority_count = len([t for t in result["tasks"] if days_until_deadline(t) > 60 or days_until_deadline(t) == 999])
+                
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    st.metric("Total Tasks", summary["total_tasks"])
+                    st.metric("Total Tasks", summary["total_tasks"], help=f"Complete compliance calendar for {result['entity_name']}")
                 with col2:
-                    st.metric("Autonomous", summary["decisions"].get("AUTONOMOUS", 0))
+                    st.metric("Autonomous", summary["decisions"].get("AUTONOMOUS", 0), help="Tasks you can handle independently")
                 with col3:
-                    st.metric("Review Required", summary["decisions"].get("REVIEW_REQUIRED", 0))
+                    st.metric("Review Required", summary["decisions"].get("REVIEW_REQUIRED", 0), help="Tasks requiring manager/compliance team approval")
                 with col4:
-                    st.metric("Escalate", summary["decisions"].get("ESCALATE", 0))
+                    st.metric("Escalate", summary["decisions"].get("ESCALATE", 0), help="Tasks requiring expert/legal counsel")
+                
+                st.markdown("---")
                 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("High Risk", summary["high_risk_tasks"])
+                    st.metric("🔴 High Priority", high_priority_count, help="Due in ≤7 days OR high risk + due in ≤30 days")
                 with col2:
-                    st.metric("Medium Risk", summary["medium_risk_tasks"])
+                    st.metric("🟡 Medium Priority", medium_priority_count, help="Due in 8-60 days OR medium/high risk + due in 8-90 days")
                 with col3:
-                    st.metric("Low Risk", summary["low_risk_tasks"])
+                    st.metric("🟢 Low Priority", low_priority_count, help="Due in 61+ days or no deadline")
                 with col4:
-                    autonomy_pct = summary["autonomous_percentage"]
-                    st.metric("Autonomy Rate", f"{autonomy_pct:.1f}%")
+                    autonomy_pct = summary.get("autonomous_percentage", 0)
+                    st.metric("Autonomy Rate", f"{autonomy_pct:.1f}%", help="Percentage of tasks you can handle independently")
+                
+                st.markdown("---")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("High Risk", summary.get("high_risk_tasks", 0), help="Tasks with HIGH risk level")
+                with col2:
+                    st.metric("Medium Risk", summary.get("medium_risk_tasks", 0), help="Tasks with MEDIUM risk level")
+                with col3:
+                    st.metric("Low Risk", summary.get("low_risk_tasks", 0), help="Tasks with LOW risk level")
                 
                 # Applicable Regulations
                 if result["applicable_regulations"]:
@@ -550,22 +573,40 @@ if submitted:
                 
                 # Helper function to calculate days until deadline
                 def days_until_deadline(task):
+                    """Calculate days until deadline from TODAY, ensuring accurate date comparison."""
                     if not task.get("deadline"):
                         return 999  # Tasks without deadlines go to low priority
                     try:
-                        deadline_date = datetime.fromisoformat(task["deadline"])
-                        today = datetime.now()
-                        return (deadline_date - today).days
-                    except:
+                        # Parse deadline (handle both ISO format and date strings)
+                        deadline_str = task["deadline"]
+                        if 'T' in deadline_str:
+                            deadline_date = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+                        else:
+                            deadline_date = datetime.fromisoformat(deadline_str)
+                        
+                        # Use date() for proper date-only comparison
+                        if hasattr(deadline_date, 'date'):
+                            deadline_date_only = deadline_date.date()
+                        else:
+                            deadline_date_only = deadline_date
+                        
+                        today = datetime.now().date()
+                        days_left = (deadline_date_only - today).days
+                        
+                        # Return max(0, days_left) to avoid negative days
+                        return max(0, days_left)
+                    except Exception as e:
+                        # Log error but don't crash - return 999 for low priority
+                        print(f"Error calculating days until deadline: {e}")
                         return 999
                 
                 # Helper function to determine priority based on deadline AND risk
                 def calculate_priority(task):
                     """
-                    Priority calculation:
+                    Priority calculation with more inclusive logic:
                     - HIGH: Due in ≤7 days OR High risk + due in ≤30 days
-                    - MEDIUM: Due in 8-30 days OR Medium/High risk + due in ≤60 days
-                    - LOW: Due in 31+ days OR no deadline
+                    - MEDIUM: Due in 8-60 days OR Medium/High risk + due in 8-90 days
+                    - LOW: Due in 61+ days OR no deadline
                     """
                     days_left = days_until_deadline(task)
                     risk_level = task.get("risk_level", "LOW")
@@ -576,13 +617,15 @@ if submitted:
                     if risk_level == "HIGH" and days_left <= 30:
                         return "HIGH", days_left
                     
-                    # MEDIUM PRIORITY rules
-                    if days_left <= 30:
+                    # MEDIUM PRIORITY rules - more inclusive
+                    # Due in 8-60 days (expanded from 8-30)
+                    if days_left <= 60:
                         return "MEDIUM", days_left
-                    if risk_level in ["HIGH", "MEDIUM"] and days_left <= 60:
+                    # Medium/High risk tasks due in 8-90 days
+                    if risk_level in ["HIGH", "MEDIUM"] and days_left <= 90:
                         return "MEDIUM", days_left
                     
-                    # LOW PRIORITY (everything else)
+                    # LOW PRIORITY (everything else - 61+ days)
                     return "LOW", days_left
                 
                 # Categorize tasks by priority with enhanced logic
@@ -631,7 +674,8 @@ if submitted:
                         options=["HIGH", "MEDIUM", "LOW"],
                         default=["HIGH", "MEDIUM", "LOW"],
                         key="filter_priority_calendar",
-                        help="Filter by priority level"
+                        help="Filter by priority level",
+                        inside_form=False
                     )
                 
                 with filter_col2:
@@ -650,7 +694,8 @@ if submitted:
                         options=regulation_options,
                         default=regulation_options,
                         key="filter_regulation_calendar",
-                        help="Filter by regulation type"
+                        help="Filter by regulation type",
+                        inside_form=False
                     )
                 
                 with filter_col3:
@@ -659,7 +704,8 @@ if submitted:
                         options=["HIGH", "MEDIUM", "LOW"],
                         default=["HIGH", "MEDIUM", "LOW"],
                         key="filter_risk_calendar",
-                        help="Filter by risk level. Risk levels (LOW/MEDIUM/HIGH) indicate the potential impact of non-compliance."
+                        help="Filter by risk level. Risk levels (LOW/MEDIUM/HIGH) indicate the potential impact of non-compliance.",
+                        inside_form=False
                     )
                 
                 with filter_col4:
@@ -784,6 +830,25 @@ if submitted:
                                     if reason.strip():
                                         st.markdown(f"- {reason.strip()}")
                             
+                            st.markdown(f"#### 🎯 Risk Analysis")
+                            risk_level = task.get('risk_level', 'MEDIUM')
+                            risk_factors = task.get('risk_factors', {})
+                            
+                            # Display risk level with explanation
+                            risk_explanations = {
+                                "HIGH": "⚠️ **High Risk**: This task has significant compliance implications. Non-compliance could result in penalties, legal action, or regulatory sanctions. Expert review is strongly recommended.",
+                                "MEDIUM": "🟡 **Medium Risk**: This task has moderate compliance requirements. Review recommended before proceeding, especially if you're unsure about specific regulations.",
+                                "LOW": "🟢 **Low Risk**: This task has minimal compliance risk. Standard procedures should be sufficient, but always verify requirements for your specific jurisdiction."
+                            }
+                            st.markdown(risk_explanations.get(risk_level, f"**Risk Level:** {show_risk_badge(risk_level)}"))
+                            
+                            # Show specific risk factors if available
+                            if risk_factors and isinstance(risk_factors, dict):
+                                st.markdown("**Key Risk Factors:**")
+                                for factor, value in list(risk_factors.items())[:3]:  # Show top 3
+                                    if value:
+                                        st.markdown(f"- {factor.replace('_', ' ').title()}: {value}")
+                            
                             st.markdown(f"#### ✅ Action")
                             decision_actions = {
                                 "AUTONOMOUS": "✅ **You can proceed independently** - Handle this task on your own",
@@ -791,16 +856,17 @@ if submitted:
                                 "ESCALATE": "🚨 **Expert required** - This needs a compliance specialist or legal counsel"
                             }
                             st.markdown(decision_actions.get(task['decision'], task['decision']))
-                            st.markdown(f"**Risk Level:** {show_risk_badge(task['risk_level'])} | **Confidence:** {task['confidence']*100:.1f}%")
+                            st.markdown(f"**Confidence:** {task.get('confidence', 0.7)*100:.1f}%")
                 
                 st.markdown("---")
                 
                 # Display MEDIUM PRIORITY tasks
                 st.markdown("### 🟡 MEDIUM PRIORITY (Plan Ahead)")
                 if not medium_priority:
-                    st.info("✅ No medium-priority tasks at this time")
+                    st.info("ℹ️ **No medium-priority tasks at this time** - All tasks are either urgent (high priority) or can be planned for later (low priority).")
+                    st.caption(f"💡 **Note**: Medium priority includes tasks due in 8-60 days OR medium/high risk tasks due in 8-90 days. Your current calendar has {len(high_priority)} high-priority and {len(low_priority)} low-priority tasks.")
                 else:
-                    st.info(f"📋 **{len(medium_priority)} tasks** to plan for this month")
+                    st.info(f"📋 **{len(medium_priority)} tasks** to plan for this month (due in 8-60 days or medium/high risk tasks due in 8-90 days)")
                     
                     for task in medium_priority:
                         days_left = task["days_until_deadline"]
@@ -831,6 +897,25 @@ if submitted:
                                     if reason.strip():
                                         st.markdown(f"- {reason.strip()}")
                             
+                            st.markdown(f"#### 🎯 Risk Analysis")
+                            risk_level = task.get('risk_level', 'MEDIUM')
+                            risk_factors = task.get('risk_factors', {})
+                            
+                            # Display risk level with explanation
+                            risk_explanations = {
+                                "HIGH": "⚠️ **High Risk**: This task has significant compliance implications. Non-compliance could result in penalties, legal action, or regulatory sanctions. Expert review is strongly recommended.",
+                                "MEDIUM": "🟡 **Medium Risk**: This task has moderate compliance requirements. Review recommended before proceeding, especially if you're unsure about specific regulations.",
+                                "LOW": "🟢 **Low Risk**: This task has minimal compliance risk. Standard procedures should be sufficient, but always verify requirements for your specific jurisdiction."
+                            }
+                            st.markdown(risk_explanations.get(risk_level, f"**Risk Level:** {show_risk_badge(risk_level)}"))
+                            
+                            # Show specific risk factors if available
+                            if risk_factors and isinstance(risk_factors, dict):
+                                st.markdown("**Key Risk Factors:**")
+                                for factor, value in list(risk_factors.items())[:3]:  # Show top 3
+                                    if value:
+                                        st.markdown(f"- {factor.replace('_', ' ').title()}: {value}")
+                            
                             st.markdown(f"#### ✅ Action")
                             decision_actions = {
                                 "AUTONOMOUS": "✅ **You can proceed independently** when ready",
@@ -838,7 +923,7 @@ if submitted:
                                 "ESCALATE": "🚨 **Expert required** - Coordinate with compliance specialist or legal counsel"
                             }
                             st.markdown(decision_actions.get(task['decision'], task['decision']))
-                            st.markdown(f"**Risk Level:** {show_risk_badge(task['risk_level'])} | **Confidence:** {task['confidence']*100:.1f}%")
+                            st.markdown(f"**Confidence:** {task.get('confidence', 0.7)*100:.1f}%")
                 
                 st.markdown("---")
                 

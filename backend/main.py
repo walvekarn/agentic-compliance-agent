@@ -161,6 +161,9 @@ app.include_router(audit_router, prefix="/api/v1")  # /api/v1/audit/*
 app.include_router(feedback_router, prefix="/api/v1")  # /api/v1/feedback/*
 app.include_router(agentic_router, prefix="/api/v1")  # /api/v1/agentic/*
 
+# Note: Route aliasing is handled directly in the router files using multiple decorators
+# This provides better type safety and cleaner code organization
+
 
 if __name__ == "__main__":
     import uvicorn

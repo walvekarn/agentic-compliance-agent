@@ -29,6 +29,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"  # Show chat for insights
 )
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # ============================================================================
 # AUTHENTICATION CHECK
 # ============================================================================
@@ -47,7 +51,7 @@ st.markdown("""
     h1 {
         font-size: 3.5rem !important;
         font-weight: 800 !important;
-        color: #1e3a8a !important;
+        color: #0f172a !important;
         text-align: center;
         margin-bottom: 1rem !important;
     }
@@ -55,7 +59,7 @@ st.markdown("""
     h2 {
         font-size: 2.25rem !important;
         font-weight: 700 !important;
-        color: #1e3a8a !important;
+        color: #1e40af !important;
         margin-top: 2.5rem !important;
         margin-bottom: 1.5rem !important;
         border-left: 6px solid #3b82f6;
@@ -65,7 +69,7 @@ st.markdown("""
     h3 {
         font-size: 1.75rem !important;
         font-weight: 700 !important;
-        color: #3b82f6 !important;
+        color: #2563eb !important;
         margin-top: 1.5rem !important;
         margin-bottom: 1rem !important;
     }
@@ -96,7 +100,7 @@ st.markdown("""
     .stMetric [data-testid="stMetricValue"] {
         font-size: 2.25rem !important;
         font-weight: 800 !important;
-        color: #1e3a8a !important;
+        color: #0f172a !important;
     }
     
     /* Chart containers */
@@ -183,38 +187,65 @@ def fetch_feedback_stats():
         return get_demo_feedback_stats(), True
 
 def flatten_audit_entry(entry):
-    """Flatten nested API response into flat dictionary"""
+    """Flatten nested API response into flat dictionary with improved error handling"""
     # Check for None entry
     if entry is None:
         return None
     
     try:
+        # Safely extract nested data with type checking
+        decision = entry.get('decision', {})
+        if not isinstance(decision, dict):
+            decision = {}
+        
+        task = entry.get('task', {})
+        if not isinstance(task, dict):
+            task = {}
+        
+        entity = entry.get('entity', {})
+        if not isinstance(entity, dict):
+            entity = {}
+        
+        entity_context = entry.get('entity_context', {})
+        if not isinstance(entity_context, dict):
+            entity_context = {}
+        
+        # Safely extract decision confidence and risk score with defaults
+        decision_confidence = decision.get('confidence_score', 0)
+        if not isinstance(decision_confidence, (int, float)):
+            decision_confidence = 0
+        
+        risk_score = decision.get('risk_score', 0)
+        if not isinstance(risk_score, (int, float)):
+            risk_score = 0
+        
         return {
-            'audit_id': entry.get('audit_id'),
+            'audit_id': entry.get('audit_id') or entry.get('id'),
             'timestamp': entry.get('timestamp'),
-            'agent_type': entry.get('agent_type'),
+            'agent_type': entry.get('agent_type', 'UNKNOWN'),
             # Task fields
-            'task_description': entry.get('task', {}).get('description', ''),
-            'task_category': entry.get('task', {}).get('category', ''),
+            'task_description': task.get('description', ''),
+            'task_category': task.get('category', ''),
             # Entity fields
-            'entity_name': entry.get('entity', {}).get('name', ''),
-            'entity_type': entry.get('entity', {}).get('type', ''),
+            'entity_name': entity.get('name', ''),
+            'entity_type': entity.get('type', ''),
             # Decision fields (CRITICAL: these are nested!)
-            'decision_outcome': entry.get('decision', {}).get('outcome', ''),
-            'decision_confidence': entry.get('decision', {}).get('confidence_score', 0),
-            'risk_level': entry.get('decision', {}).get('risk_level', ''),
-            'risk_score': entry.get('decision', {}).get('risk_score', 0),
+            'decision_outcome': decision.get('outcome', 'UNKNOWN'),
+            'decision_confidence': decision_confidence,
+            'risk_level': decision.get('risk_level', 'UNKNOWN'),
+            'risk_score': risk_score,
             # Entity context (for jurisdictions)
-            'jurisdictions': entry.get('entity_context', {}).get('jurisdictions', []),
-            'industry': entry.get('entity_context', {}).get('industry', ''),
+            'jurisdictions': entity_context.get('jurisdictions', []) if isinstance(entity_context.get('jurisdictions'), list) else [],
+            'industry': entity_context.get('industry', ''),
             # Risk factors (keep as dict for detailed analysis)
-            'risk_factors': entry.get('risk_factors', {}),
+            'risk_factors': entry.get('risk_factors', {}) if isinstance(entry.get('risk_factors'), dict) else {},
             # Reasoning chain
-            'reasoning_chain': entry.get('reasoning_chain', []),
+            'reasoning_chain': entry.get('reasoning_chain', []) if isinstance(entry.get('reasoning_chain'), list) else [],
             'escalation_reason': entry.get('escalation_reason', ''),
         }
     except Exception as e:
-        # Silently skip malformed entries
+        # Log error but don't crash - return None to skip this entry
+        print(f"Error flattening audit entry: {e}")
         return None
 
 # Load data
@@ -251,6 +282,20 @@ df_audit['date'] = df_audit['timestamp'].dt.date
 
 # Summary Metrics
 st.markdown("## 📈 Key Metrics")
+
+# Add explanation box for metrics
+st.markdown("""
+<div style='background-color: #f0f9ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 2rem;'>
+    <h3 style='margin-top: 0; color: #1e40af;'>💡 Understanding These Metrics</h3>
+    <ul style='margin-bottom: 0; color: #1e293b;'>
+        <li><strong>Total Decisions:</strong> Number of compliance tasks analyzed by the AI agent. Each analysis creates one decision record.</li>
+        <li><strong>Avg Confidence:</strong> How certain the AI is about its recommendations (0-100%). Higher = more reliable. Calculated as the average confidence score across all decisions.</li>
+        <li><strong>Escalation Rate:</strong> Percentage of tasks that required expert review. Lower rates indicate better AI autonomy and more routine decisions handled independently.</li>
+        <li><strong>AI Accuracy:</strong> Percentage of AI decisions confirmed correct by humans (requires feedback). Calculated as: (agreements / total feedback) × 100. Higher accuracy indicates more trustworthy AI.</li>
+    </ul>
+    <p style='margin-top: 1rem; margin-bottom: 0; color: #475569; font-size: 0.9rem;'><em>💡 Tip: These metrics help you understand how the AI is performing and where it's learning from your organization's patterns.</em></p>
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -330,7 +375,7 @@ fig_confidence.update_layout(
     font=dict(size=12)
 )
 
-st.plotly_chart(fig_confidence, use_container_width=True)
+st.plotly_chart(fig_confidence, width="stretch")
 
 # Show insight
 recent_confidence = confidence_by_date['mean'].iloc[-1] if len(confidence_by_date) > 0 else 0
@@ -372,7 +417,7 @@ fig_escalations.update_layout(
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
 
-st.plotly_chart(fig_escalations, use_container_width=True)
+st.plotly_chart(fig_escalations, width="stretch")
 
 # Calculate escalation trend
 if len(df_audit) >= 10:
@@ -447,7 +492,7 @@ if len(high_risk_entries) > 0:
         paper_bgcolor='white'
     )
     
-    st.plotly_chart(fig_risk_factors, use_container_width=True)
+    st.plotly_chart(fig_risk_factors, width="stretch")
     
     # Show top risk factor
     top_factor = df_risk_factors.iloc[-1]
@@ -509,7 +554,7 @@ if jurisdiction_counts:
         paper_bgcolor='white'
     )
     
-    st.plotly_chart(fig_jurisdictions, use_container_width=True)
+    st.plotly_chart(fig_jurisdictions, width="stretch")
     
     # Show top jurisdictions
     col1, col2 = st.columns(2)
@@ -560,7 +605,7 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
             paper_bgcolor='white'
         )
         
-        st.plotly_chart(fig_agreement, use_container_width=True)
+        st.plotly_chart(fig_agreement, width="stretch")
     
     with col2:
         # Bar chart of override breakdown by decision type
@@ -589,7 +634,7 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
                 paper_bgcolor='white'
             )
             
-            st.plotly_chart(fig_overrides, use_container_width=True)
+            st.plotly_chart(fig_overrides, width="stretch")
     
     # Summary metrics
     st.markdown("### Learning Progress")
@@ -675,7 +720,7 @@ with col1:
     )
     
     fig_decisions.update_layout(height=350, paper_bgcolor='white')
-    st.plotly_chart(fig_decisions, use_container_width=True)
+    st.plotly_chart(fig_decisions, width="stretch")
 
 with col2:
     st.markdown("### Risk Level Distribution")
@@ -694,7 +739,7 @@ with col2:
     )
     
     fig_risks.update_layout(height=350, paper_bgcolor='white')
-    st.plotly_chart(fig_risks, use_container_width=True)
+    st.plotly_chart(fig_risks, width="stretch")
 
 st.markdown("---")
 
@@ -712,7 +757,7 @@ with col1:
         data=csv_audit,
         file_name=f"agent_audit_data_{datetime.now().strftime('%Y%m%d')}.csv",
         mime="text/csv",
-        use_container_width=True
+        width="stretch"
     )
 
 with col2:
@@ -725,7 +770,7 @@ with col2:
             data=csv_feedback,
             file_name=f"agent_feedback_data_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv",
-            use_container_width=True
+            width="stretch"
         )
     else:
         st.info("No feedback data available for export yet")

@@ -22,6 +22,10 @@ from components.api_client import APIClient, display_api_error
 # Page config
 st.set_page_config(page_title="Deployment Readiness", page_icon="✅", layout="wide")
 
+# Apply light theme CSS
+from components.ui_helpers import apply_light_theme_css
+apply_light_theme_css()
+
 # Authentication
 require_auth()
 
@@ -87,6 +91,18 @@ st.markdown("""
 # Header
 st.markdown('<div class="readiness-header"><h1>✅ Deployment Readiness Checker</h1><p>Comprehensive system health validation</p></div>', unsafe_allow_html=True)
 
+# Feature explanation
+st.markdown("""
+<div style='background-color: #d1f2eb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #28a745; margin-bottom: 2rem;'>
+    <h3 style='margin-top: 0; color: #155724;'>❓ What is This Tool?</h3>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Purpose:</strong> Validate that your system is properly configured and ready for production deployment. Checks all critical components and configurations.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>When to Use:</strong> Before deploying to production, after major configuration changes, or when troubleshooting deployment issues. Run this before going live.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>What It Does:</strong> Performs comprehensive health checks on database connectivity, API endpoints, authentication, OpenAI configuration, error handling, and system dependencies.</p>
+    <p style='color: #1e293b; margin-bottom: 0.5rem;'><strong>Expected Output:</strong> A detailed report showing which checks passed, which failed, and which have warnings. Includes remediation steps for any issues found.</p>
+    <p style='color: #1e293b; margin-bottom: 0;'><strong>Time Required:</strong> 10-30 seconds. Quick validation check that runs automatically.</p>
+</div>
+""", unsafe_allow_html=True)
+
 # Session state
 if "health_check_results" not in st.session_state:
     st.session_state.health_check_results = None
@@ -96,7 +112,7 @@ if "health_check_running" not in st.session_state:
 # Run health check button
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    run_button = st.button("🔍 Run Health Check", type="primary", use_container_width=True)
+    run_button = st.button("🔍 Run Health Check", type="primary", width="stretch")
 
 if run_button or st.session_state.health_check_running:
     if not st.session_state.health_check_running:

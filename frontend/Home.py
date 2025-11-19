@@ -33,28 +33,49 @@ st.set_page_config(
 hdr_c1, hdr_c2 = st.columns([6, 1])
 with hdr_c2:
     if is_authenticated():
-        if st.button("Logout", use_container_width=True):
+        if st.button("Logout", width="stretch"):
             logout()
 
 if not show_login_page():
     st.stop()
 # ============================================================================
 
-# Enhanced CSS for maximum readability
+# Enhanced CSS for maximum readability with better contrast - FORCE LIGHT THEME
 st.markdown("""
 <style>
+    /* FORCE LIGHT THEME - Override Streamlit's default dark theme */
+    html, body, [class*="css"] {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+    
+    /* Override Streamlit's sidebar dark theme */
+    section[data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+    }
+    
+    section[data-testid="stSidebar"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Override main app background */
+    .stApp {
+        background-color: #ffffff !important;
+    }
+    
     /* Main container with better padding */
     .main {
         padding: 1rem 2rem 2rem 2rem;
         max-width: 1400px;
         margin: 0 auto;
+        background-color: #ffffff !important;
     }
     
-    /* Much larger, bolder headers */
+    /* Much larger, bolder headers - DARKER for better contrast */
     h1 {
         font-size: 4rem !important;
         font-weight: 800 !important;
-        color: #1e3a8a !important;
+        color: #0f172a !important;
         text-align: center;
         margin-bottom: 0.75rem !important;
         line-height: 1.1 !important;
@@ -63,7 +84,7 @@ st.markdown("""
     h2 {
         font-size: 2.5rem !important;
         font-weight: 700 !important;
-        color: #1e3a8a !important;
+        color: #1e40af !important;
         margin-top: 2.5rem !important;
         margin-bottom: 1.5rem !important;
         text-align: center;
@@ -72,25 +93,26 @@ st.markdown("""
     h3 {
         font-size: 2rem !important;
         font-weight: 700 !important;
-        color: #3b82f6 !important;
+        color: #2563eb !important;
         margin-top: 1.5rem !important;
         margin-bottom: 1rem !important;
     }
     
-    /* Bigger body text */
+    /* Bigger body text - DARKER for readability */
     p, li, div {
         font-size: 1.25rem !important;
         line-height: 1.7 !important;
+        color: #1e293b !important;
     }
     
-    /* Feature cards - much more prominent */
+    /* Feature cards - LIGHTER background */
     .feature-card {
-        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
         padding: 2.5rem;
         border-radius: 20px;
         margin: 1.5rem 0;
         box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        border: 3px solid #93c5fd;
+        border: 3px solid #7dd3fc;
         transition: all 0.3s;
         min-height: 280px;
     }
@@ -105,7 +127,7 @@ st.markdown("""
         font-size: 2.25rem !important;
         font-weight: 800 !important;
         margin-bottom: 1.25rem !important;
-        color: #1e3a8a !important;
+        color: #0f172a !important;
         text-align: center;
     }
     
@@ -119,14 +141,14 @@ st.markdown("""
     
     .feature-card ul {
         font-size: 1.2rem !important;
-        color: #3730a3 !important;
+        color: #1e293b !important;
         list-style-position: inside;
     }
     
     .feature-card ul li {
         font-size: 1.2rem !important;
         padding: 0.5rem 0;
-        color: #3730a3 !important;
+        color: #1e293b !important;
     }
     
     /* Huge button styling */
@@ -153,7 +175,12 @@ st.markdown("""
         margin: 1.5rem 0 !important;
     }
     
-    /* Metrics */
+    /* Ensure all text is readable */
+    .stMarkdown {
+        color: #1e293b !important;
+    }
+    
+    /* Metrics with better contrast */
     .stMetric {
         background-color: #f8fafc !important;
         padding: 2rem !important;
@@ -164,11 +191,44 @@ st.markdown("""
     .stMetric label {
         font-size: 1.3rem !important;
         font-weight: 600 !important;
+        color: #0f172a !important;
     }
     
     .stMetric [data-testid="stMetricValue"] {
         font-size: 2.5rem !important;
         font-weight: 800 !important;
+        color: #0f172a !important;
+    }
+    
+    /* Force all Streamlit text elements to be dark */
+    .stText, .stMarkdown, .stWrite, p, span, div, label {
+        color: #1e293b !important;
+    }
+    
+    /* Override Streamlit's default text colors */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0f172a !important;
+    }
+    
+    /* Ensure buttons are visible */
+    .stButton > button {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    
+    /* Override any dark backgrounds in Streamlit components */
+    [data-testid="stAppViewContainer"] {
+        background-color: #ffffff !important;
+    }
+    
+    /* Force sidebar to be light */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+    }
+    
+    [data-testid="stSidebar"] .css-1d391kg {
+        background-color: #f8fafc !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -184,15 +244,33 @@ Your AI agent for compliance decisions — autonomous, transparent, and always l
 # Onboarding panel
 with st.container():
     st.markdown("### 🚀 Get Started")
-    ob_col1, ob_col2 = st.columns([1, 1])
+    ob_col1, ob_col2 = st.columns([2, 1])
     with ob_col1:
-        st.info("Start with a sample task to see how analysis works.")
-        if st.button("🎯 Start with a sample task", key="demo_task_btn", use_container_width=True, type="primary"):
+        st.markdown("""
+        <div style='background-color: #f0f9ff; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #3b82f6; margin-bottom: 1rem;'>
+            <p style='font-size: 1.2rem; color: #1e40af; margin: 0 0 1rem 0; font-weight: 600;'>
+                🎯 Quick Start Options
+            </p>
+            <p style='font-size: 1.1rem; color: #1e293b; margin: 0;'>
+                <strong>Option 1:</strong> Analyze a single task to get instant guidance on whether you can proceed independently, need approval, or should escalate to an expert.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🎯 Start with a sample task", key="demo_task_btn", width="stretch", type="primary"):
             # Provide a demo hint for Analyze Task page (non-invasive)
             st.session_state["demo_task_text"] = "Review privacy policy updates for a new feature rollout across US/EU."
             st.switch_page("pages/1_Analyze_Task.py")
     with ob_col2:
-        st.caption("Or generate a full compliance calendar using the 'Plan All Tasks' section below.")
+        st.markdown("""
+        <div style='background-color: #fef3c7; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #f59e0b; margin-bottom: 1rem;'>
+            <p style='font-size: 1.1rem; color: #92400e; margin: 0; font-weight: 600;'>
+                📋 Option 2
+            </p>
+            <p style='font-size: 1rem; color: #1e293b; margin-top: 0.5rem; margin-bottom: 0;'>
+                Generate a complete compliance calendar with all tasks prioritized by deadline and risk level.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Check API connection (health endpoint is unprotected)
 api = APIClient()
@@ -240,7 +318,7 @@ with col1:
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("🎯 START HERE →", key="analyze_task_btn", use_container_width=True, type="primary"):
+    if st.button("🎯 START HERE →", key="analyze_task_btn", width="stretch", type="primary"):
         st.switch_page("pages/1_Analyze_Task.py")
 
 with col2:
@@ -255,7 +333,7 @@ with col2:
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("📋 CREATE TASK LIST →", key="compliance_calendar_btn", use_container_width=True, type="primary"):
+    if st.button("📋 CREATE TASK LIST →", key="compliance_calendar_btn", width="stretch", type="primary"):
         st.switch_page("pages/2_Compliance_Calendar.py")
 
 with col3:
@@ -270,7 +348,7 @@ with col3:
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("📊 VIEW HISTORY →", key="audit_trail_btn", use_container_width=True, type="primary"):
+    if st.button("📊 VIEW HISTORY →", key="audit_trail_btn", width="stretch", type="primary"):
         st.switch_page("pages/3_Audit_Trail.py")
 
 # ✅ NEW: Agent Insights Dashboard
@@ -290,7 +368,7 @@ st.markdown("""
 
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    if st.button("📊 VIEW INSIGHTS DASHBOARD →", key="agent_insights_btn", use_container_width=True, type="primary"):
+    if st.button("📊 VIEW INSIGHTS DASHBOARD →", key="agent_insights_btn", width="stretch", type="primary"):
         st.switch_page("pages/4_Agent_Insights.py")
 
 # ✅ AGENTIC AI: Agent activity and learning indicators

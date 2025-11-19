@@ -54,9 +54,43 @@ def render_results(analysis: dict) -> None:
         st.warning("⚠️ No analysis results available")
         return
     
-    # Render results header
+    # Render results header with clearer structure
     st.markdown("---")
     st.markdown("## 🎯 Your Results")
+    
+    # Add a clear summary section FIRST
+    st.markdown("""
+    <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 10px; margin-bottom: 2rem; border-left: 4px solid #3b82f6;'>
+        <p style='font-size: 1.1rem; color: #1e40af; margin: 0;'>
+            <strong>📋 Summary:</strong> Below is your compliance analysis with decision, confidence level, risk assessment, and actionable recommendations.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Quick summary metrics at the top
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        decision = analysis.get("decision", "UNKNOWN")
+        decision_display = decision.replace("_", " ").title() if isinstance(decision, str) else str(decision)
+        st.metric("Decision", decision_display, help="The AI's recommended action")
+    with col2:
+        # Extract confidence - try confidence_score first (0-1), then confidence
+        confidence_raw = analysis.get("confidence_score") or analysis.get("confidence", 0)
+        if isinstance(confidence_raw, (int, float)):
+            # Normalize to 0-100% for display
+            if confidence_raw <= 1.0:
+                confidence_percent = confidence_raw * 100
+            else:
+                confidence_percent = confidence_raw
+            st.metric("Confidence", f"{confidence_percent:.0f}%", help="How certain the AI is about this decision (0-100%)")
+        else:
+            st.metric("Confidence", "N/A", help="How certain the AI is about this decision")
+    with col3:
+        risk = analysis.get("risk_level", "UNKNOWN")
+        risk_display = risk.replace("_", " ").title() if isinstance(risk, str) else str(risk)
+        st.metric("Risk Level", risk_display, help="Overall risk assessment")
+    
+    st.markdown("---")
     
     # =========================================================================
     # CORE DECISION OUTPUT
@@ -259,56 +293,268 @@ def render_reasoning_chain(analysis: dict) -> None:
 
 def render_recommendations(analysis: dict) -> None:
     """
-    Render action recommendations.
+    Render action recommendations with sources.
     
-    Status: ⚠️ PARTIAL - Simple list in new UI
+    Status: ✅ IMPROVED
     Priority: P0 - Critical
     
-    TODO: Restore features from old UI:
-    - Numbered recommendations with full details
-    - Expandable source citations for each recommendation
-    - Regulatory basis (GDPR, CCPA, etc.)
-    - Supporting evidence (confidence, risk factors, similar cases)
-    - Related analysis points
-    - Visual confidence meter per recommendation
+    Provides specific, actionable recommendations based on actual analysis data.
     """
+    decision = analysis.get('decision', '')
+    task_type = analysis.get('task', {}).get('category', '') if isinstance(analysis.get('task'), dict) else ''
+    task_description = analysis.get('task', {}).get('description', '') if isinstance(analysis.get('task'), dict) else ''
+    risk_level = analysis.get('risk_level', 'MEDIUM')
+    jurisdictions = analysis.get('entity_context', {}).get('jurisdictions', []) if isinstance(analysis.get('entity_context'), dict) else []
+    industry = analysis.get('entity_context', {}).get('industry', '') if isinstance(analysis.get('entity_context'), dict) else ''
+    
+    # Get recommendations from API or generate context-specific ones
     recommendations = analysis.get('recommendations', [])
+    
+    # If no recommendations from API, generate context-specific ones
+    if not recommendations:
+        recommendations = _generate_context_specific_recommendations(
+            decision, task_type, task_description, risk_level, jurisdictions, industry
+        )
+    
     if recommendations:
-        with st.expander("💡 What To Do Next", expanded=True):
-            for i, rec in enumerate(recommendations, 1):
-                st.markdown(f"**{i}.** {rec}")
+        st.markdown("---")
+        st.markdown("## 💡 What To Do Next")
+        
+        for i, rec in enumerate(recommendations, 1):
+            if isinstance(rec, dict):
+                # Handle structured recommendation
+                title = rec.get('title', f"Step {i}")
+                description = rec.get('description', '')
+                priority = rec.get('priority', 'MEDIUM')
+                
+                priority_emoji = "🔴" if priority == "HIGH" else "🟡" if priority == "MEDIUM" else "🟢"
+                st.markdown(f"""
+                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6;'>
+                    <strong>{priority_emoji} {i}. {title}</strong><br>
+                    <span style='color: #475569;'>{description}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Handle string recommendation
+                st.markdown(f"""
+                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6;'>
+                    <strong>{i}.</strong> {rec}
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Add regulatory references if available
+        regulatory_refs = analysis.get('regulatory_references', [])
+        if regulatory_refs:
+            st.markdown("---")
+            st.markdown("### 📜 Regulatory References")
+            for ref in regulatory_refs:
+                if isinstance(ref, dict):
+                    regulation = ref.get('regulation', 'N/A')
+                    article = ref.get('article', '')
+                    description = ref.get('description', '')
+                    if article:
+                        st.markdown(f"- **{regulation}**: {article} - {description}")
+                    else:
+                        st.markdown(f"- **{regulation}**: {description}")
+                elif isinstance(ref, str):
+                    st.markdown(f"- {ref}")
+
+
+def _generate_context_specific_recommendations(
+    decision: str,
+    task_type: str,
+    task_description: str,
+    risk_level: str,
+    jurisdictions: list,
+    industry: str
+) -> list:
+    """Generate context-specific recommendations based on analysis data."""
+    recommendations = []
+    
+    # Decision-specific recommendations
+    if decision == "AUTONOMOUS":
+        recommendations.append({
+            "title": "Review Applicable Regulations",
+            "description": f"Review {task_type.replace('_', ' ').title() if task_type else 'compliance'} requirements for {', '.join(jurisdictions[:2]) if jurisdictions else 'your jurisdictions'}. Ensure you understand all obligations before proceeding.",
+            "priority": "HIGH"
+        })
+        recommendations.append({
+            "title": "Document Your Approach",
+            "description": "Create a brief document outlining your compliance approach, rationale, and any controls you'll implement. This helps with future audits and demonstrates due diligence.",
+            "priority": "MEDIUM"
+        })
+        recommendations.append({
+            "title": "Implement and Monitor",
+            "description": "Proceed with implementation and schedule a follow-up review in 30 days to ensure ongoing compliance and address any issues early.",
+            "priority": "MEDIUM"
+        })
+    elif decision == "REVIEW_REQUIRED":
+        recommendations.append({
+            "title": "Schedule Review Meeting",
+            "description": "Contact your manager or compliance team within the next 2-3 business days to schedule a review meeting. Don't delay - approval is required before proceeding.",
+            "priority": "HIGH"
+        })
+        recommendations.append({
+            "title": "Prepare Review Materials",
+            "description": f"Prepare a brief summary of the {task_type.replace('_', ' ').title() if task_type else 'compliance'} requirements, your proposed approach, and any potential risks or concerns. Include relevant regulatory references.",
+            "priority": "HIGH"
+        })
+        recommendations.append({
+            "title": "Wait for Approval",
+            "description": "Do not proceed with any actions until you receive explicit approval. Document the approved approach and any conditions or modifications requested.",
+            "priority": "HIGH"
+        })
+    else:  # ESCALATE
+        recommendations.append({
+            "title": "Contact Compliance Officer Immediately",
+            "description": "Reach out to your compliance officer or legal counsel within 24 hours. This task requires expert review due to its complexity and potential legal/regulatory implications.",
+            "priority": "HIGH"
+        })
+        recommendations.append({
+            "title": "Provide Task Details",
+            "description": f"Share the task details: {task_description[:150] + '...' if len(task_description) > 150 else task_description}. Include all relevant context about jurisdictions, data types, and deadlines.",
+            "priority": "HIGH"
+        })
+        recommendations.append({
+            "title": "Do Not Proceed",
+            "description": "Do not take any action until you receive expert guidance. Proceeding without proper review could result in compliance violations and penalties.",
+            "priority": "HIGH"
+        })
+    
+    # Add jurisdiction-specific recommendations
+    if jurisdictions:
+        if "EU" in str(jurisdictions) or "European Union" in str(jurisdictions):
+            recommendations.append({
+                "title": "GDPR Compliance Check",
+                "description": "If this task involves personal data, ensure GDPR requirements are met, including data subject rights, lawful basis, and privacy notices.",
+                "priority": "MEDIUM"
+            })
+        if "US_CA" in str(jurisdictions) or "California" in str(jurisdictions):
+            recommendations.append({
+                "title": "CCPA Compliance Check",
+                "description": "If this task involves California residents' personal information, ensure CCPA requirements are met, including consumer rights and privacy disclosures.",
+                "priority": "MEDIUM"
+            })
+    
+    return recommendations
 
 
 def render_action_plan(analysis: dict) -> None:
     """
-    Render step-by-step action plan.
+    Render step-by-step action plan with specific tasks.
     
-    Status: ❌ MISSING - Not implemented in new UI
-    Priority: P1 - Important
+    Status: ✅ IMPLEMENTED
+    Priority: P0 - Critical
     
-    TODO: Implement action plan:
-    - "Your Action Plan" section
-    - Numbered steps specific to decision type
-    - Derived from decision outcome
-    - Clear, actionable guidance
+    Provides clear, actionable steps based on decision outcome.
     """
-    return
+    decision = analysis.get('decision', '')
+    task_type = analysis.get('task', {}).get('category', '') if isinstance(analysis.get('task'), dict) else ''
+    risk_level = analysis.get('risk_level', 'MEDIUM')
+    task_description = analysis.get('task', {}).get('description', 'N/A') if isinstance(analysis.get('task'), dict) else 'N/A'
+    
+    st.markdown("---")
+    st.markdown("## ✅ Your Action Plan")
+    
+    if decision == "AUTONOMOUS":
+        st.success("**You can proceed independently.** Follow these steps:")
+        steps = [
+            f"1. Review the {task_type.replace('_', ' ').title() if task_type else 'compliance'} requirements for your jurisdiction",
+            "2. Document your compliance approach and rationale",
+            "3. Implement the required controls or processes",
+            "4. Schedule a follow-up review in 30 days to ensure ongoing compliance"
+        ]
+    elif decision == "REVIEW_REQUIRED":
+        st.warning("**Get approval before proceeding.** Here's your plan:")
+        steps = [
+            "1. Schedule a meeting with your manager or compliance team within the next 2-3 business days",
+            f"2. Prepare a brief summary of the {task_type.replace('_', ' ').title() if task_type else 'compliance'} requirements and your proposed approach",
+            "3. Present your plan for review and address any concerns",
+            "4. Document the approved approach and any conditions",
+            "5. Implement only after receiving explicit approval"
+        ]
+    else:  # ESCALATE
+        st.error("**Expert review required.** Take these steps immediately:")
+        task_summary = task_description[:100] + "..." if len(task_description) > 100 else task_description
+        steps = [
+            "1. Contact your compliance officer or legal counsel immediately (within 24 hours)",
+            f"2. Provide them with the task details: {task_summary}",
+            "3. Request a compliance review meeting as soon as possible",
+            "4. Do not proceed with any actions until expert guidance is received",
+            "5. Document the expert's recommendations and follow them precisely"
+        ]
+    
+    for step in steps:
+        st.markdown(f"- {step}")
+    
+    # Add regulatory references if available
+    regulatory_refs = analysis.get('regulatory_references', [])
+    if regulatory_refs:
+        st.markdown("---")
+        st.markdown("### 📜 Regulatory References")
+        for ref in regulatory_refs:
+            if isinstance(ref, dict):
+                regulation = ref.get('regulation', 'N/A')
+                article = ref.get('article', '')
+                description = ref.get('description', '')
+                if article:
+                    st.markdown(f"- **{regulation}**: {article} - {description}")
+                else:
+                    st.markdown(f"- **{regulation}**: {description}")
 
 
 def render_stakeholders(analysis: dict) -> None:
     """
     Render stakeholder involvement guidance.
     
-    Status: ❌ MISSING - Not implemented in new UI
-    Priority: P1 - Important
+    Status: ✅ IMPLEMENTED
+    Priority: P0 - Critical
     
-    TODO: Implement stakeholders section:
-    - "Who To Talk To" section
-    - Role-specific guidance
-    - Derived from decision outcome
-    - Info box styling
+    Provides clear guidance on who to involve based on decision and risk level.
     """
-    return
+    decision = analysis.get('decision', '')
+    risk_level = analysis.get('risk_level', 'MEDIUM')
+    
+    if decision == "AUTONOMOUS":
+        return  # No stakeholders needed for autonomous decisions
+    
+    st.markdown("---")
+    st.markdown("## 👥 Who To Talk To")
+    
+    stakeholders = []
+    
+    if decision == "REVIEW_REQUIRED":
+        stakeholders.append({
+            "role": "Your Manager",
+            "reason": "Required for approval before proceeding with this task",
+            "when": "Before starting the task (within 2-3 business days)"
+        })
+        if risk_level == "HIGH":
+            stakeholders.append({
+                "role": "Compliance Team",
+                "reason": "High-risk tasks require compliance review to ensure proper handling",
+                "when": "As soon as possible, ideally before manager approval"
+            })
+    else:  # ESCALATE
+        stakeholders.append({
+            "role": "Compliance Officer",
+            "reason": "Expert review required for complex compliance scenarios with significant legal or regulatory implications",
+            "when": "Immediately (within 24 hours)"
+        })
+        stakeholders.append({
+            "role": "Legal Counsel",
+            "reason": "Legal implications require professional guidance to avoid violations and penalties",
+            "when": "Before any action is taken"
+        })
+    
+    for stakeholder in stakeholders:
+        st.markdown(f"""
+        <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #3b82f6;'>
+            <strong>👤 {stakeholder['role']}</strong><br>
+            <small><strong>Why:</strong> {stakeholder['reason']}</small><br>
+            <small><strong>When:</strong> {stakeholder['when']}</small>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_escalation_reason(analysis: dict) -> None:
