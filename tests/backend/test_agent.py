@@ -26,7 +26,7 @@ def test_agent_with_custom_model(mock_openai_api_key):
     assert agent.model == custom_model
 
 
-@patch('src.agent.openai_agent.ChatOpenAI')
+@patch('backend.agent.openai_agent.ChatOpenAI')
 def test_process_query_sync(mock_chat, mock_openai_api_key):
     """Test synchronous query processing"""
     # Mock the response
@@ -43,7 +43,7 @@ def test_process_query_sync(mock_chat, mock_openai_api_key):
 
 
 @pytest.mark.asyncio
-@patch('src.agent.openai_agent.ChatOpenAI')
+@patch('backend.agent.openai_agent.ChatOpenAI')
 async def test_process_query_async(mock_chat, mock_openai_api_key):
     """Test asynchronous query processing"""
     # Mock the response

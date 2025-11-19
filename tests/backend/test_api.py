@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from unittest.mock import patch, Mock, AsyncMock
 
-from main import app
+from backend.main import app
 from backend.db.base import Base, get_db
 
 # Create test database
@@ -50,15 +50,17 @@ def test_health_check():
     assert response.json()["status"] == "healthy"
 
 
-@patch('src.api.routes.agent')
-def test_process_query_endpoint(mock_agent):
+@patch('backend.api.routes.get_agent')
+def test_process_query_endpoint(mock_get_agent):
     """Test the query processing endpoint"""
-    # Mock the agent response with AsyncMock
-    mock_agent.process_query = AsyncMock(return_value={
+    # Create a mock agent instance
+    mock_agent_instance = Mock()
+    mock_agent_instance.process_query = AsyncMock(return_value={
         "status": "success",
         "response": "GDPR is a data protection regulation",
         "model": "gpt-4o-mini",
     })
+    mock_get_agent.return_value = mock_agent_instance
     
     response = client.post(
         "/api/v1/query",

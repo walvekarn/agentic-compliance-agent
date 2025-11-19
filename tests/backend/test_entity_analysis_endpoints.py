@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime
 
-from main import app
+from backend.main import app
 from backend.db.base import get_db
 
 
