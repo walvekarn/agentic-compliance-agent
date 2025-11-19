@@ -223,13 +223,13 @@ def multiselect_with_select_all(
         all_selected = len(current_selection) == len(options) and len(options) > 0
 
         if inside_form:
-        # SAFE toggle for forms (checkbox instead of button)
-        toggle = st.checkbox(
-            "📋 Select All" if not all_selected else "✂️ Clear All",
-            value=all_selected,
-            key=f"{state_key}_select_all_toggle",
-            help="Select all options" if not all_selected else "Clear all selections"
-        )
+            # SAFE toggle for forms (checkbox instead of button)
+            toggle = st.checkbox(
+                "📋 Select All" if not all_selected else "✂️ Clear All",
+                value=all_selected,
+                key=f"{state_key}_select_all_toggle",
+                help="Select all options" if not all_selected else "Clear all selections"
+            )
         else:
             # Use button when not in form (better UX outside forms)
             if st.button(
