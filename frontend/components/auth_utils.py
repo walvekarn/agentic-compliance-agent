@@ -163,7 +163,7 @@ def show_login_page():
                                 # Clear redirect flag on successful login
                                 st.session_state["auth_redirect_in_progress"] = False
                                 # Ensure a hard rerun to refresh sidebar/pages
-                                    st.rerun()
+                                st.rerun()
                             else:
                                 # Surface backend status or error to aid diagnosis (minimal, targeted)
                                 detail = err or "Login failed"
