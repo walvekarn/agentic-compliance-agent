@@ -168,7 +168,13 @@ async def analyze_compliance_decision(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="AnalysisError",
+            message=f"Analysis failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )
 
 
 @router.post("/quick-check")
@@ -200,7 +206,13 @@ async def quick_risk_check(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Quick check failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="QuickCheckError",
+            message=f"Quick check failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )
 
 
 @router.get("/risk-levels")
@@ -312,7 +324,13 @@ async def batch_analyze(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="BatchAnalysisError",
+            message=f"Batch analysis failed: {str(e)}",
+            details={"error_type": type(e).__name__, "task_count": len(tasks) if 'tasks' in locals() else None}
+        )
 
 
 class WhatIfRequest(BaseModel):

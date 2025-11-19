@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Caching Configuration
     CACHE_TTL_SECONDS: int = 300  # 5 minutes default
     CACHE_MAX_SIZE: int = 100  # Maximum cache entries
+    
+    # Agentic Engine Timeouts (in seconds)
+    AGENTIC_OPERATION_TIMEOUT: int = 120  # Default timeout for agentic operations (test suite, benchmarks, recovery)
+    AGENTIC_SECONDARY_TASK_TIMEOUT: int = 30  # Timeout for secondary tasks (AI analysis, etc.)
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

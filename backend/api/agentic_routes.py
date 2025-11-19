@@ -962,7 +962,7 @@ async def run_test_suite_endpoint(
                     complexity_distribution=complexity_dist,
                     max_iterations=request.max_iterations
                 ),
-                timeout=120.0  # 120 second timeout
+                timeout=float(settings.AGENTIC_OPERATION_TIMEOUT)  # Configurable timeout
             )
             
             print(f"[INFO] Test suite execution completed: {results.get('summary', {}).get('total_tests', 0)} tests at {timestamp}")
@@ -993,7 +993,7 @@ async def run_test_suite_endpoint(
                     openai_response = await call_openai_async(
                         prompt=summary_prompt,
                         is_main_task=False,  # Test suite analysis is a secondary task
-                        timeout=30.0
+                        timeout=float(settings.AGENTIC_SECONDARY_TASK_TIMEOUT)
                     )
                     
                     if openai_response["status"] == "completed":
@@ -1025,7 +1025,7 @@ async def run_test_suite_endpoint(
             }
             
         except asyncio.TimeoutError:
-            error_msg = "Test suite execution timed out after 120 seconds"
+            error_msg = f"Test suite execution timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
             print(f"[ERROR] {error_msg} at {timestamp}")
             return {
                 "status": "timeout",
@@ -1100,7 +1100,7 @@ async def run_benchmarks_endpoint(
                     max_cases_per_level=request.max_cases_per_level,
                     max_iterations=request.max_iterations
                 ),
-                timeout=120.0  # 120 second timeout
+                timeout=float(settings.AGENTIC_OPERATION_TIMEOUT)  # Configurable timeout
             )
             
             summary = results.get('summary', {})
@@ -1133,7 +1133,7 @@ async def run_benchmarks_endpoint(
                     openai_response = await call_openai_async(
                         prompt=analysis_prompt,
                         is_main_task=False,  # Benchmark analysis is a secondary task
-                        timeout=30.0
+                        timeout=float(settings.AGENTIC_SECONDARY_TASK_TIMEOUT)
                     )
                     
                     if openai_response["status"] == "completed":
@@ -1165,7 +1165,7 @@ async def run_benchmarks_endpoint(
             }
             
         except asyncio.TimeoutError:
-            error_msg = "Benchmark execution timed out after 120 seconds"
+            error_msg = f"Benchmark execution timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
             print(f"[ERROR] {error_msg} at {timestamp}")
             return {
                 "status": "timeout",
@@ -1249,7 +1249,7 @@ async def run_recovery_endpoint(
                     failure_rate=request.failure_rate,
                     max_iterations=request.max_iterations
                 ),
-                timeout=120.0  # 120 second timeout
+                timeout=float(settings.AGENTIC_OPERATION_TIMEOUT)  # Configurable timeout
             )
             
             recovery_stats = results.get("failure_statistics", {})
@@ -1284,7 +1284,7 @@ async def run_recovery_endpoint(
                     openai_response = await call_openai_async(
                         prompt=analysis_prompt,
                         is_main_task=False,  # Recovery analysis is a secondary task
-                        timeout=30.0
+                        timeout=float(settings.AGENTIC_SECONDARY_TASK_TIMEOUT)
                     )
                     
                     if openai_response["status"] == "completed":
@@ -1316,7 +1316,7 @@ async def run_recovery_endpoint(
             }
             
         except asyncio.TimeoutError:
-            error_msg = "Recovery simulation timed out after 120 seconds"
+            error_msg = f"Recovery simulation timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
             print(f"[ERROR] {error_msg} at {timestamp}")
             return {
                 "status": "timeout",

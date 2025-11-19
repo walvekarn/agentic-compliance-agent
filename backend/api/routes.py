@@ -110,9 +110,12 @@ async def process_compliance_query(
                 "user_id": current_user.id,
                 "query_length": len(request.query)
             })
-            raise HTTPException(
+            from backend.api.error_utils import raise_standardized_error
+            raise_standardized_error(
                 status_code=504,
-                detail="Request timed out. The AI is taking too long to respond. Please try a simpler question or try again."
+                error_type="TimeoutError",
+                message="Request timed out. The AI is taking too long to respond. Please try a simpler question or try again.",
+                details={"timeout_seconds": 30}
             )
         
         # Handle error responses from agent
@@ -137,7 +140,13 @@ async def process_compliance_query(
             except Exception as db_error:
                 logger.error(f"Failed to log error query to database: {db_error}", exc_info=True)
             
-            raise HTTPException(status_code=500, detail=error_message)
+            from backend.api.error_utils import raise_standardized_error
+            raise_standardized_error(
+                status_code=500,
+                error_type="AgentError",
+                message=error_message,
+                details={"model": result.get("model", "unknown")}
+            )
         
         # Store successful query in database
         try:
@@ -182,9 +191,12 @@ async def process_compliance_query(
             db.rollback()
         except Exception as rollback_error:
             logger.error(f"Unhandled error in route rollback: {rollback_error}", exc_info=True)
-        raise HTTPException(
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            error_type="InternalServerError",
+            message=f"Internal server error: {str(e)}",
+            details={"error_type": type(e).__name__}
         )
 
 

@@ -309,9 +309,29 @@ if submitted:
             
             if response.success:
                 if response.data:
-                    SessionManager.save_analysis(response.data)
-                    st.success("✅ Analysis complete! Results below:")
-                    st.rerun()  # Rerun to show results cleanly and clear any errors
+                    # Validate response structure with graceful error handling
+                    try:
+                        analysis = response.data
+                        # Validate required fields exist
+                        required_fields = ["decision", "risk_level", "confidence_score"]
+                        missing_fields = [field for field in required_fields if field not in analysis]
+                        
+                        if missing_fields:
+                            st.warning(f"⚠️ **Partial Response**: Missing fields: {', '.join(missing_fields)}. Some features may not work correctly.")
+                            # Set defaults for missing fields
+                            if "risk_level" not in analysis:
+                                analysis["risk_level"] = "UNKNOWN"
+                            if "confidence_score" not in analysis:
+                                analysis["confidence_score"] = 0.0
+                            if "decision" not in analysis:
+                                analysis["decision"] = "REVIEW_REQUIRED"
+                        
+                        SessionManager.save_analysis(analysis)
+                        st.success("✅ Analysis complete! Results below:")
+                        st.rerun()  # Rerun to show results cleanly and clear any errors
+                    except (KeyError, TypeError, AttributeError) as validation_error:
+                        st.error(f"❌ **Invalid Response Format**: The API returned data in an unexpected format: {str(validation_error)}")
+                        st.info("💡 **Troubleshooting**:\n1. The backend may have returned an incomplete response\n2. Try submitting the form again\n3. If the problem persists, contact support")
                 else:
                     st.error("❌ **Empty Response**: The API returned no data. Please try again.")
             else:

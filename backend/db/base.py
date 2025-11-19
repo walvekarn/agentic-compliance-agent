@@ -40,6 +40,25 @@ class Base(DeclarativeBase):
     pass
 
 
+def get_database_type() -> str:
+    """
+    Detect database type from DATABASE_URL
+    
+    Returns:
+        Database type string: "sqlite", "postgresql", "mysql", etc.
+    """
+    url = settings.DATABASE_URL.lower()
+    if "sqlite" in url:
+        return "sqlite"
+    elif "postgresql" in url or "postgres" in url:
+        return "postgresql"
+    elif "mysql" in url:
+        return "mysql"
+    else:
+        # Default to sqlite for unknown types
+        return "sqlite"
+
+
 def get_db():
     """
     Dependency function to get database session

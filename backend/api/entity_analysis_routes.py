@@ -29,11 +29,11 @@ class AnalyzeEntityRequest(BaseModel):
     locations: List[str] = Field(..., description="List of locations/jurisdictions (e.g., ['US', 'EU', 'UK'])")
     entity_type: Optional[str] = Field(default="PRIVATE_COMPANY", description="Type of entity")
     industry: Optional[str] = Field(default="TECHNOLOGY", description="Industry category")
-    employee_count: Optional[int] = Field(default=None, description="Number of employees")
-    annual_revenue: Optional[float] = Field(default=None, description="Annual revenue")
+    employee_count: Optional[int] = Field(default=None, ge=1, le=10000000, description="Number of employees (1-10M)")
+    annual_revenue: Optional[float] = Field(default=None, ge=0.0, description="Annual revenue (must be >= 0)")
     has_personal_data: bool = Field(default=True, description="Whether entity handles personal data")
     is_regulated: bool = Field(default=False, description="Whether entity is directly regulated")
-    previous_violations: int = Field(default=0, description="Number of previous compliance violations")
+    previous_violations: int = Field(default=0, ge=0, description="Number of previous compliance violations (must be >= 0)")
     
     class Config:
         json_schema_extra = {
@@ -424,7 +424,13 @@ async def analyze_entity(
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Entity analysis failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="EntityAnalysisError",
+            message=f"Entity analysis failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )
 
 
 @router.get("/audit_log/{task_id}", response_model=AuditLogResponse)
@@ -453,12 +459,27 @@ async def get_audit_log(
         # Query audit trail by task_id in metadata
         from backend.db.models import AuditTrail
         from sqlalchemy import func
+        from backend.db.base import get_database_type
         
-        # Use SQLite's JSON extraction to find matching task_id
-        # This works with SQLite's json_extract function
-        audit_entry = db.query(AuditTrail).filter(
-            func.json_extract(AuditTrail.meta_data, '$.task_id') == task_id
-        ).order_by(AuditTrail.timestamp.desc()).first()
+        # Use portable JSON query based on database type
+        db_type = get_database_type()
+        
+        if db_type == "sqlite":
+            # SQLite-specific JSON extraction using json_extract function
+            audit_entry = db.query(AuditTrail).filter(
+                func.json_extract(AuditTrail.meta_data, '$.task_id') == task_id
+            ).order_by(AuditTrail.timestamp.desc()).first()
+        elif db_type == "postgresql":
+            # PostgreSQL uses JSON operators: meta_data->>'task_id'
+            audit_entry = db.query(AuditTrail).filter(
+                AuditTrail.meta_data['task_id'].astext == task_id
+            ).order_by(AuditTrail.timestamp.desc()).first()
+        else:
+            # MySQL and other databases: use JSON_EXTRACT function
+            # Fallback to SQLite method for compatibility
+            audit_entry = db.query(AuditTrail).filter(
+                func.json_extract(AuditTrail.meta_data, '$.task_id') == task_id
+            ).order_by(AuditTrail.timestamp.desc()).first()
         
         if not audit_entry:
             raise HTTPException(
@@ -488,5 +509,11 @@ async def get_audit_log(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve audit log: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="AuditLogError",
+            message=f"Failed to retrieve audit log: {str(e)}",
+            details={"error_type": type(e).__name__, "task_id": task_id}
+        )
 
