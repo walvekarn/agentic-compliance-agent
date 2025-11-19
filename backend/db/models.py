@@ -73,12 +73,17 @@ class AuditTrail(Base):
     risk_score = Column(Float, nullable=True)
     
     # Backwards compatibility — some routes still expect audit_id
+    # Note: API routes use 'audit_id' parameter name for consistency,
+    # but internally we query by 'id' (the primary key).
+    # This property provides seamless mapping between the two.
     @property
     def audit_id(self):
+        """Get audit_id (alias for id) for API compatibility"""
         return self.id
 
     @audit_id.setter
     def audit_id(self, value):
+        """Set audit_id (maps to id) for API compatibility"""
         self.id = value
     
     # Reasoning chain (stored as JSON array)

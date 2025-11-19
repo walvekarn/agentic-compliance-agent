@@ -1,5 +1,6 @@
 """API routes for the experimental agentic AI engine"""
 
+import logging
 from backend.config import settings
 import asyncio
 from datetime import datetime
@@ -19,6 +20,8 @@ from backend.agentic_engine.testing.health_check import SystemHealthCheck
 from backend.agent.audit_service import AuditService
 from backend.db.base import get_db
 from backend.auth.security import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agentic", tags=["Agentic AI Engine", "Protected"], dependencies=[Depends(get_current_user)])
 
@@ -342,15 +345,35 @@ async def analyze_with_agentic_engine(
             f"{request.task.task_description}"
         )
         
-        # Run orchestrator
-        result = orchestrator.run(
-            task=task_description,
-            context=context,
-            max_iterations=request.max_iterations
-        )
+        # Run orchestrator with proper error handling
+        try:
+            result = orchestrator.run(
+                task=task_description,
+                context=context,
+                max_iterations=request.max_iterations
+            )
+        except Exception as orchestrator_error:
+            logger.error(
+                f"Orchestrator execution failed: {orchestrator_error}",
+                exc_info=True,
+                extra={
+                    "entity_name": request.entity.entity_name,
+                    "task_description": request.task.task_description,
+                    "max_iterations": request.max_iterations
+                }
+            )
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Agentic analysis execution failed: {str(orchestrator_error)}"
+            )
         
-        # Get agent loop metrics
-        agent_loop_metrics = orchestrator.agent_loop.get_metrics()
+        # Get agent loop metrics with error handling
+        try:
+            agent_loop_metrics = orchestrator.agent_loop.get_metrics()
+        except Exception as metrics_error:
+            logger.warning(f"Failed to get agent loop metrics: {metrics_error}")
+            agent_loop_metrics = None
         
         # Log agentic loop output to audit trail
         try:
@@ -366,19 +389,47 @@ async def analyze_with_agentic_engine(
                     "task_category": request.task.task_category
                 }
             )
-        except Exception as e:
+        except Exception as audit_error:
             # Don't fail the request if logging fails
-            print(f"Warning: Failed to log agentic loop output: {e}")
+            logger.warning(f"Failed to log agentic loop output: {audit_error}")
         
         # Transform orchestrator result to API response format
-        response = transform_orchestrator_result(result, agent_loop_metrics)
+        try:
+            response = transform_orchestrator_result(result, agent_loop_metrics)
+        except Exception as transform_error:
+            logger.error(
+                f"Failed to transform orchestrator result: {transform_error}",
+                exc_info=True
+            )
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to format analysis response: {str(transform_error)}"
+            )
         
         return response
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        # Log unexpected errors
+        logger.error(
+            f"Unexpected error in analyze_with_agentic_engine: {type(e).__name__}: {e}",
+            exc_info=True,
+            extra={
+                "entity_name": request.entity.entity_name if 'request' in locals() else None,
+                "task_description": request.task.task_description if 'request' in locals() else None
+            }
+        )
+        # Attempt to rollback any pending database transactions
+        try:
+            db.rollback()
+        except Exception as rollback_error:
+            logger.error(f"Unhandled error in route rollback: {rollback_error}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Agentic analysis failed: {str(e)}"
+            detail=f"Internal server error: {str(e)}"
         )
 
 
@@ -985,7 +1036,11 @@ async def run_test_suite_endpoint(
             
     except Exception as e:
         error_msg = f"Test suite execution failed: {str(e)}"
-        print(f"[ERROR] {error_msg} at {timestamp}")
+        logger.error(f"{error_msg} at {timestamp}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if db is not available
         return {
             "status": "error",
             "results": None,
@@ -1121,7 +1176,11 @@ async def run_benchmarks_endpoint(
             
     except Exception as e:
         error_msg = f"Benchmark execution failed: {str(e)}"
-        print(f"[ERROR] {error_msg} at {timestamp}")
+        logger.error(f"{error_msg} at {timestamp}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if db is not available
         return {
             "status": "error",
             "results": None,
@@ -1268,7 +1327,11 @@ async def run_recovery_endpoint(
             
     except Exception as e:
         error_msg = f"Recovery simulation failed: {str(e)}"
-        print(f"[ERROR] {error_msg} at {timestamp}")
+        logger.error(f"{error_msg} at {timestamp}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if db is not available
         return {
             "status": "error",
             "results": None,

@@ -311,6 +311,7 @@ async def batch_analyze(
         return results
         
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
 
 
