@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # Add frontend to path
-# From tests/dashboard/test_auth_module.py -> project_root/frontend
+# From tests/frontend/test_auth_module.py -> project_root/frontend
 frontend_path = Path(__file__).parent.parent.parent / "frontend"
 sys.path.insert(0, str(frontend_path))
 

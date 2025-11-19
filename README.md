@@ -364,7 +364,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 Terminal 2 - Dashboard:
 ```bash
 cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
-streamlit run dashboard/Home.py --server.port 8501
+streamlit run frontend/Home.py --server.port 8501
 ```
 
 ### ✅ Verify Installation

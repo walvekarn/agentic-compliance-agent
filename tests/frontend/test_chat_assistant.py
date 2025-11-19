@@ -10,7 +10,7 @@ import requests
 import json
 
 # Add frontend to path
-# From tests/dashboard/test_chat_assistant.py -> project_root/frontend
+# From tests/frontend/test_chat_assistant.py -> project_root/frontend
 frontend_path = Path(__file__).parent.parent.parent / "frontend"
 sys.path.insert(0, str(frontend_path))
 
