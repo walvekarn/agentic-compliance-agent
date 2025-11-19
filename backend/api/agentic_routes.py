@@ -1341,12 +1341,12 @@ async def run_recovery_endpoint(
 
 
 # ============================================================================
-# ROUTE ALIASES for camelCase/kebab-case/snake_case compatibility
+# ROUTE ALIASES for camelCase/kebab-case compatibility
 # ============================================================================
-# These aliases allow endpoints to be accessed with different naming conventions
-# for better API compatibility and flexibility
+# Limited aliases for common naming conventions only
+# Canonical routes: /testSuite, /benchmarks, /recovery, /health/full
 
-# Alias: /testSuite -> /test-suite, /test_suite
+# Alias: /testSuite -> /test-suite (kebab-case - most common alternative)
 @router.post("/test-suite")
 async def run_test_suite_endpoint_kebab(
     request: TestSuiteRequest,
@@ -1356,29 +1356,7 @@ async def run_test_suite_endpoint_kebab(
     return await run_test_suite_endpoint(request, db)
 
 
-@router.post("/test_suite")
-async def run_test_suite_endpoint_snake(
-    request: TestSuiteRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /testSuite in snake_case"""
-    return await run_test_suite_endpoint(request, db)
-
-
-# Alias: /health/full -> /healthFull, /health_full
-@router.get("/healthFull")
-async def full_health_check_camel():
-    """Alias for /health/full in camelCase"""
-    return await full_health_check()
-
-
-@router.get("/health_full")
-async def full_health_check_snake():
-    """Alias for /health/full in snake_case"""
-    return await full_health_check()
-
-
-# Alias: /benchmarks -> /benchmark-run, /benchmark_run
+# Alias: /benchmarks -> /benchmark-run (kebab-case - most common alternative)
 @router.post("/benchmark-run")
 async def run_benchmarks_endpoint_kebab(
     request: BenchmarkRequest,
@@ -1388,16 +1366,7 @@ async def run_benchmarks_endpoint_kebab(
     return await run_benchmarks_endpoint(request, db)
 
 
-@router.post("/benchmark_run")
-async def run_benchmarks_endpoint_snake(
-    request: BenchmarkRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /benchmarks in snake_case"""
-    return await run_benchmarks_endpoint(request, db)
-
-
-# Alias: /recovery -> /failure-simulate, /failure_simulate
+# Alias: /recovery -> /failure-simulate (kebab-case - most common alternative)
 @router.post("/failure-simulate")
 async def run_recovery_endpoint_kebab(
     request: FailureSimulationRequest,
@@ -1407,65 +1376,7 @@ async def run_recovery_endpoint_kebab(
     return await run_recovery_endpoint(request, db)
 
 
-@router.post("/failure_simulate")
-async def run_recovery_endpoint_snake(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /recovery in snake_case"""
-    return await run_recovery_endpoint(request, db)
-
-
-# Additional aliases for common naming variations
-# Alias: /recovery -> /error-recovery, /error_recovery
-@router.post("/error-recovery")
-async def run_recovery_endpoint_error_kebab(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /recovery as /error-recovery in kebab-case"""
-    return await run_recovery_endpoint(request, db)
-
-
-@router.post("/error_recovery")
-async def run_recovery_endpoint_error_snake(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /recovery as /error_recovery in snake_case"""
-    return await run_recovery_endpoint(request, db)
-
-
-# Alias: /recovery -> /failure-simulation
-@router.post("/failure-simulation")
-async def run_recovery_endpoint_simulation(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /recovery as /failure-simulation"""
-    return await run_recovery_endpoint(request, db)
-
-
-# Alias: /benchmarks -> /bench-marks, /bench_marks
-@router.post("/bench-marks")
-async def run_benchmarks_endpoint_marks_kebab(
-    request: BenchmarkRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /benchmarks as /bench-marks in kebab-case"""
-    return await run_benchmarks_endpoint(request, db)
-
-
-@router.post("/bench_marks")
-async def run_benchmarks_endpoint_marks_snake(
-    request: BenchmarkRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /benchmarks as /bench_marks in snake_case"""
-    return await run_benchmarks_endpoint(request, db)
-
-
-# Alias: /health/full -> /health-full
+# Alias: /health/full -> /health-full (kebab-case - most common alternative)
 @router.get("/health-full")
 async def full_health_check_kebab():
     """Alias for /health/full in kebab-case"""

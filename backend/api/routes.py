@@ -309,24 +309,29 @@ async def export_email(
     db: Session = Depends(get_db)
 ):
     """
-    Stub endpoint for email export functionality.
+    Email export functionality (NOT IMPLEMENTED).
     
-    Note: This is a placeholder implementation. Full email functionality
-    would require SMTP configuration and email service integration.
+    This endpoint is a placeholder. Email functionality requires SMTP configuration
+    and email service integration.
     
     Args:
         request: EmailExportRequest with recipient, subject, body, and optional attachment
         db: Database session
         
     Returns:
-        Success message (stub)
+        501 Not Implemented status
+        
+    Raises:
+        HTTPException: Always raises 501 Not Implemented
     """
-    # Stub implementation - returns success without actually sending email
-    return {
-        "status": "success",
-        "message": "Email export functionality is not yet implemented. Please use download options instead.",
-        "recipient": request.recipient,
-        "subject": request.subject,
-        "note": "This endpoint is a placeholder. Email functionality requires SMTP configuration."
-    }
+    raise HTTPException(
+        status_code=501,
+        detail={
+            "status": "not_implemented",
+            "message": "Email export functionality is not yet implemented. Please use download options instead.",
+            "recipient": request.recipient,
+            "subject": request.subject,
+            "note": "This endpoint requires SMTP configuration and email service integration. Use download options (TXT, Excel, JSON) for now."
+        }
+    )
 
