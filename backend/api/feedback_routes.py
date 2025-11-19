@@ -119,7 +119,7 @@ def submit_feedback(
                 db.commit()
             except Exception as e:
                 # Don't fail feedback submission if processing fails
-                print(f"Warning: Feedback processing failed: {e}")
+                logger.warning(f"Feedback processing failed: {e}", exc_info=True)
         
         return FeedbackResponse(
             feedback_id=db_feedback.feedback_id,

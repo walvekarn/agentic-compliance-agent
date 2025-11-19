@@ -22,7 +22,7 @@ Status:
 """
 
 import streamlit as st
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Any, Optional, List
 
 if TYPE_CHECKING:
     from backend.agent.risk_models import DecisionAnalysis
@@ -34,7 +34,7 @@ from .similar_cases_display import render_similar_cases
 from .suggestions_display import render_proactive_suggestions
 
 
-def render_results(analysis: dict) -> None:
+def render_results(analysis: Dict[str, Any]) -> None:
     """
     Main orchestrator for rendering all analysis results.
     
@@ -172,7 +172,7 @@ def render_results(analysis: dict) -> None:
 # =============================================================================
 
 
-def render_decision_banner(analysis: dict) -> None:
+def render_decision_banner(analysis: Dict[str, Any]) -> None:
     """
     Render the main decision outcome banner.
     
@@ -201,7 +201,7 @@ def render_decision_banner(analysis: dict) -> None:
 # See: frontend/components/analyze_task/confidence_display.py
 
 
-def render_risk_level_display(analysis: dict) -> None:
+def render_risk_level_display(analysis: Dict[str, Any]) -> None:
     """
     Render risk level assessment.
     
@@ -233,7 +233,7 @@ def render_risk_level_display(analysis: dict) -> None:
 # See: frontend/components/analyze_task/similar_cases_display.py
 
 
-def render_pattern_analysis(analysis: dict) -> None:
+def render_pattern_analysis(analysis: Dict[str, Any]) -> None:
     """
     Render pattern analysis summary.
     
@@ -270,7 +270,7 @@ def render_pattern_analysis(analysis: dict) -> None:
 # See: frontend/components/analyze_task/risk_display.py
 
 
-def render_reasoning_chain(analysis: dict) -> None:
+def render_reasoning_chain(analysis: Dict[str, Any]) -> None:
     """
     Render AI reasoning chain.
     
@@ -291,7 +291,7 @@ def render_reasoning_chain(analysis: dict) -> None:
                 st.markdown(f"{i}. {step}")
 
 
-def render_recommendations(analysis: dict) -> None:
+def render_recommendations(analysis: Dict[str, Any]) -> None:
     """
     Render action recommendations with sources.
     
@@ -365,9 +365,9 @@ def _generate_context_specific_recommendations(
     task_type: str,
     task_description: str,
     risk_level: str,
-    jurisdictions: list,
+    jurisdictions: List[str],
     industry: str
-) -> list:
+) -> List[Dict[str, Any]]:
     """Generate context-specific recommendations based on analysis data."""
     recommendations = []
     
@@ -439,7 +439,7 @@ def _generate_context_specific_recommendations(
     return recommendations
 
 
-def render_action_plan(analysis: dict) -> None:
+def render_action_plan(analysis: Dict[str, Any]) -> None:
     """
     Render step-by-step action plan with specific tasks.
     
@@ -503,7 +503,7 @@ def render_action_plan(analysis: dict) -> None:
                     st.markdown(f"- **{regulation}**: {description}")
 
 
-def render_stakeholders(analysis: dict) -> None:
+def render_stakeholders(analysis: Dict[str, Any]) -> None:
     """
     Render stakeholder involvement guidance.
     
@@ -557,7 +557,7 @@ def render_stakeholders(analysis: dict) -> None:
         """, unsafe_allow_html=True)
 
 
-def render_escalation_reason(analysis: dict) -> None:
+def render_escalation_reason(analysis: Dict[str, Any]) -> None:
     """
     Render escalation reason if applicable.
     
@@ -595,7 +595,7 @@ def render_escalation_reason(analysis: dict) -> None:
     st.error(f"🚨 **Escalation Reason**: {escalation_reason}")
 
 
-def render_confidence_warnings(analysis: dict) -> None:
+def render_confidence_warnings(analysis: Dict[str, Any]) -> None:
     """
     Render dynamic confidence warnings.
     
@@ -639,7 +639,7 @@ def render_confidence_warnings(analysis: dict) -> None:
     # High confidence (>= 0.85) - no warning needed, already shown in confidence meter
 
 
-def render_agent_explainability(analysis: dict) -> None:
+def render_agent_explainability(analysis: Dict[str, Any]) -> None:
     """
     Render agent explainability section.
     
@@ -683,7 +683,7 @@ def render_agent_explainability(analysis: dict) -> None:
                 st.caption(f"... and {len(reasoning) - 5} more steps")
 
 
-def render_counterfactual_explanations(analysis: dict) -> None:
+def render_counterfactual_explanations(analysis: Dict[str, Any]) -> None:
     """
     Render counterfactual "what if" scenarios.
     
@@ -729,7 +729,7 @@ def render_counterfactual_explanations(analysis: dict) -> None:
         """)
 
 
-def render_feedback_form(analysis: dict) -> None:
+def render_feedback_form(analysis: Dict[str, Any]) -> None:
     """
     Render human feedback form for learning loop.
     
@@ -797,7 +797,7 @@ def render_feedback_form(analysis: dict) -> None:
                 st.error(f"❌ Failed to submit feedback: {response.error}")
 
 
-def render_export_section(analysis: dict) -> None:
+def render_export_section(analysis: Dict[str, Any]) -> None:
     """
     Render export options.
     
@@ -836,7 +836,7 @@ def render_export_section(analysis: dict) -> None:
     st.caption("💡 Note: Email export is not yet available. Please use download options above.")
 
 
-def _format_analysis_as_text(analysis: dict) -> str:
+def _format_analysis_as_text(analysis: Dict[str, Any]) -> str:
     """Format analysis as text report"""
     lines = []
     lines.append("=" * 70)
@@ -874,7 +874,7 @@ def _format_analysis_as_text(analysis: dict) -> str:
     return "\n".join(lines)
 
 
-def _format_analysis_as_dataframe(analysis: dict) -> pd.DataFrame:
+def _format_analysis_as_dataframe(analysis: Dict[str, Any]) -> "pd.DataFrame":
     """Format analysis as DataFrame for Excel export"""
     import pandas as pd
     
@@ -903,7 +903,7 @@ def _format_analysis_as_dataframe(analysis: dict) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def render_chat_integration(analysis: dict) -> None:
+def render_chat_integration(analysis: Dict[str, Any]) -> None:
     """
     Render chat assistant integration.
     

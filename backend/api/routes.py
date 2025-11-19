@@ -166,7 +166,7 @@ async def process_compliance_query(
             query_id = db_query.id
         except Exception as db_error:
             # Log database error but still return the result
-            print(f"Failed to save query to database: {db_error}")
+            logger.warning(f"Failed to save query to database: {db_error}", exc_info=True)
             db.rollback()
             query_id = None
         

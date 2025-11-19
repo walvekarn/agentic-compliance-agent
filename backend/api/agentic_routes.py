@@ -453,7 +453,7 @@ async def get_agentic_engine_status():
         version = get_version()
     except ImportError:
         version = "1.3.0-agentic-hardened"
-        print(f"[INFO] Using default version: {version}")
+        logger.info(f"Using default version: {version}")
         
         # STEP 2: Initialize ReasoningEngine for natural language analysis
         from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
@@ -486,15 +486,15 @@ async def get_agentic_engine_status():
                     status_summary = result_content.get("content", "System operational")
                 else:
                     status_summary = str(result_content) if result_content else "System operational"
-                print(f"[INFO] Status analysis completed at {timestamp}")
+                logger.info(f"Status analysis completed at {timestamp}")
             else:
                 error_msg = openai_response.get("error", "Unknown error")
                 status_summary = f"Status analysis unavailable: {error_msg}"
-                print(f"[ERROR] Status analysis failed: {error_msg} at {timestamp}")
+                logger.error(f"Status analysis failed: {error_msg} at {timestamp}")
             
         except Exception as e:
             status_summary = "Status analysis unavailable"
-            print(f"[ERROR] Status analysis failed: {str(e)} at {timestamp}")
+            logger.error(f"Status analysis failed: {str(e)} at {timestamp}", exc_info=True)
         
         # STEP 5: Build comprehensive status results
         status_data = {
@@ -534,7 +534,7 @@ async def get_agentic_engine_status():
         
     except Exception as e:
         error_msg = f"Status check failed: {str(e)}"
-        print(f"[ERROR] {error_msg} at {timestamp}")
+        logger.error(f"{error_msg} at {timestamp}", exc_info=True)
         return {
             "status": "error",
             "results": None,
@@ -935,13 +935,13 @@ async def run_test_suite_endpoint(
     try:
         # STEP 1: Initialize test suite engine
         test_engine = TestSuiteEngine(db_session=db)
-        print(f"[INFO] Test suite engine initialized at {timestamp}")
+        logger.info(f"Test suite engine initialized at {timestamp}")
         
         # STEP 2: Convert custom scenarios if provided
         scenarios = None
         if request.custom_scenarios:
             scenarios = [TestScenario.from_dict(s) for s in request.custom_scenarios]
-            print(f"[INFO] Using {len(scenarios)} custom scenarios")
+            logger.info(f"Using {len(scenarios)} custom scenarios")
         
         # STEP 3: Convert complexity distribution if provided
         complexity_dist = None
@@ -950,7 +950,7 @@ async def run_test_suite_endpoint(
                 ComplexityLevel(k): v 
                 for k, v in request.complexity_distribution.items()
             }
-            print(f"[INFO] Complexity distribution: {request.complexity_distribution}")
+            logger.info(f"Complexity distribution: {request.complexity_distribution}")
         
         # STEP 4: Run test suite with timeout
         try:
@@ -965,7 +965,7 @@ async def run_test_suite_endpoint(
                 timeout=float(settings.AGENTIC_OPERATION_TIMEOUT)  # Configurable timeout
             )
             
-            print(f"[INFO] Test suite execution completed: {results.get('summary', {}).get('total_tests', 0)} tests at {timestamp}")
+            logger.info(f"Test suite execution completed: {results.get('summary', {}).get('total_tests', 0)} tests at {timestamp}")
             
             # STEP 5: Enhance results with OpenAI analysis using ReasoningEngine
             try:
@@ -1003,17 +1003,17 @@ async def run_test_suite_endpoint(
                         else:
                             ai_analysis = str(result_content) if result_content else ""
                         results["summary"]["ai_analysis"] = ai_analysis
-                        print(f"[INFO] OpenAI analysis completed for test suite at {timestamp}")
+                        logger.info(f"OpenAI analysis completed for test suite at {timestamp}")
                     else:
                         error_msg = openai_response.get("error", "Unknown error")
-                        print(f"[ERROR] Test suite AI analysis failed: {error_msg} at {timestamp}")
+                        logger.error(f"Test suite AI analysis failed: {error_msg} at {timestamp}")
                         results["summary"]["ai_analysis"] = None
                 except Exception as e:
-                    print(f"[ERROR] Test suite AI analysis failed: {str(e)} at {timestamp}")
+                    logger.error(f"Test suite AI analysis failed: {str(e)} at {timestamp}", exc_info=True)
                     results["summary"]["ai_analysis"] = None
                     
             except Exception as e:
-                print(f"[ERROR] Failed to initialize reasoning engine for test suite: {str(e)} at {timestamp}")
+                logger.error(f"Failed to initialize reasoning engine for test suite: {str(e)} at {timestamp}", exc_info=True)
                 # Continue without AI analysis - results are still valid
             
             # STEP 6: Return standardized response format
@@ -1026,7 +1026,7 @@ async def run_test_suite_endpoint(
             
         except asyncio.TimeoutError:
             error_msg = f"Test suite execution timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
-            print(f"[ERROR] {error_msg} at {timestamp}")
+            logger.error(f"{error_msg} at {timestamp}")
             return {
                 "status": "timeout",
                 "results": None,
@@ -1076,10 +1076,10 @@ async def run_benchmarks_endpoint(
         if request.levels:
             try:
                 levels = [BenchmarkLevel(level) for level in request.levels]
-                print(f"[INFO] Benchmark levels: {request.levels} at {timestamp}")
+                logger.info(f"Benchmark levels: {request.levels} at {timestamp}")
             except ValueError as e:
                 error_msg = f"Invalid benchmark level. Valid levels: {[l.value for l in BenchmarkLevel]}"
-                print(f"[ERROR] {error_msg} at {timestamp}")
+                logger.error(f"{error_msg} at {timestamp}")
                 return {
                     "status": "error",
                     "results": None,
@@ -1089,7 +1089,7 @@ async def run_benchmarks_endpoint(
         
         # STEP 2: Initialize benchmark runner
         runner = BenchmarkRunner(db_session=db)
-        print(f"[INFO] Benchmark runner initialized at {timestamp}")
+        logger.info(f"Benchmark runner initialized at {timestamp}")
         
         # STEP 3: Run benchmark suite with timeout
         try:
@@ -1104,7 +1104,7 @@ async def run_benchmarks_endpoint(
             )
             
             summary = results.get('summary', {})
-            print(f"[INFO] Benchmark execution completed: {summary.get('total_cases', 0)} cases at {timestamp}")
+            logger.info(f"Benchmark execution completed: {summary.get('total_cases', 0)} cases at {timestamp}")
             
             # STEP 4: Enhance results with OpenAI analysis using ReasoningEngine
             try:
@@ -1143,17 +1143,17 @@ async def run_benchmarks_endpoint(
                         else:
                             ai_analysis = str(result_content) if result_content else ""
                         results["summary"]["ai_analysis"] = ai_analysis
-                        print(f"[INFO] OpenAI analysis completed for benchmarks at {timestamp}")
+                        logger.info(f"OpenAI analysis completed for benchmarks at {timestamp}")
                     else:
                         error_msg = openai_response.get("error", "Unknown error")
-                        print(f"[ERROR] Benchmark AI analysis failed: {error_msg} at {timestamp}")
+                        logger.error(f"Benchmark AI analysis failed: {error_msg} at {timestamp}")
                         results["summary"]["ai_analysis"] = None
                 except Exception as e:
-                    print(f"[ERROR] Benchmark AI analysis failed: {str(e)} at {timestamp}")
+                    logger.error(f"Benchmark AI analysis failed: {str(e)} at {timestamp}", exc_info=True)
                     results["summary"]["ai_analysis"] = None
                     
             except Exception as e:
-                print(f"[ERROR] Failed to initialize reasoning engine for benchmarks: {str(e)} at {timestamp}")
+                logger.error(f"Failed to initialize reasoning engine for benchmarks: {str(e)} at {timestamp}", exc_info=True)
                 # Continue without AI analysis - results are still valid
             
             # STEP 5: Return standardized response format
@@ -1166,7 +1166,7 @@ async def run_benchmarks_endpoint(
             
         except asyncio.TimeoutError:
             error_msg = f"Benchmark execution timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
-            print(f"[ERROR] {error_msg} at {timestamp}")
+            logger.error(f"{error_msg} at {timestamp}")
             return {
                 "status": "timeout",
                 "results": None,
@@ -1214,10 +1214,10 @@ async def run_recovery_endpoint(
         # STEP 1: Validate failure type
         try:
             failure_type = FailureType(request.failure_type)
-            print(f"[INFO] Failure type validated: {request.failure_type} at {timestamp}")
+            logger.info(f"Failure type validated: {request.failure_type} at {timestamp}")
         except ValueError:
             error_msg = f"Invalid failure type: {request.failure_type}. Valid types: {[ft.value for ft in FailureType]}"
-            print(f"[ERROR] {error_msg} at {timestamp}")
+            logger.error(f"{error_msg} at {timestamp}")
             return {
                 "status": "error",
                 "results": None,
@@ -1227,16 +1227,16 @@ async def run_recovery_endpoint(
         
         # STEP 2: Initialize failure simulator
         simulator = FailureSimulator(db_session=db)
-        print(f"[INFO] Failure simulator initialized at {timestamp}")
+        logger.info(f"Failure simulator initialized at {timestamp}")
         
         # STEP 3: Prepare context for simulation
         context = {}
         if request.entity_context:
             context["entity"] = request.entity_context
-            print(f"[INFO] Entity context provided: {request.entity_context.get('entity_name', 'unknown')}")
+            logger.info(f"Entity context provided: {request.entity_context.get('entity_name', 'unknown')}")
         if request.task_context:
             context["task"] = request.task_context
-            print(f"[INFO] Task context provided")
+            logger.info("Task context provided")
         
         # STEP 4: Run simulation with timeout
         try:
@@ -1253,8 +1253,8 @@ async def run_recovery_endpoint(
             )
             
             recovery_stats = results.get("failure_statistics", {})
-            print(f"[INFO] Recovery simulation completed: {len(results.get('failures', []))} failures, "
-                  f"{recovery_stats.get('recovery_attempts', 0)} recovery attempts at {timestamp}")
+            logger.info(f"Recovery simulation completed: {len(results.get('failures', []))} failures, "
+                       f"{recovery_stats.get('recovery_attempts', 0)} recovery attempts at {timestamp}")
             
             # STEP 5: Enhance results with OpenAI analysis using ReasoningEngine
             try:
@@ -1294,17 +1294,17 @@ async def run_recovery_endpoint(
                         else:
                             ai_analysis = str(result_content) if result_content else ""
                         results["recovery_analysis"] = ai_analysis
-                        print(f"[INFO] OpenAI analysis completed for recovery simulation at {timestamp}")
+                        logger.info(f"OpenAI analysis completed for recovery simulation at {timestamp}")
                     else:
                         error_msg = openai_response.get("error", "Unknown error")
-                        print(f"[ERROR] Recovery AI analysis failed: {error_msg} at {timestamp}")
+                        logger.error(f"Recovery AI analysis failed: {error_msg} at {timestamp}")
                         results["recovery_analysis"] = None
                 except Exception as e:
-                    print(f"[ERROR] Recovery AI analysis failed: {str(e)} at {timestamp}")
+                    logger.error(f"Recovery AI analysis failed: {str(e)} at {timestamp}", exc_info=True)
                     results["recovery_analysis"] = None
                     
             except Exception as e:
-                print(f"[ERROR] Failed to initialize reasoning engine for recovery: {str(e)} at {timestamp}")
+                logger.error(f"Failed to initialize reasoning engine for recovery: {str(e)} at {timestamp}", exc_info=True)
                 # Continue without AI analysis - results are still valid
             
             # STEP 6: Return standardized response format
@@ -1317,7 +1317,7 @@ async def run_recovery_endpoint(
             
         except asyncio.TimeoutError:
             error_msg = f"Recovery simulation timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds"
-            print(f"[ERROR] {error_msg} at {timestamp}")
+            logger.error(f"{error_msg} at {timestamp}")
             return {
                 "status": "timeout",
                 "results": None,
@@ -1341,44 +1341,8 @@ async def run_recovery_endpoint(
 
 
 # ============================================================================
-# ROUTE ALIASES for camelCase/kebab-case compatibility
-# ============================================================================
-# Limited aliases for common naming conventions only
+# NOTE: Route aliases removed - frontend uses canonical routes only
 # Canonical routes: /testSuite, /benchmarks, /recovery, /health/full
-
-# Alias: /testSuite -> /test-suite (kebab-case - most common alternative)
-@router.post("/test-suite")
-async def run_test_suite_endpoint_kebab(
-    request: TestSuiteRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /testSuite in kebab-case"""
-    return await run_test_suite_endpoint(request, db)
-
-
-# Alias: /benchmarks -> /benchmark-run (kebab-case - most common alternative)
-@router.post("/benchmark-run")
-async def run_benchmarks_endpoint_kebab(
-    request: BenchmarkRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /benchmarks in kebab-case"""
-    return await run_benchmarks_endpoint(request, db)
-
-
-# Alias: /recovery -> /failure-simulate (kebab-case - most common alternative)
-@router.post("/failure-simulate")
-async def run_recovery_endpoint_kebab(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """Alias for /recovery in kebab-case"""
-    return await run_recovery_endpoint(request, db)
-
-
-# Alias: /health/full -> /health-full (kebab-case - most common alternative)
-@router.get("/health-full")
-async def full_health_check_kebab():
-    """Alias for /health/full in kebab-case"""
-    return await full_health_check()
+# Frontend calls: /api/v1/agentic/testSuite, /api/v1/agentic/benchmarks, /api/v1/agentic/recovery
+# ============================================================================
 
