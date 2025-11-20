@@ -39,61 +39,103 @@ class FormValidator:
         
         # Validate company name
         if not company_name:
-            errors.append("**Company Name**: Please enter your company name")
+            errors.append(
+                "**Company Name** is required. "
+                "💡 Enter the name of your organization. This helps personalize the analysis."
+            )
         elif len(company_name) < 2:
-            errors.append("**Company Name**: Please enter a valid company name (at least 2 characters)")
+            errors.append(
+                "**Company Name** must be at least 2 characters. "
+                "💡 Please enter a valid company name."
+            )
         
         # Validate company type
         if not company_type or company_type == "-- Please select --":
-            errors.append("**Organization Type**: Please select your type of organization")
+            errors.append(
+                "**Organization Type** is required. "
+                "💡 Select the type that best describes your organization (e.g., Private company, Public company, Startup)."
+            )
         
         # Validate industry
         if not industry or industry == "-- Please select --":
-            errors.append("**Industry**: Please select your industry")
+            errors.append(
+                "**Industry** is required. "
+                "💡 Select your industry or sector. Different industries have different compliance requirements."
+            )
         
         # Validate employee count
         employee_count_value = parse_positive_int(
             employee_count,
-            "the number of employees",
+            "Number of Employees",
             errors,
             minimum=1
         )
-        if employee_count_value == 1 and not handles_customer_data:
-            warnings.append("**Single Employee**: You entered 1 employee. If correct, continue. Otherwise, adjust above.")
+        if employee_count_value:
+            if employee_count_value == 1 and not handles_customer_data:
+                warnings.append(
+                    "**Single Employee**: You entered 1 employee. "
+                    "💡 If correct, continue. Otherwise, adjust above. Single-person operations typically have simpler compliance requirements."
+                )
+            elif employee_count_value > 10000000:
+                errors.append(
+                    "**Number of Employees** seems too large. "
+                    "💡 Please check your number. If you have more than 10 million employees, contact support."
+                )
         
         # Validate locations
         if not locations or len(locations) == 0:
-            errors.append("**Operating Locations**: Please select at least one location")
+            errors.append(
+                "**Operating Locations** is required. "
+                "💡 Select at least one location where your organization operates. This determines which regulations apply (e.g., GDPR for EU, HIPAA for US healthcare)."
+            )
         
         # Validate task description
         if not task_description:
-            errors.append("**Task Description**: Please describe what you need to do")
+            errors.append(
+                "**Task Description** is required. "
+                "💡 Describe what you need to do in your own words. Be specific about the compliance task or question."
+            )
         elif len(task_description) < 10:
-            errors.append("**Task Description**: Please provide more details (at least 10 characters)")
+            errors.append(
+                "**Task Description** needs more detail. "
+                "💡 Please provide at least 10 characters. More detail helps the AI give better guidance."
+            )
         
         # Validate task type
         if not task_type or task_type == "-- Please select --":
-            errors.append("**Task Type**: Please select what kind of task this is")
+            errors.append(
+                "**Task Type** is required. "
+                "💡 Select the category that best describes your task (e.g., Data Privacy, Policy Review, Regulatory Filing)."
+            )
         
         # Validate impact level
         if not impact_level or impact_level == "-- Select impact --":
-            errors.append("**Impact**: Please choose how serious it would be if something went wrong")
+            errors.append(
+                "**Impact Level** is required. "
+                "💡 Choose how serious it would be if something went wrong. This helps assess the risk level."
+            )
         
         # Validate deadline if checkbox is checked
         has_deadline = form_data.get('has_deadline', False)
         deadline_date = form_data.get('deadline_date')
         if has_deadline and not deadline_date:
-            errors.append("**Deadline**: Please select a deadline date since you checked the deadline checkbox")
+            errors.append(
+                "**Deadline** is required. "
+                "💡 Since you checked the deadline checkbox, please select a deadline date. This helps prioritize the task."
+            )
         
         # Validate people affected (optional but warn if extreme)
         people_affected_value = parse_optional_int(
             people_affected,
-            "the number of people affected",
+            "People Affected",
             errors,
             minimum=0
         )
         if people_affected_value and people_affected_value > 1000000:
-            warnings.append("**People Affected**: Over 1 million people - this is very high-impact and will likely require expert review")
+            warnings.append(
+                "**People Affected**: Over 1 million people - this is very high-impact. "
+                "💡 This task will likely require expert review due to the large number of people potentially affected."
+            )
         
         return errors, warnings
     

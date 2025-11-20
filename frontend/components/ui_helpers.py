@@ -10,18 +10,20 @@ from typing import List, Any, Optional
 
 def apply_light_theme_css():
     """
-    Apply light theme CSS to override Streamlit's default dark theme.
+    Apply comprehensive light theme CSS to override Streamlit's default dark theme.
+    Includes complete styling for all components: checkboxes, dropdowns, buttons, inputs, filters, etc.
     Call this at the top of each page to ensure consistent light theme.
     """
     st.markdown("""
     <style>
-        /* FORCE LIGHT THEME - Override Streamlit's default dark theme */
+        /* ====================================================================
+           BASE THEME - Force Light Theme
+           ==================================================================== */
         html, body, [class*="css"] {
             background-color: #ffffff !important;
             color: #1e293b !important;
         }
         
-        /* Override Streamlit's sidebar dark theme */
         section[data-testid="stSidebar"] {
             background-color: #f8fafc !important;
         }
@@ -30,34 +32,14 @@ def apply_light_theme_css():
             color: #1e293b !important;
         }
         
-        /* Override main app background */
         .stApp {
             background-color: #ffffff !important;
         }
         
-        /* Force all Streamlit text elements to be dark */
-        .stText, .stMarkdown, .stWrite, p, span, div, label {
-            color: #1e293b !important;
-        }
-        
-        /* Override Streamlit's default text colors */
-        h1, h2, h3, h4, h5, h6 {
-            color: #0f172a !important;
-        }
-        
-        /* Ensure buttons are visible */
-        .stButton > button {
-            background-color: #3b82f6 !important;
-            color: #ffffff !important;
-            border: none !important;
-        }
-        
-        /* Override any dark backgrounds in Streamlit components */
         [data-testid="stAppViewContainer"] {
             background-color: #ffffff !important;
         }
         
-        /* Force sidebar to be light */
         [data-testid="stSidebar"] {
             background-color: #f8fafc !important;
         }
@@ -66,84 +48,600 @@ def apply_light_theme_css():
             background-color: #f8fafc !important;
         }
         
-        /* Main container */
         .main {
             background-color: #ffffff !important;
         }
         
-        /* FORM ELEMENTS - Force light theme */
-        /* Text inputs */
-        .stTextInput > div > div > input {
+        /* ====================================================================
+           TEXT ELEMENTS
+           ==================================================================== */
+        .stText, .stMarkdown, .stWrite, p, span, div, label {
+            color: #1e293b !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: #0f172a !important;
+        }
+        
+        /* ====================================================================
+           CHAT MESSAGE COMPONENTS - Light Theme
+           ==================================================================== */
+        [data-testid="stChatMessage"] {
+            background-color: #ffffff !important;
+        }
+        
+        [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] span {
+            color: #1e293b !important;
+        }
+        
+        [data-testid="stChatMessageUser"] {
+            background-color: #f1f5f9 !important;
+        }
+        
+        [data-testid="stChatMessageAssistant"] {
+            background-color: #ffffff !important;
+        }
+        
+        /* Chat input styling */
+        [data-testid="stTextInput"] input {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border: 1px solid #cbd5e1 !important;
         }
         
-        .stTextInput label {
+        [data-testid="stTextInput"] input:focus {
+            border-color: #3b82f6 !important;
+            outline: 2px solid #3b82f6 !important;
+        }
+        
+        /* Chat input container */
+        [data-testid="stTextInput"] > div > div {
+            background-color: #ffffff !important;
+        }
+        
+        /* Chat input label */
+        [data-testid="stTextInput"] label {
             color: #1e293b !important;
         }
         
-        /* Text areas */
-        .stTextArea > div > div > textarea {
+        /* Info boxes and alerts */
+        .stAlert {
+            background-color: #f0f9ff !important;
+            border-left: 4px solid #3b82f6 !important;
+        }
+        
+        .stAlert p, .stAlert div {
+            color: #1e293b !important;
+        }
+        
+        /* Caption text */
+        .stCaption {
+            color: #64748b !important;
+        }
+        
+        /* Expander styling */
+        [data-testid="stExpander"] {
+            background-color: #ffffff !important;
+        }
+        
+        [data-testid="stExpander"] summary {
+            color: #1e293b !important;
+        }
+        
+        [data-testid="stExpander"] summary:hover {
+            color: #3b82f6 !important;
+        }
+        
+        /* Expander content - prevent black background when expanded */
+        [data-testid="stExpander"] > div,
+        [data-testid="stExpander"] [data-testid="element-container"],
+        [data-testid="stExpander"] [data-testid="stVerticalBlock"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+        [data-testid="stExpander"] [data-testid="stMarkdownContainer"] > div {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        [data-testid="stExpander"] p,
+        [data-testid="stExpander"] div,
+        [data-testid="stExpander"] h1,
+        [data-testid="stExpander"] h2,
+        [data-testid="stExpander"] h3,
+        [data-testid="stExpander"] h4,
+        [data-testid="stExpander"] h5,
+        [data-testid="stExpander"] h6,
+        [data-testid="stExpander"] span,
+        [data-testid="stExpander"] li,
+        [data-testid="stExpander"] ul {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        
+        /* ====================================================================
+           CHECKBOXES - Complete Styling (Enhanced for Light Theme)
+           ==================================================================== */
+        .stCheckbox {
+            margin-bottom: 0.5rem;
+        }
+        
+        .stCheckbox label {
+            color: #1e293b !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Checkbox box styling - Multiple selectors to override Streamlit defaults */
+        .stCheckbox [data-baseweb="checkbox"],
+        .stCheckbox input[type="checkbox"],
+        input[type="checkbox"][data-baseweb="checkbox"],
+        [data-baseweb="checkbox"] {
+            background-color: #ffffff !important;
+            border: 2px solid #cbd5e1 !important;
+            border-radius: 4px !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:checked,
+        .stCheckbox input[type="checkbox"]:checked,
+        input[type="checkbox"][data-baseweb="checkbox"]:checked,
+        [data-baseweb="checkbox"]:checked {
+            background-color: #3b82f6 !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        /* Fix checkbox checkmark color - ensure it's white on blue */
+        .stCheckbox [data-baseweb="checkbox"]:checked::after,
+        .stCheckbox input[type="checkbox"]:checked::after,
+        [data-baseweb="checkbox"]:checked::after {
+            color: #ffffff !important;
+            border-color: #ffffff !important;
+        }
+        
+        /* Override any dark theme checkbox styling */
+        .stCheckbox [data-baseweb="checkbox"] svg,
+        [data-baseweb="checkbox"] svg {
+            color: #3b82f6 !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:checked svg,
+        [data-baseweb="checkbox"]:checked svg {
+            color: #ffffff !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:hover {
+            border-color: #3b82f6 !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:focus {
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        /* Force checkbox background - stronger override for dark theme */
+        .stCheckbox [data-baseweb="checkbox"] > div,
+        .stCheckbox [data-baseweb="checkbox"] > div > div {
+            background-color: #ffffff !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:checked > div,
+        .stCheckbox [data-baseweb="checkbox"]:checked > div > div {
+            background-color: #3b82f6 !important;
+        }
+        
+        /* Checkbox SVG checkmark - ensure white on blue */
+        .stCheckbox [data-baseweb="checkbox"]:checked svg path,
+        .stCheckbox [data-baseweb="checkbox"]:checked svg {
+            stroke: #ffffff !important;
+            fill: #ffffff !important;
+            color: #ffffff !important;
+        }
+        
+        /* Override any dark checkbox backgrounds */
+        .stCheckbox [data-baseweb="checkbox"] {
+            background: #ffffff !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:checked {
+            background: #3b82f6 !important;
+        }
+        
+        /* ====================================================================
+           DROPDOWNS/SELECTBOXES - Complete Styling
+           ==================================================================== */
+        .stSelectbox [data-baseweb="select"] > div {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
         }
         
-        .stTextArea label {
+        .stSelectbox [data-baseweb="select"] span {
             color: #1e293b !important;
         }
         
-        /* Selectboxes */
-        .stSelectbox > div > div > select {
-            background-color: #ffffff !important;
-            color: #1e293b !important;
-            border: 1px solid #cbd5e1 !important;
+        .stSelectbox [data-baseweb="select"]:hover {
+            border-color: #3b82f6 !important;
+        }
+        
+        .stSelectbox [data-baseweb="select"]:focus {
+            border-color: #3b82f6 !important;
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
         }
         
         .stSelectbox label {
             color: #1e293b !important;
         }
         
-        /* Multiselect */
-        .stMultiSelect > div > div {
+        /* Dropdown options list */
+        [data-baseweb="popover"] {
+            background-color: #ffffff !important;
+        }
+        
+        [data-baseweb="popover"] [role="option"] {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        
+        [data-baseweb="popover"] [role="option"]:hover {
+            background-color: #f1f5f9 !important;
+        }
+        
+        /* ====================================================================
+           MULTISELECT - Complete Styling
+           ==================================================================== */
+        .stMultiSelect [data-baseweb="select"] > div {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+        }
+        
+        .stMultiSelect [data-baseweb="select"] span {
+            color: #1e293b !important;
+        }
+        
+        .stMultiSelect [data-baseweb="select"]:hover {
+            border-color: #3b82f6 !important;
+        }
+        
+        .stMultiSelect [data-baseweb="select"]:focus {
+            border-color: #3b82f6 !important;
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        .stMultiSelect [data-baseweb="tag"] {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+            border-radius: 4px !important;
         }
         
         .stMultiSelect label {
             color: #1e293b !important;
         }
         
-        /* Checkboxes */
-        .stCheckbox label {
-            color: #1e293b !important;
-        }
-        
-        /* Date inputs */
-        .stDateInput > div > div > input {
+        /* ====================================================================
+           TEXT INPUTS - Complete Styling
+           ==================================================================== */
+        .stTextInput > div > div > input {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            padding: 0.5rem 0.75rem !important;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #3b82f6 !important;
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        .stTextInput > div > div > input::placeholder {
+            color: #94a3b8 !important;
+        }
+        
+        .stTextInput label {
+            color: #1e293b !important;
+        }
+        
+        /* Password input styling - fix black background */
+        .stTextInput input[type="password"],
+        input[type="password"],
+        [data-baseweb="input"] input[type="password"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        
+        /* Password visibility toggle button container */
+        .stTextInput > div > div > div:last-child,
+        [data-baseweb="input"] > div:last-child {
+            background-color: #ffffff !important;
+        }
+        
+        /* Password visibility toggle button */
+        .stTextInput button[data-testid="baseButton-secondary"],
+        [data-baseweb="input"] button {
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #1e293b !important;
+        }
+        
+        /* Eye icon in password field */
+        .stTextInput button svg,
+        [data-baseweb="input"] button svg {
+            color: #1e293b !important;
+        }
+        
+        /* ====================================================================
+           TEXT AREAS - Complete Styling
+           ==================================================================== */
+        .stTextArea > div > div > textarea {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            padding: 0.5rem 0.75rem !important;
+        }
+        
+        .stTextArea > div > div > textarea:focus {
+            border-color: #3b82f6 !important;
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        .stTextArea label {
+            color: #1e293b !important;
+        }
+        
+        /* ====================================================================
+           BUTTONS - Complete Styling with States
+           ==================================================================== */
+        .stButton > button {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0.5rem 1.5rem !important;
+            font-weight: 600 !important;
+            transition: all 0.2s !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #2563eb !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        .stButton > button:active {
+            background-color: #1d4ed8 !important;
+            transform: translateY(0) !important;
+        }
+        
+        .stButton > button:focus {
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        .stButton > button:disabled {
+            background-color: #cbd5e1 !important;
+            color: #94a3b8 !important;
+            cursor: not-allowed !important;
+        }
+        
+        /* Secondary button style - Enhanced */
+        .stButton > button[kind="secondary"],
+        button[kind="secondary"],
+        .stButton > button[data-kind="secondary"] {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+            font-weight: 600 !important;
+        }
+        
+        .stButton > button[kind="secondary"]:hover,
+        button[kind="secondary"]:hover,
+        .stButton > button[data-kind="secondary"]:hover {
+            background-color: #e2e8f0 !important;
+            border-color: #94a3b8 !important;
+            color: #0f172a !important;
+        }
+        
+        /* Download button styling */
+        .stDownloadButton > button,
+        button[data-testid="baseButton-secondary"],
+        .stDownloadButton button {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+            border: none !important;
+            font-weight: 600 !important;
+        }
+        
+        .stDownloadButton > button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        .stDownloadButton button:hover {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+        }
+        
+        /* Export section buttons - ensure they're visible */
+        button:has-text("Download"),
+        button:contains("Download"),
+        .stButton button:contains("Download") {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Override any dark button backgrounds */
+        button {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+        }
+        
+        button[kind="secondary"] {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+        }
+        
+        /* ====================================================================
+           DATE INPUTS - Complete Styling
+           ==================================================================== */
+        .stDateInput > div > div > input,
+        input[type="date"],
+        [data-baseweb="input"] input {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+        }
+        
+        /* Date input container - fix black borders */
+        .stDateInput > div,
+        .stDateInput > div > div,
+        [data-baseweb="input"] {
+            background-color: #ffffff !important;
+            border: none !important;
+        }
+        
+        /* Date picker calendar icon button */
+        .stDateInput button,
+        [data-baseweb="input"] button,
+        .stDateInput [data-baseweb="button"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        
+        /* Remove any black lines/borders */
+        .stDateInput > div > div > div:last-child {
+            background-color: #ffffff !important;
+            border: none !important;
         }
         
         .stDateInput label {
             color: #1e293b !important;
         }
         
-        /* Number inputs */
+        /* Calendar popup */
+        [data-baseweb="calendar"] {
+            background-color: #ffffff !important;
+        }
+        
+        /* ====================================================================
+           NUMBER INPUTS - Complete Styling
+           ==================================================================== */
         .stNumberInput > div > div > input {
             background-color: #ffffff !important;
             color: #1e293b !important;
             border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
         }
         
         .stNumberInput label {
             color: #1e293b !important;
         }
         
-        /* Override Streamlit's dark input backgrounds */
+        /* ====================================================================
+           ALERTS - Theme Override
+           ==================================================================== */
+        .stAlert {
+            background-color: #f8fafc !important;
+            border-left: 4px solid #3b82f6 !important;
+        }
+        
+        .stAlert [data-baseweb="notification"] {
+            background-color: #f8fafc !important;
+        }
+        
+        /* ====================================================================
+           FORMS - Layout and Alignment
+           ==================================================================== */
+        .stForm {
+            background-color: #ffffff !important;
+            padding: 1.5rem !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Form elements alignment */
+        .stForm .stTextInput,
+        .stForm .stSelectbox,
+        .stForm .stMultiSelect,
+        .stForm .stCheckbox,
+        .stForm .stDateInput,
+        .stForm .stNumberInput {
+            margin-bottom: 1rem !important;
+        }
+        
+        /* Form column alignment */
+        .stForm [data-testid="column"] {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        
+        /* Filter alignment */
+        [data-testid="column"] .stSelectbox,
+        [data-testid="column"] .stMultiSelect {
+            width: 100% !important;
+        }
+        
+        /* ====================================================================
+           TABLES/DATAFRAMES - Theme Override
+           ==================================================================== */
+        .stDataFrame {
+            background-color: #ffffff !important;
+        }
+        
+        .stDataFrame table {
+            background-color: #ffffff !important;
+        }
+        
+        .stDataFrame th {
+            background-color: #f8fafc !important;
+            color: #1e293b !important;
+        }
+        
+        .stDataFrame td {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        /* ====================================================================
+           METRICS - Consistent Styling
+           ==================================================================== */
+        .stMetric {
+            background-color: #ffffff !important;
+            padding: 1.5rem !important;
+            border-radius: 12px !important;
+            border: 2px solid #e2e8f0 !important;
+        }
+        
+        .stMetric label {
+            color: #475569 !important;
+            font-size: 1rem !important;
+            font-weight: 600 !important;
+        }
+        
+        .stMetric [data-testid="stMetricValue"] {
+            color: #0f172a !important;
+            font-size: 2rem !important;
+            font-weight: 800 !important;
+        }
+        
+        /* ====================================================================
+           HELP TEXT/TOOLTIPS
+           ==================================================================== */
+        .stTooltip,
+        .stHelp {
+            color: #64748b !important;
+        }
+        
+        /* ====================================================================
+           OVERRIDE STREAMLIT'S DARK INPUT BACKGROUNDS
+           ==================================================================== */
         input[type="text"],
         input[type="number"],
         input[type="date"],
@@ -151,17 +649,6 @@ def apply_light_theme_css():
         select {
             background-color: #ffffff !important;
             color: #1e293b !important;
-        }
-        
-        /* Form containers */
-        .stForm {
-            background-color: #ffffff !important;
-        }
-        
-        /* Help text */
-        .stTooltip,
-        .stHelp {
-            color: #64748b !important;
         }
     </style>
     """, unsafe_allow_html=True)

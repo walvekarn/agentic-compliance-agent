@@ -131,7 +131,7 @@ EXAMPLE_FORM_VALUES = {
     "company_type": "Private company (not traded publicly)",
     "industry": "Technology and software",
     "employee_count": "250",
-    "locations": ["United States", "European Union countries"],
+    "locations": ["United States", "European Union countries"],  # Match LOCATION_OPTIONS exactly
     "handles_data": True,
     "is_regulated": False,
     "task_description": "We need to update our privacy policy to include new features we're launching next month. The features involve collecting user preferences and behavior data to personalize the experience.",

@@ -7,7 +7,7 @@
 
 **Version:** 1.3.0-agentic-hardened  
 **Version Source:** `src/core/version.py`  
-**Release Date:** January 2025  
+**Release Date:** November 2025  
 **Status:** ✅ **Production Ready (Hardened)**  
 **Stability:** Stable  
 **Test Coverage:** 84%
@@ -46,8 +46,8 @@
 | `/api/v1/query` | POST | ✅ Working | 2024-11-13 |
 | `/api/v1/feedback` | POST | ✅ Working | 2024-11-13 |
 | `/api/v1/entity/analyze` | POST | ✅ Working | 2024-11-13 |
-| `/api/v1/agentic/analyze` | POST | 🧪 Experimental (Functional) | 2025-01-27 |
-| `/api/v1/agentic/status` | GET | 🧪 Experimental (Functional) | 2025-01-27 |
+| `/api/v1/agentic/analyze` | POST | 🧪 Experimental (Functional) | 2025-11-15 |
+| `/api/v1/agentic/status` | GET | 🧪 Experimental (Functional) | 2025-11-15 |
 
 ### Streamlit Dashboard (100% Verified)
 
@@ -287,7 +287,7 @@
 
 ## 🔄 Version History
 
-### v1.0.0 (January 2025) - **Current**
+### v1.0.0 (November 2025) - **Current**
 - ✅ Initial release
 - ✅ Core agentic features implemented
 - ✅ 84 tests passing
@@ -416,8 +416,8 @@
 
 ---
 
-**Last Updated:** January 2025  
-**Next Review:** February 2025  
+**Last Updated:** November 2025  
+**Next Review:** December 2025  
 **Maintainer:** Nikita Walvekar  
 **License:** MIT
 

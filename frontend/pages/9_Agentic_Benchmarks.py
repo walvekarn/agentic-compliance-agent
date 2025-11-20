@@ -12,6 +12,10 @@ import json
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
+
+# Force light theme for all Plotly charts
+pio.templates.default = "plotly_white"
 
 # Add frontend directory to path
 frontend_dir = Path(__file__).parent.parent
@@ -277,6 +281,10 @@ if st.session_state.benchmark_results:
         ))
         
         fig.update_layout(
+            template="plotly_white",
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font=dict(color='#1e293b'),
             polar=dict(
                 radialaxis=dict(
                     visible=True,

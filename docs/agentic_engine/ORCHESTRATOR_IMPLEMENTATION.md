@@ -124,7 +124,7 @@ The `run()` method returns a dictionary with the following structure:
 ### 5. Usage Example
 
 ```python
-from src.agentic_engine.orchestrator import AgenticAIOrchestrator
+from backend.agentic_engine.orchestrator import AgenticAIOrchestrator
 
 # Initialize orchestrator
 orchestrator = AgenticAIOrchestrator(config={"max_steps": 10})

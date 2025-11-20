@@ -23,6 +23,88 @@ def initialize_chat_state():
         st.session_state.chat_pending_question = ""
 
 
+def process_chat_query(user_query: str, current_page: str, system_prompt: str):
+    """
+    Process a chat query and add response to chat messages.
+    
+    Args:
+        user_query: The user's question
+        current_page: Current page name
+        system_prompt: System prompt for the page
+    """
+    # Prepare context-aware query with page-specific system prompt
+    context = st.session_state.chat_context
+    
+    # Build context parts
+    context_parts = [f"System: {system_prompt}"]
+    
+    # Add page/entity context if available
+    if context:
+        if context.get("page"):
+            context_parts.append(f"Current Page: {context['page']}")
+        if context.get("entity_name"):
+            context_parts.append(f"Entity: {context['entity_name']}")
+        if context.get("task_description"):
+            context_parts.append(f"Task: {context['task_description'][:200]}")
+        if context.get("decision"):
+            context_parts.append(f"Decision: {context['decision']}")
+        if context.get("risk_level"):
+            context_parts.append(f"Risk: {context['risk_level']}")
+    
+    # Combine system prompt, context, and user query
+    enhanced_query = (
+        f"{chr(10).join(context_parts)}\n\n"
+        f"User Question: {user_query}"
+    )
+    
+    # Prepare chat history for API
+    chat_history = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in st.session_state.chat_messages[:-1]  # Exclude the current message
+    ]
+    
+    # Call API
+    try:
+        client = APIClient()
+        response = client.post(
+            "/api/v1/query",
+            {
+                "query": enhanced_query,
+                "chat_history": chat_history if chat_history else None
+            },
+            timeout=30
+        )
+        
+        if response.success:
+            result = response.data or {}
+            ai_response = result.get("response", "No response received")
+            
+            # Add AI response to chat with page tag
+            timestamp = datetime.now().strftime("%I:%M %p")
+            st.session_state.chat_messages.append({
+                "role": "assistant",
+                "content": ai_response,
+                "timestamp": timestamp,
+                "page": current_page
+            })
+        else:
+            error_msg = response.error or "❌ Error"
+            st.session_state.chat_messages.append({
+                "role": "assistant",
+                "content": error_msg,
+                "timestamp": datetime.now().strftime("%I:%M %p"),
+                "page": current_page
+            })
+    except Exception as e:
+        error_msg = f"❌ Unexpected error: {str(e)}"
+        st.session_state.chat_messages.append({
+            "role": "assistant",
+            "content": error_msg,
+            "timestamp": datetime.now().strftime("%I:%M %p"),
+            "page": current_page
+        })
+
+
 def get_page_context(context_data):
     """
     Get page-specific context and system prompt based on current page
@@ -194,8 +276,16 @@ def render_chat_panel(context_data=None):
     </style>
     """, unsafe_allow_html=True)
     
-    # Chat header with global chat explanation
-    st.markdown("### 💬 AI Assistant")
+    # Chat header with enhanced visibility
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                color: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;'>
+        <h3 style='color: white; margin: 0; text-align: center;'>💬 AI Assistant</h3>
+        <p style='color: white; margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;'>
+            Ask questions about compliance, decisions, or how to use this tool
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Explicit messaging that chat is global
     st.info("💬 **Global Conversation** - Your chat history is saved across all pages", icon="ℹ️")
@@ -268,84 +358,9 @@ def render_chat_panel(context_data=None):
             st.markdown(user_query)
             st.caption(f"_{timestamp} • 📍 {current_page}_")
         
-        # Prepare context-aware query with page-specific system prompt
-        context = st.session_state.chat_context
-        
-        # Build context parts
-        context_parts = [f"System: {system_prompt}"]
-        
-        # Add page/entity context if available
-        if context:
-            if context.get("page"):
-                context_parts.append(f"Current Page: {context['page']}")
-            if context.get("entity_name"):
-                context_parts.append(f"Entity: {context['entity_name']}")
-            if context.get("task_description"):
-                context_parts.append(f"Task: {context['task_description'][:200]}")
-            if context.get("decision"):
-                context_parts.append(f"Decision: {context['decision']}")
-            if context.get("risk_level"):
-                context_parts.append(f"Risk: {context['risk_level']}")
-        
-        # Combine system prompt, context, and user query
-        enhanced_query = (
-            f"{chr(10).join(context_parts)}\n\n"
-            f"User Question: {user_query}"
-        )
-        
-        # Prepare chat history for API
-        chat_history = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in st.session_state.chat_messages[:-1]  # Exclude the current message
-        ]
-        
-        # Call API
+        # Process the query using helper function
         with st.spinner("🤔 AI is thinking..."):
-            try:
-                client = APIClient()
-                response = client.post(
-                    "/api/v1/query",
-                    {
-                        "query": enhanced_query,
-                        "chat_history": chat_history if chat_history else None
-                    },
-                    timeout=30
-                )
-                
-                if response.success:
-                    result = response.data or {}
-                    ai_response = result.get("response", "No response received")
-                    
-                    # Add AI response to chat with page tag
-                    timestamp = datetime.now().strftime("%I:%M %p")
-                    st.session_state.chat_messages.append({
-                        "role": "assistant",
-                        "content": ai_response,
-                        "timestamp": timestamp,
-                        "page": current_page  # Tag response with current page
-                    })
-                    
-                    # Display AI response
-                    with st.chat_message("assistant"):
-                        st.markdown(ai_response)
-                        st.caption(f"_{timestamp} • 📍 {current_page}_")
-                else:
-                    display_api_error(response)
-                    st.session_state.chat_messages.append({
-                        "role": "assistant",
-                        "content": response.error or "❌ Error",
-                        "timestamp": datetime.now().strftime("%I:%M %p"),
-                        "page": current_page
-                    })
-            except Exception as e:
-                error_msg = f"❌ Unexpected error: {str(e)}"
-                st.error(error_msg)
-                st.session_state.chat_messages.append({
-                    "role": "assistant",
-                    "content": error_msg,
-                    "timestamp": datetime.now().strftime("%I:%M %p"),
-                    "page": current_page
-                })
+            process_chat_query(user_query, current_page, system_prompt)
         
         # Rerun to display the new messages
         st.rerun()
@@ -361,8 +376,18 @@ def render_chat_panel(context_data=None):
         
         for idx, suggestion in enumerate(suggestions):
             if st.button(suggestion, key=f"suggest_btn_{idx}", width="stretch"):
-                # Populate the chat input with the suggestion
+                # Set pending question and trigger chat submission
                 st.session_state.chat_pending_question = suggestion
+                # Add user message immediately
+                timestamp = datetime.now().strftime("%I:%M %p")
+                st.session_state.chat_messages.append({
+                    "role": "user",
+                    "content": suggestion,
+                    "timestamp": timestamp,
+                    "page": current_page
+                })
+                # Process the query
+                process_chat_query(suggestion, current_page, system_prompt)
                 st.rerun()
     
     # Chat controls

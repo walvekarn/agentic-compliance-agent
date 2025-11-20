@@ -48,7 +48,17 @@ SessionManager.init()
 api_client = APIClient()
 
 st.title("✅ Check a Task - Get Instant Guidance")
-st.markdown("Answer a few questions and get instant guidance on whether you can handle this task yourself.")
+st.markdown("""
+<div style='background-color: #f0f9ff; padding: 1.5rem; border-radius: 10px; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;'>
+    <p style='font-size: 1.1rem; color: #1e40af; margin: 0; line-height: 1.6;'>
+        <strong>What this does:</strong> Answer a few questions about your company and the compliance task you're working on. 
+        Our AI will analyze the situation and tell you if you can proceed independently, need approval, or should escalate to an expert.
+    </p>
+    <p style='font-size: 1rem; color: #64748b; margin: 0.75rem 0 0 0;'>
+        💡 <strong>New here?</strong> Click "⚡ Load Example" below to see how it works with sample data.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ============================================================================
 # SHOW PREVIOUS ANALYSIS NOTICE
@@ -64,7 +74,17 @@ if SessionManager.has_results():
 action_col1, action_col2, action_col3 = st.columns([1, 1, 3])
 with action_col1:
     if st.button("⚡ Load Example", width="stretch"):
+        # Save example values to form data and draft
         SessionManager.save_form_data(EXAMPLE_FORM_VALUES)
+        SessionManager.save_draft(EXAMPLE_FORM_VALUES, "analyze_task")
+        # Clear any previous form errors
+        if "form_errors" in st.session_state:
+            del st.session_state.form_errors
+        if "form_warnings" in st.session_state:
+            del st.session_state.form_warnings
+        # Force immediate rerun to show the data
+        st.session_state["example_loaded"] = True
+        st.success("✅ Example data loaded! Scroll down to see the form.")
         st.rerun()
 with action_col2:
     if st.button("🔄 Reset Form", width="stretch"):
@@ -72,10 +92,42 @@ with action_col2:
         st.rerun()
 
 # ============================================================================
+# DRAFT RESTORATION (Before form)
+# ============================================================================
+# Check for draft and restore if exists
+if SessionManager.has_draft("analyze_task"):
+    draft = SessionManager.get_draft("analyze_task")
+    if draft:
+        draft_info = st.session_state.get("draft_analyze_task", {})
+        draft_timestamp = draft_info.get("timestamp", "recently")
+        # Try to format timestamp nicely
+        try:
+            from datetime import datetime
+            if isinstance(draft_timestamp, str) and "T" in draft_timestamp:
+                dt = datetime.fromisoformat(draft_timestamp.replace("Z", "+00:00"))
+                draft_timestamp = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            pass
+        
+        st.info(f"💾 **Draft found!** Your previous form data has been restored. Last saved: {draft_timestamp}")
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            if st.button("🗑️ Clear Draft", use_container_width=True):
+                SessionManager.clear_draft("analyze_task")
+                st.rerun()
+        # Merge draft with form defaults
+        form_defaults = {**SessionManager.get_form_data(), **draft}
+    else:
+        form_defaults = SessionManager.get_form_data()
+else:
+    form_defaults = SessionManager.get_form_data()
+
+# ============================================================================
 # MAIN FORM
 # ============================================================================
 with st.form("task_check_form", clear_on_submit=False):
-    form_defaults = SessionManager.get_form_data()
+    # Progress indicator
+    st.progress(0.5, text="Step 1 of 2: Company Information")
     
     st.markdown("## 📋 Step 1: Your Company Information")
     
@@ -123,7 +175,7 @@ with st.form("task_check_form", clear_on_submit=False):
             options=LOCATION_OPTIONS,
             default=default_locations,
             key="locations_multiselect",
-            help="Select all locations where your organization operates. Required field.",
+            help="Select all locations where your organization operates. Required field. 💡 Tip: 'Jurisdictions' are countries/regions with different compliance rules (e.g., US, EU, UK). Each location may have different regulations.",
             inside_form=True
         )
         
@@ -138,10 +190,12 @@ with st.form("task_check_form", clear_on_submit=False):
             "We're a regulated entity (bank, healthcare, etc.)",
             value=form_defaults.get("is_regulated", False),
             key="is_regulated_checkbox",
-            help="Check if your organization is directly regulated (e.g., bank, healthcare provider)"
+            help="Check if your organization is directly regulated by government agencies. 💡 Examples: Banks (FDIC), Healthcare (HIPAA), Public Companies (SEC), Financial Services (FINRA). If unsure, leave unchecked."
         )
     
     st.markdown("---")
+    # Update progress indicator
+    st.progress(1.0, text="Step 2 of 2: Task Details")
     st.markdown("## 📝 Step 2: About This Task")
     
     task_description = st.text_area(
@@ -272,6 +326,8 @@ if submitted:
         'people_affected': people_affected
     }
     SessionManager.save_form_data(form_data)
+    # Also save as draft
+    SessionManager.save_draft(form_data, "analyze_task")
     
     # Validate
     errors, warnings = FormValidator.validate(form_data)

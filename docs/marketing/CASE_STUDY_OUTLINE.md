@@ -323,5 +323,5 @@ Build an **agentic AI system** that:
 ---
 
 *Case study prepared by [Your Name]*  
-*Last Updated: January 2025*
+*Last Updated: November 2025*
 

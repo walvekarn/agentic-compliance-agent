@@ -133,4 +133,35 @@ class SessionManager:
             delta = datetime.now() - st.session_state.analysis_timestamp
             return delta.seconds // 60
         return None
+    
+    @staticmethod
+    def save_draft(form_data: Dict[str, Any], page: str = "analyze_task"):
+        """Save form data as draft."""
+        draft_key = f"draft_{page}"
+        st.session_state[draft_key] = {
+            "data": form_data,
+            "timestamp": datetime.now().isoformat(),
+            "page": page
+        }
+    
+    @staticmethod
+    def get_draft(page: str = "analyze_task") -> Optional[Dict[str, Any]]:
+        """Get saved draft for a page."""
+        draft_key = f"draft_{page}"
+        if draft_key in st.session_state:
+            return st.session_state[draft_key].get("data")
+        return None
+    
+    @staticmethod
+    def has_draft(page: str = "analyze_task") -> bool:
+        """Check if draft exists for a page."""
+        draft_key = f"draft_{page}"
+        return draft_key in st.session_state and st.session_state[draft_key] is not None
+    
+    @staticmethod
+    def clear_draft(page: str = "analyze_task"):
+        """Clear saved draft."""
+        draft_key = f"draft_{page}"
+        if draft_key in st.session_state:
+            del st.session_state[draft_key]
 

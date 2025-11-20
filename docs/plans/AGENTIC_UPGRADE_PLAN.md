@@ -1,7 +1,7 @@
 # 🚀 Agentic Engine Upgrade Plan
 ## Guided Mode - Level 2 Autonomy
 
-**Date:** January 2025  
+**Date:** November 2025  
 **Goal:** Reach 9/10 system completeness for Agentic Engine  
 **Mode:** Guided (ask before major changes)
 
@@ -67,10 +67,10 @@ UI (5_Agentic_Analysis.py) → Display results
 1. **Initialize tools in `__init__`** (lines 25-63)
    ```python
    # Add after line 51 (after memory_store initialization)
-   from src.agentic_engine.tools.entity_tool import EntityTool
-   from src.agentic_engine.tools.calendar_tool import CalendarTool
-   from src.agentic_engine.tools.http_tool import HTTPTool
-   from src.agentic_engine.tools.task_tool import TaskTool
+   from backend.agentic_engine.tools.entity_tool import EntityTool
+   from backend.agentic_engine.tools.calendar_tool import CalendarTool
+   from backend.agentic_engine.tools.http_tool import HTTPTool
+   from backend.agentic_engine.tools.task_tool import TaskTool
    
    # Initialize tools
    self.tools = {
@@ -897,6 +897,6 @@ return {
 
 ---
 
-**Plan Generated:** January 2025  
+**Plan Generated:** November 2025  
 **Next Step:** Await user approval before implementation
 

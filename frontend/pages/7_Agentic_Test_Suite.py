@@ -12,6 +12,10 @@ import json
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
+
+# Force light theme for all Plotly charts
+pio.templates.default = "plotly_white"
 
 # Add frontend directory to path
 frontend_dir = Path(__file__).parent.parent
@@ -328,25 +332,32 @@ if st.session_state.test_results:
                         complexity_data[complexity]["pass"] += 1
                     else:
                         complexity_data[complexity]["fail"] += 1
-            
-            heatmap_data = []
-            for complexity, counts in complexity_data.items():
-                heatmap_data.append({
-                    "Complexity": complexity.upper(),
-                    "Pass": counts["pass"],
-                    "Fail": counts["fail"]
-                })
-            
-            if heatmap_data:
-                heatmap_df = pd.DataFrame(heatmap_data)
-                heatmap_df = heatmap_df.set_index("Complexity")
-                fig = px.imshow(
-                    heatmap_df,
-                    labels=dict(x="Result", y="Complexity", color="Count"),
-                    title="Pass/Fail Heatmap by Complexity",
-                    color_continuous_scale=["#dc3545", "#28a745"]
-                )
-                st.plotly_chart(fig, width="stretch")
+                
+                heatmap_data = []
+                for complexity, counts in complexity_data.items():
+                    heatmap_data.append({
+                        "Complexity": complexity.upper(),
+                        "Pass": counts["pass"],
+                        "Fail": counts["fail"]
+                    })
+                
+                if heatmap_data:
+                    heatmap_df = pd.DataFrame(heatmap_data)
+                    heatmap_df = heatmap_df.set_index("Complexity")
+                    fig = px.imshow(
+                        heatmap_df,
+                        labels=dict(x="Result", y="Complexity", color="Count"),
+                        title="Pass/Fail Heatmap by Complexity",
+                        color_continuous_scale=["#dc3545", "#28a745"]
+                    )
+                    st.plotly_chart(fig, width="stretch")
+                else:
+                    st.info("No complexity data available for heatmap.")
+            except Exception as e:
+                st.warning(f"⚠️ **Error displaying complexity heatmap**: {str(e)}")
+                st.info("Complexity data may be in an unexpected format.")
+        else:
+            st.info("No test results available for complexity analysis.")
     
     # Detailed results
     st.markdown("## 🔍 Detailed Test Results")

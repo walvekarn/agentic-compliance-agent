@@ -8,10 +8,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 from datetime import datetime, timedelta
 import json
 import sys
 from pathlib import Path
+
+# Force light theme for all Plotly charts
+pio.templates.default = "plotly_white"
 
 # Add frontend directory to path for imports
 frontend_dir = Path(__file__).parent.parent
@@ -32,6 +36,30 @@ st.set_page_config(
 # Apply light theme CSS
 from components.ui_helpers import apply_light_theme_css
 apply_light_theme_css()
+
+# Additional light theme overrides for this page
+st.markdown("""
+<style>
+    /* Force sidebar to be light */
+    section[data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+    }
+    
+    section[data-testid="stSidebar"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Force main content area */
+    .main .block-container {
+        background-color: #ffffff !important;
+    }
+    
+    /* Ensure charts have light background */
+    .js-plotly-plot {
+        background-color: #ffffff !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================================
 # AUTHENTICATION CHECK
@@ -370,9 +398,10 @@ fig_confidence.add_hline(
 fig_confidence.update_layout(
     height=400,
     hovermode='x unified',
+    template="plotly_white",
     plot_bgcolor='white',
     paper_bgcolor='white',
-    font=dict(size=12)
+    font=dict(size=12, color='#1e293b')
 )
 
 st.plotly_chart(fig_confidence, width="stretch")
@@ -412,8 +441,10 @@ fig_escalations = px.area(
 fig_escalations.update_layout(
     height=400,
     hovermode='x unified',
+    template="plotly_white",
     plot_bgcolor='white',
     paper_bgcolor='white',
+    font=dict(color='#1e293b'),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
 
@@ -488,8 +519,10 @@ if len(high_risk_entries) > 0:
     fig_risk_factors.update_layout(
         height=400,
         showlegend=False,
+        template="plotly_white",
         plot_bgcolor='white',
-        paper_bgcolor='white'
+        paper_bgcolor='white',
+        font=dict(color='#1e293b')
     )
     
     st.plotly_chart(fig_risk_factors, width="stretch")
@@ -551,7 +584,9 @@ if jurisdiction_counts:
     
     fig_jurisdictions.update_layout(
         height=500,
-        paper_bgcolor='white'
+        template="plotly_white",
+        paper_bgcolor='white',
+        font=dict(color='#1e293b')
     )
     
     st.plotly_chart(fig_jurisdictions, width="stretch")
@@ -602,7 +637,9 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
             title='AI Accuracy: Agreement vs Override',
             height=400,
             showlegend=True,
-            paper_bgcolor='white'
+            template="plotly_white",
+            paper_bgcolor='white',
+            font=dict(color='#1e293b')
         )
         
         st.plotly_chart(fig_agreement, width="stretch")
@@ -630,8 +667,10 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
             fig_overrides.update_layout(
                 height=400,
                 showlegend=False,
+                template="plotly_white",
                 plot_bgcolor='white',
-                paper_bgcolor='white'
+                paper_bgcolor='white',
+                font=dict(color='#1e293b')
             )
             
             st.plotly_chart(fig_overrides, width="stretch")
@@ -719,7 +758,12 @@ with col1:
         }
     )
     
-    fig_decisions.update_layout(height=350, paper_bgcolor='white')
+    fig_decisions.update_layout(
+        height=350,
+        template="plotly_white",
+        paper_bgcolor='white',
+        font=dict(color='#1e293b')
+    )
     st.plotly_chart(fig_decisions, width="stretch")
 
 with col2:
@@ -738,7 +782,12 @@ with col2:
         }
     )
     
-    fig_risks.update_layout(height=350, paper_bgcolor='white')
+    fig_risks.update_layout(
+        height=350,
+        template="plotly_white",
+        paper_bgcolor='white',
+        font=dict(color='#1e293b')
+    )
     st.plotly_chart(fig_risks, width="stretch")
 
 st.markdown("---")

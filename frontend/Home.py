@@ -17,6 +17,7 @@ from components.chat_assistant import render_chat_panel
 from components.auth_utils import show_login_page, is_authenticated, logout
 from components.api_client import APIClient, display_api_error
 from components.demo_data import get_demo_audit_statistics, get_demo_feedback_stats, should_use_demo_data
+from components.ui_helpers import apply_light_theme_css
 
 # Page configuration
 st.set_page_config(
@@ -40,38 +41,20 @@ if not show_login_page():
     st.stop()
 # ============================================================================
 
-# Enhanced CSS for maximum readability with better contrast - FORCE LIGHT THEME
+# Apply centralized light theme CSS
+apply_light_theme_css()
+
+# Home page-specific styling (enhanced headers, feature cards, etc.)
 st.markdown("""
 <style>
-    /* FORCE LIGHT THEME - Override Streamlit's default dark theme */
-    html, body, [class*="css"] {
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-    }
-    
-    /* Override Streamlit's sidebar dark theme */
-    section[data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
-    }
-    
-    section[data-testid="stSidebar"] * {
-        color: #1e293b !important;
-    }
-    
-    /* Override main app background */
-    .stApp {
-        background-color: #ffffff !important;
-    }
-    
-    /* Main container with better padding */
+    /* Main container with better padding for Home page */
     .main {
         padding: 1rem 2rem 2rem 2rem;
         max-width: 1400px;
         margin: 0 auto;
-        background-color: #ffffff !important;
     }
     
-    /* Much larger, bolder headers - DARKER for better contrast */
+    /* Much larger, bolder headers for Home page - DARKER for better contrast */
     h1 {
         font-size: 4rem !important;
         font-weight: 800 !important;
@@ -98,14 +81,14 @@ st.markdown("""
         margin-bottom: 1rem !important;
     }
     
-    /* Bigger body text - DARKER for readability */
+    /* Bigger body text for Home page - DARKER for readability */
     p, li, div {
         font-size: 1.25rem !important;
         line-height: 1.7 !important;
         color: #1e293b !important;
     }
     
-    /* Feature cards - LIGHTER background */
+    /* Feature cards - Home page specific */
     .feature-card {
         background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
         padding: 2.5rem;
@@ -151,7 +134,7 @@ st.markdown("""
         color: #1e293b !important;
     }
     
-    /* Huge button styling */
+    /* Enhanced button styling for Home page */
     .stButton button {
         font-size: 1.4rem !important;
         font-weight: 700 !important;
@@ -167,7 +150,7 @@ st.markdown("""
         box-shadow: 0 10px 20px rgba(59, 130, 246, 0.4) !important;
     }
     
-    /* Alerts */
+    /* Enhanced alerts for Home page */
     .stAlert {
         font-size: 1.3rem !important;
         padding: 1.5rem !important;
@@ -175,12 +158,7 @@ st.markdown("""
         margin: 1.5rem 0 !important;
     }
     
-    /* Ensure all text is readable */
-    .stMarkdown {
-        color: #1e293b !important;
-    }
-    
-    /* Metrics with better contrast */
+    /* Enhanced metrics for Home page */
     .stMetric {
         background-color: #f8fafc !important;
         padding: 2rem !important;
@@ -199,47 +177,138 @@ st.markdown("""
         font-weight: 800 !important;
         color: #0f172a !important;
     }
-    
-    /* Force all Streamlit text elements to be dark */
-    .stText, .stMarkdown, .stWrite, p, span, div, label {
-        color: #1e293b !important;
-    }
-    
-    /* Override Streamlit's default text colors */
-    h1, h2, h3, h4, h5, h6 {
-        color: #0f172a !important;
-    }
-    
-    /* Ensure buttons are visible */
-    .stButton > button {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-        border: none !important;
-    }
-    
-    /* Override any dark backgrounds in Streamlit components */
-    [data-testid="stAppViewContainer"] {
-        background-color: #ffffff !important;
-    }
-    
-    /* Force sidebar to be light */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
-    }
-    
-    [data-testid="stSidebar"] .css-1d391kg {
-        background-color: #f8fafc !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.title("🛡️ AI Agentic Compliance Assistant")
+# Header with Clear Value Proposition
+st.title("🛡️ AI Compliance Assistant")
 st.markdown("""
-<p style='font-size: 1.8rem; text-align: center; color: #475569; margin-bottom: 2rem; font-weight: 500;'>
-Your AI agent for compliance decisions — autonomous, transparent, and always learning
-</p>
+<div style='background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem; border-left: 6px solid #3b82f6;'>
+    <h2 style='color: #1e40af; margin-top: 0; font-size: 2rem;'>Get Instant Answers to Your Compliance Questions</h2>
+    <p style='font-size: 1.3rem; color: #1e293b; margin: 1rem 0; line-height: 1.6;'>
+        <strong>Not sure if you can handle a compliance task yourself?</strong> Our AI analyzes your situation and tells you:
+    </p>
+    <div style='display: flex; gap: 2rem; margin-top: 1.5rem; flex-wrap: wrap;'>
+        <div style='flex: 1; min-width: 200px;'>
+            <p style='font-size: 1.1rem; margin: 0.5rem 0;'><strong>✅ Go Ahead</strong> — Handle it yourself</p>
+            <p style='font-size: 0.95rem; color: #64748b; margin: 0;'>Low risk, routine tasks</p>
+        </div>
+        <div style='flex: 1; min-width: 200px;'>
+            <p style='font-size: 1.1rem; margin: 0.5rem 0;'><strong>⚠️ Get Approval</strong> — Have someone review</p>
+            <p style='font-size: 0.95rem; color: #64748b; margin: 0;'>Moderate risk, needs oversight</p>
+        </div>
+        <div style='flex: 1; min-width: 200px;'>
+            <p style='font-size: 1.1rem; margin: 0.5rem 0;'><strong>🚨 Escalate</strong> — Call an expert</p>
+            <p style='font-size: 0.95rem; color: #64748b; margin: 0;'>High risk, requires specialist</p>
+        </div>
+    </div>
+    <p style='font-size: 1.1rem; color: #1e40af; margin-top: 1.5rem; margin-bottom: 0; font-weight: 600;'>
+        💡 Every decision includes detailed reasoning, risk assessment, and actionable next steps.
+    </p>
+</div>
 """, unsafe_allow_html=True)
+
+# First-time user detection and onboarding
+if "has_seen_onboarding" not in st.session_state:
+    st.session_state.has_seen_onboarding = False
+
+if not st.session_state.has_seen_onboarding:
+    with st.container():
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 2.5rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 8px 16px rgba(0,0,0,0.15);'>
+            <h2 style='color: white; margin-top: 0; font-size: 2.5rem;'>👋 Welcome! First Time Here?</h2>
+            <p style='font-size: 1.3rem; margin-bottom: 2rem; line-height: 1.6;'>
+                This AI assistant helps you make smart compliance decisions. Here's how to get started:
+            </p>
+            <div style='background: rgba(255,255,255,0.15); padding: 1.5rem; border-radius: 10px; margin-bottom: 1.5rem;'>
+                <ol style='font-size: 1.2rem; line-height: 2.2; margin: 0; padding-left: 1.5rem;'>
+                    <li style='margin-bottom: 0.75rem;'><strong>Click "Check One Task"</strong> below to analyze a compliance question</li>
+                    <li style='margin-bottom: 0.75rem;'><strong>Fill out the form</strong> with your company and task details (or use "Load Example" for a demo)</li>
+                    <li style='margin-bottom: 0.75rem;'><strong>Get instant guidance</strong> with a clear decision, risk assessment, and action plan</li>
+            </ol>
+            </div>
+            <p style='font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0; background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px;'>
+                💡 <strong>Pro Tip:</strong> The AI learns from your feedback. After each analysis, you can confirm or correct the decision to help it improve!
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("✅ Got it!", type="primary", width="stretch"):
+                st.session_state.has_seen_onboarding = True
+                st.rerun()
+        with col2:
+            if st.button("📖 Show me a quick tour", width="stretch"):
+                st.session_state.show_tour = True
+                st.session_state.tour_step = 0
+                st.rerun()
+
+# Onboarding tour
+if st.session_state.get("show_tour", False):
+    tour_step = st.session_state.get("tour_step", 0)
+    
+    tour_steps = [
+        {
+            "title": "🎯 Step 1: Analyze a Task",
+            "content": "Click 'Check One Task' to get instant guidance on any compliance question. The AI will tell you if you can proceed, need approval, or should escalate.",
+            "action": "Go to Analyze Task page"
+        },
+        {
+            "title": "📋 Step 2: Generate Calendar",
+            "content": "Use 'Compliance Calendar' to get a complete list of compliance tasks for your organization, prioritized by deadline and risk.",
+            "action": "Go to Compliance Calendar page"
+        },
+        {
+            "title": "📊 Step 3: Review History",
+            "content": "Check 'Audit Trail' to see all past decisions, filter by date/risk/decision type, and export for your records.",
+            "action": "Go to Audit Trail page"
+        },
+        {
+            "title": "💬 Step 4: Ask Questions",
+            "content": "Use the chat assistant in the sidebar on any page to ask questions about compliance, decisions, or how to use features.",
+            "action": "Try the chat assistant"
+        }
+    ]
+    
+    if tour_step < len(tour_steps):
+        current_step = tour_steps[tour_step]
+        
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 2rem; border-radius: 15px; margin: 2rem 0;'>
+            <h2 style='color: white; margin-top: 0;'>{}</h2>
+            <p style='font-size: 1.2rem; color: white; margin-bottom: 1.5rem;'>{}</p>
+            <p style='font-size: 1rem; color: white; font-weight: 600;'>{}</p>
+        </div>
+        """.format(current_step["title"], current_step["content"], current_step["action"]), unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if tour_step > 0:
+                if st.button("⬅️ Previous", width="stretch"):
+                    st.session_state.tour_step = tour_step - 1
+                    st.rerun()
+        with col2:
+            if st.button("✅ Got it, skip tour", width="stretch", type="primary"):
+                st.session_state.show_tour = False
+                st.session_state.has_seen_onboarding = True
+                st.session_state.tour_step = 0
+                st.rerun()
+        with col3:
+            if tour_step < len(tour_steps) - 1:
+                if st.button("Next ➡️", width="stretch", type="primary"):
+                    st.session_state.tour_step = tour_step + 1
+                    st.rerun()
+            else:
+                if st.button("✅ Finish Tour", width="stretch", type="primary"):
+                    st.session_state.show_tour = False
+                    st.session_state.has_seen_onboarding = True
+                    st.session_state.tour_step = 0
+                    st.rerun()
+        
+        st.caption(f"Step {tour_step + 1} of {len(tour_steps)}")
 
 # Onboarding panel
 with st.container():
@@ -286,18 +355,19 @@ else:
 # Separator
 st.markdown("---")
 
-# Welcome section
+# Quick Start Guide
 st.markdown("""
 <div class="feature-card">
-    <h2>👋 Welcome! Here's How It Works</h2>
-    <p style="font-size: 1.4rem;">This tool helps you make smart decisions about compliance tasks. Just tell us what you're working on, and we'll give you clear guidance.</p>
-    <p style="font-size: 1.3rem; font-weight: 600;">We'll tell you one of three things:</p>
-    <ul>
-        <li><strong>✅ Go Ahead</strong> — You can handle this yourself</li>
-        <li><strong>⚠️ Get Approval</strong> — Have someone review it first</li>
-        <li><strong>🚨 Call an Expert</strong> — This needs a specialist</li>
-    </ul>
-    <p style="font-size: 1.3rem; margin-top: 1.5rem;">Every decision is automatically saved for your records.</p>
+    <h2>🚀 Quick Start Guide</h2>
+    <p style="font-size: 1.3rem; margin-bottom: 1.5rem;">Get started in 3 simple steps:</p>
+    <ol style="font-size: 1.2rem; line-height: 2;">
+        <li><strong>Click "Check One Task"</strong> below to analyze a compliance question</li>
+        <li><strong>Fill out the form</strong> with your company and task details (or use "Load Example")</li>
+        <li><strong>Get instant guidance</strong> with a clear decision, risk assessment, and action plan</li>
+    </ol>
+    <p style="font-size: 1.1rem; margin-top: 1.5rem; color: #64748b;">
+        💾 All decisions are automatically saved. You can review them anytime in "Review History".
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -351,42 +421,48 @@ with col3:
     if st.button("📊 VIEW HISTORY →", key="audit_trail_btn", width="stretch", type="primary"):
         st.switch_page("pages/3_Audit_Trail.py")
 
-# ✅ NEW: Agent Insights Dashboard
-st.markdown("<h2>📈 Advanced Analytics</h2>", unsafe_allow_html=True)
-st.markdown("""
-<div class="feature-card" style="max-width: 800px; margin: 2rem auto;">
-    <h3>📊 Agent Insights Dashboard</h3>
-    <p style="font-size: 1.3rem;">Visualize agent performance, patterns, and learning progress</p>
-    <ul style="font-size: 1.2rem;">
-        <li>Interactive charts showing confidence trends and escalation patterns</li>
-        <li>Jurisdiction heatmaps and risk factor analysis</li>
-        <li>AI vs Human accuracy comparison</li>
-        <li>Export data for further analysis</li>
-    </ul>
-</div>
-""", unsafe_allow_html=True)
+# Advanced Features (Collapsible)
+with st.expander("🔧 Advanced Features & Analytics", expanded=False):
+    st.markdown("""
+    <div style='padding: 1rem;'>
+        <h3 style='color: #1e40af;'>📊 Agent Insights Dashboard</h3>
+        <p style='font-size: 1.1rem; color: #64748b; margin-bottom: 1rem;'>
+            Visualize agent performance, patterns, and learning progress with interactive charts and analytics.
+        </p>
+        <p style='font-size: 0.95rem; color: #94a3b8; margin-bottom: 1.5rem;'>
+            <em>Note: This feature is most useful after you've made several decisions.</em>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    if st.button("📊 VIEW INSIGHTS DASHBOARD →", key="agent_insights_btn", width="stretch", type="primary"):
-        st.switch_page("pages/4_Agent_Insights.py")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📊 View Insights Dashboard", key="agent_insights_btn", width="stretch", use_container_width=True):
+            st.switch_page("pages/4_Agent_Insights.py")
 
-# ✅ AGENTIC AI: Agent activity and learning indicators
+    with col2:
+        if st.button("🤖 Advanced Agentic Analysis", key="agentic_analysis_btn", width="stretch", use_container_width=True):
+            st.switch_page("pages/5_Agentic_Analysis.py")
+    
+    st.caption("💡 These advanced features use experimental AI reasoning. For most users, 'Check One Task' provides everything you need.")
+
+# Agent Activity Metrics
 st.markdown("---")
-st.markdown("<h2>🤖 Agent Activity</h2>", unsafe_allow_html=True)
+st.markdown("<h2>📊 Your Activity Summary</h2>", unsafe_allow_html=True)
 
-# Explanatory text for users
-st.info("""
-📊 **Your Decision History**
-
-These metrics show how the AI has helped you:
-
-- **Decisions Made**: Total compliance questions analyzed
-- **Autonomy Rate**: % you handled yourself (vs. escalated)
-- **Scenarios Analyzed**: Unique situations reviewed
-
-💡 **Higher autonomy rate = More routine decisions automated**
-""")
+# Better empty state messaging
+if not is_authenticated():
+    st.info("""
+    👋 **Welcome!** 
+    
+    Sign in to see your decision history and activity metrics. Once you start analyzing tasks, you'll see:
+    - Total decisions made
+    - Autonomy rate (how often you can proceed independently)
+    - AI confidence trends
+    - Feedback accuracy
+    """)
+else:
+    st.caption("💡 These metrics help you understand how the AI is assisting with your compliance decisions.")
 
 # Agent activity metrics - only load if authenticated
 stats = None
@@ -417,52 +493,60 @@ if stats:
     
     # Show demo data notice if applicable
     if is_demo_data:
-        st.info("📊 **Demo Data**: Showing sample metrics. Real data will appear once you start analyzing tasks.")
+        st.info("""
+        📊 **Getting Started**
+        
+        These are sample metrics to show you what the dashboard looks like. 
+        **Start analyzing tasks** to see your real data here!
+        
+        👉 Click "Check One Task" above to get started.
+        """)
     
     # Decision Performance Metrics
-    st.markdown("### Decision Performance")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Decisions Made", f"{total:,}", help="Total compliance questions analyzed by the AI agent")
-    
-    with col2:
-        autonomous = stats.get("autonomous_count", 0)
-        autonomy_pct = (autonomous/total*100) if total > 0 else 0
-        st.metric("✅ Handled Independently", f"{autonomous:,}", 
-                 delta=f"{autonomy_pct:.0f}% autonomy",
-                 help="Tasks you completed on your own without needing expert review. Higher is better for efficiency!")
-    
-    with col3:
-        avg_confidence = stats.get("avg_confidence", 0) * 100
-        st.metric("Agent Confidence", f"{avg_confidence:.0f}%", 
-                 help="How sure the AI is about its recommendations. Higher confidence means more reliable guidance.")
-    
-    with col4:
-        high_priority = stats.get("high_risk_count", 0)
-        st.metric("🚨 High Risk Items", f"{high_priority:,}",
-                 help="Audit trail entries with HIGH risk level. Note: This differs from 'High Priority' in Compliance Calendar which considers deadlines.")
-    
-    # Agent Learning Status
-    st.markdown("### 🧠 Agent Learning Status")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if total > 0:
-            st.metric("Scenarios Analyzed", f"{total:,} scenarios", 
-                     help="The AI learns from each situation it reviews. More scenarios = smarter recommendations.")
-        else:
-            st.metric("Scenarios Analyzed", "No data yet", 
-                     help="Start analyzing tasks to see scenarios here")
-    
-    with col2:
-        st.metric("Status", "🟢 Active", help="The AI agent is running and continuously learning from your organization's compliance patterns.")
-    
-    with col3:
-        escalation_count = stats.get("escalate_count", 0)
-        escalation_rate = (escalation_count / total * 100) if total > 0 else 0
-        st.metric("Careful Decision Rate", f"{escalation_rate:.0f}%",
-                 help="When uncertain, the AI recommends expert review. This shows the AI is being cautious to protect you.")
+    if total > 0 or is_demo_data:
+        st.markdown("### Decision Performance")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Decisions Made", f"{total:,}", help="Total compliance questions analyzed by the AI agent")
+        
+        with col2:
+            autonomous = stats.get("autonomous_count", 0)
+            autonomy_pct = (autonomous/total*100) if total > 0 else 0
+            st.metric("✅ Handled Independently", f"{autonomous:,}", 
+                     delta=f"{autonomy_pct:.0f}% autonomy",
+                     help="Tasks you completed on your own without needing expert review. Higher is better for efficiency!")
+        
+        with col3:
+            avg_confidence = stats.get("avg_confidence", 0) * 100
+            st.metric("Agent Confidence", f"{avg_confidence:.0f}%", 
+                     help="How sure the AI is about its recommendations. Higher confidence means more reliable guidance.")
+        
+        with col4:
+            high_priority = stats.get("high_risk_count", 0)
+            st.metric("🚨 High Risk Items", f"{high_priority:,}",
+                     help="Audit trail entries with HIGH risk level. Note: This differs from 'High Priority' in Compliance Calendar which considers deadlines.")
+        
+        # Agent Learning Status
+        st.markdown("### 🧠 Agent Learning Status")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if total > 0:
+                st.metric("Scenarios Analyzed", f"{total:,} scenarios", 
+                         help="The AI learns from each situation it reviews. More scenarios = smarter recommendations.")
+            else:
+                st.metric("Scenarios Analyzed", "No data yet", 
+                         help="Start analyzing tasks to see scenarios here")
+        
+        with col2:
+            st.metric("Status", "🟢 Active", help="The AI agent is running and continuously learning from your organization's compliance patterns.")
+        
+        with col3:
+            escalation_count = stats.get("escalate_count", 0)
+            escalation_rate = (escalation_count / total * 100) if total > 0 else 0
+            st.metric("Careful Decision Rate", f"{escalation_rate:.0f}%",
+                     help="When uncertain, the AI recommends expert review. This shows the AI is being cautious to protect you.")
 else:
     if is_authenticated():
         st.info("""

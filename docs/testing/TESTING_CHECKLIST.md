@@ -477,13 +477,13 @@ Use this checklist to verify the system is working correctly after setup or upda
 
 - [ ] **Python imports work**
   ```bash
-  python3 -c "from src.agentic_engine.orchestrator import AgenticAIOrchestrator; print('✅ Imports OK')"
+  python3 -c "from backend.agentic_engine.orchestrator import AgenticAIOrchestrator; print('✅ Imports OK')"
   ```
   - Expected: No import errors
 
 - [ ] **API routes import**
   ```bash
-  python3 -c "from src.api.agentic_routes import router; print('✅ Routes OK')"
+  python3 -c "from backend.api.agentic_routes import router; print('✅ Routes OK')"
   ```
   - Expected: No import errors
 

@@ -199,7 +199,7 @@ execute_step(step, executor_fn, context, retry_count=0, max_retries=2)
 ### Basic Usage
 
 ```python
-from src.agentic_engine.agent_loop import AgentLoop
+from backend.agentic_engine.agent_loop import AgentLoop
 
 # Initialize agent loop
 loop = AgentLoop(max_steps=10)
@@ -219,8 +219,8 @@ print(f"Metrics: {result['metrics']}")
 ### With Reasoning Engine
 
 ```python
-from src.agentic_engine.agent_loop import AgentLoop
-from src.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
+from backend.agentic_engine.agent_loop import AgentLoop
+from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 
 # Initialize reasoning engine
 reasoning = ReasoningEngine()
@@ -293,7 +293,7 @@ loop.reset_metrics()
 The enhanced `AgentLoop` integrates seamlessly with the `AgenticAIOrchestrator`:
 
 ```python
-from src.agentic_engine.orchestrator import AgenticAIOrchestrator
+from backend.agentic_engine.orchestrator import AgenticAIOrchestrator
 
 # The orchestrator automatically uses the enhanced agent_loop
 orchestrator = AgenticAIOrchestrator()

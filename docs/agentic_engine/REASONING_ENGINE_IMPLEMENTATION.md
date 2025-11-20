@@ -270,7 +270,7 @@ The `_safe_json_parse` method provides robust JSON extraction:
 Complete workflow using all three methods:
 
 ```python
-from src.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
+from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 
 # Initialize the engine
 engine = ReasoningEngine()
@@ -342,8 +342,8 @@ The implementation uses a multi-layered error handling approach:
 The ReasoningEngine is designed to integrate with the Orchestrator:
 
 ```python
-from src.agentic_engine.orchestrator import AgenticAIOrchestrator
-from src.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
+from backend.agentic_engine.orchestrator import AgenticAIOrchestrator
+from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 
 # The orchestrator can use the reasoning engine for enhanced capabilities
 orchestrator = AgenticAIOrchestrator()

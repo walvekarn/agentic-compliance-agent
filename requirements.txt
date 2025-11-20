@@ -32,6 +32,11 @@ pytest-playwright>=0.4.0
 
 # Frontend dependencies
 streamlit>=1.30.0
+plotly>=5.17.0
+pandas>=2.0.0
+
+# PDF generation
+reportlab>=4.0.0
 
 # Development dependencies
 black==23.11.0

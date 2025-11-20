@@ -343,7 +343,7 @@ OPENAI_API_KEY=sk-proj-your-actual-key-here
 
 ```bash
 # Database will auto-initialize on first run, or manually:
-python -c "from src.db.base import Base, engine; from src.db import models; Base.metadata.create_all(bind=engine)"
+python -c "from backend.db.base import Base, engine; from backend.db import models; Base.metadata.create_all(bind=engine)"
 ```
 
 #### Step 5: Start the System
@@ -831,6 +831,6 @@ Building intelligent systems that augment human expertise.
 
 *This is a portfolio/demonstration project. Not intended for production use without additional security hardening.*
 
-**Version 1.0.0** | **Released:** January 2025 | **Status:** Production Ready (MVP)
+**Version 1.0.0** | **Released:** November 2025 | **Status:** Production Ready (MVP)
 
 </div>

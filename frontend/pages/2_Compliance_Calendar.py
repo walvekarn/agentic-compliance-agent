@@ -33,41 +33,8 @@ apply_light_theme_css()
 require_auth()
 # ============================================================================
 
-# Fix dropdown text visibility
-st.markdown("""
-<style>
-    /* Fix selectbox text visibility */
-    .stSelectbox [data-baseweb="select"] > div {
-        color: #1f2937 !important;
-        background-color: #ffffff !important;
-    }
-    
-    .stSelectbox [data-baseweb="select"] span {
-        color: #1f2937 !important;
-    }
-    
-    /* Fix multiselect text visibility */
-    .stMultiSelect [data-baseweb="select"] > div {
-        color: #1f2937 !important;
-        background-color: #ffffff !important;
-    }
-    
-    .stMultiSelect [data-baseweb="tag"] {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect span {
-        color: #1f2937 !important;
-    }
-    
-    /* Input fields */
-    .stTextInput>div>div>input, .stNumberInput>div>div>input {
-        color: #1f2937 !important;
-        background-color: #ffffff !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Note: All component styling is now handled by apply_light_theme_css() in ui_helpers.py
+# No duplicate CSS needed here - base theme covers all components
 
 st.title("📋 Generate Compliance Calendar")
 st.markdown("Create a complete compliance calendar tailored to your organization.")
@@ -166,7 +133,7 @@ with action_col1:
         st.session_state.calendar_form_defaults = {
             "entity_name": "TechCorp Demo",
             "entity_type": "Private company",
-            "locations": ["United States"],
+            "locations": ["United States", "European Union"],  # Fixed: Match exact option text
             "industry": "Technology and software",
             "employee_count": "250",
             "annual_revenue": "5000000",
@@ -174,6 +141,13 @@ with action_col1:
             "is_regulated": False,
             "previous_violations": "0"
         }
+        # Clear the multiselect state key to force re-render with new defaults
+        multiselect_state_key = "multiselect_state_calendar_operating_locations"
+        if multiselect_state_key in st.session_state:
+            del st.session_state[multiselect_state_key]
+        if "calendar_operating_locations" in st.session_state:
+            del st.session_state.calendar_operating_locations
+        st.success("✅ Example data loaded! Scroll down to see the form.")
         st.rerun()
 with action_col2:
     if st.button("🔄 Reset Form", width="stretch", help="Clear all fields"):
@@ -474,6 +448,35 @@ if submitted:
                 
                 summary = result["summary"]
                 
+                # Helper function to calculate days until deadline (define before use)
+                def days_until_deadline(task):
+                    """Calculate days until deadline from TODAY, ensuring accurate date comparison."""
+                    if not task.get("deadline"):
+                        return 999  # Tasks without deadlines go to low priority
+                    try:
+                        # Parse deadline (handle both ISO format and date strings)
+                        deadline_str = task["deadline"]
+                        if 'T' in deadline_str:
+                            deadline_date = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+                        else:
+                            deadline_date = datetime.fromisoformat(deadline_str)
+                        
+                        # Use date() for proper date-only comparison
+                        if hasattr(deadline_date, 'date'):
+                            deadline_date_only = deadline_date.date()
+                        else:
+                            deadline_date_only = deadline_date
+                        
+                        today = datetime.now().date()
+                        days_left = (deadline_date_only - today).days
+                        
+                        # Return max(0, days_left) to avoid negative days
+                        return max(0, days_left)
+                    except Exception as e:
+                        # Log error but don't crash - return 999 for low priority
+                        print(f"Error calculating days until deadline: {e}")
+                        return 999
+                
                 # Calculate priority breakdown for summary
                 high_priority_count = len([t for t in result["tasks"] if days_until_deadline(t) <= 7 or (t.get("risk_level") == "HIGH" and days_until_deadline(t) <= 30)])
                 medium_priority_count = len([t for t in result["tasks"] if (8 <= days_until_deadline(t) <= 60) or (t.get("risk_level") in ["HIGH", "MEDIUM"] and 8 <= days_until_deadline(t) <= 90)])
@@ -570,35 +573,6 @@ if submitted:
                 st.markdown("---")
                 st.markdown("## 📋 Your Compliance Tasks by Priority")
                 st.markdown("Tasks are organized by urgency based on deadlines and risk levels. Focus on high-priority items first.")
-                
-                # Helper function to calculate days until deadline
-                def days_until_deadline(task):
-                    """Calculate days until deadline from TODAY, ensuring accurate date comparison."""
-                    if not task.get("deadline"):
-                        return 999  # Tasks without deadlines go to low priority
-                    try:
-                        # Parse deadline (handle both ISO format and date strings)
-                        deadline_str = task["deadline"]
-                        if 'T' in deadline_str:
-                            deadline_date = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
-                        else:
-                            deadline_date = datetime.fromisoformat(deadline_str)
-                        
-                        # Use date() for proper date-only comparison
-                        if hasattr(deadline_date, 'date'):
-                            deadline_date_only = deadline_date.date()
-                        else:
-                            deadline_date_only = deadline_date
-                        
-                        today = datetime.now().date()
-                        days_left = (deadline_date_only - today).days
-                        
-                        # Return max(0, days_left) to avoid negative days
-                        return max(0, days_left)
-                    except Exception as e:
-                        # Log error but don't crash - return 999 for low priority
-                        print(f"Error calculating days until deadline: {e}")
-                        return 999
                 
                 # Helper function to determine priority based on deadline AND risk
                 def calculate_priority(task):
@@ -843,11 +817,31 @@ if submitted:
                             st.markdown(risk_explanations.get(risk_level, f"**Risk Level:** {show_risk_badge(risk_level)}"))
                             
                             # Show specific risk factors if available
-                            if risk_factors and isinstance(risk_factors, dict):
+                            has_risk_data = False
+                            if risk_factors and isinstance(risk_factors, dict) and len(risk_factors) > 0:
                                 st.markdown("**Key Risk Factors:**")
                                 for factor, value in list(risk_factors.items())[:3]:  # Show top 3
                                     if value:
-                                        st.markdown(f"- {factor.replace('_', ' ').title()}: {value}")
+                                        st.markdown(f"- **{factor.replace('_', ' ').title()}**: {value}")
+                                        has_risk_data = True
+                            
+                            # Fallback to reasoning_summary if risk_factors not available
+                            if not has_risk_data and task.get("reasoning_summary"):
+                                reasons = task["reasoning_summary"].split("|")
+                                if reasons and any(r.strip() for r in reasons):
+                                    st.markdown("**Risk Considerations:**")
+                                    for reason in reasons[:3]:  # Show first 3 reasons
+                                        if reason.strip():
+                                            st.markdown(f"- {reason.strip()}")
+                                            has_risk_data = True
+                            
+                            # If still no data, show category-based risk info
+                            if not has_risk_data:
+                                category = task.get('category', '')
+                                if category:
+                                    st.caption(f"**Task Category:** {category.replace('_', ' ').title()} - {risk_level} risk level based on category classification.")
+                                else:
+                                    st.caption(f"Risk analysis details will be available after task generation.")
                             
                             st.markdown(f"#### ✅ Action")
                             decision_actions = {
@@ -910,11 +904,31 @@ if submitted:
                             st.markdown(risk_explanations.get(risk_level, f"**Risk Level:** {show_risk_badge(risk_level)}"))
                             
                             # Show specific risk factors if available
-                            if risk_factors and isinstance(risk_factors, dict):
+                            has_risk_data = False
+                            if risk_factors and isinstance(risk_factors, dict) and len(risk_factors) > 0:
                                 st.markdown("**Key Risk Factors:**")
                                 for factor, value in list(risk_factors.items())[:3]:  # Show top 3
                                     if value:
-                                        st.markdown(f"- {factor.replace('_', ' ').title()}: {value}")
+                                        st.markdown(f"- **{factor.replace('_', ' ').title()}**: {value}")
+                                        has_risk_data = True
+                            
+                            # Fallback to reasoning_summary if risk_factors not available
+                            if not has_risk_data and task.get("reasoning_summary"):
+                                reasons = task["reasoning_summary"].split("|")
+                                if reasons and any(r.strip() for r in reasons):
+                                    st.markdown("**Risk Considerations:**")
+                                    for reason in reasons[:3]:  # Show first 3 reasons
+                                        if reason.strip():
+                                            st.markdown(f"- {reason.strip()}")
+                                            has_risk_data = True
+                            
+                            # If still no data, show category-based risk info
+                            if not has_risk_data:
+                                category = task.get('category', '')
+                                if category:
+                                    st.caption(f"**Task Category:** {category.replace('_', ' ').title()} - {risk_level} risk level based on category classification.")
+                                else:
+                                    st.caption(f"Risk analysis details will be available after task generation.")
                             
                             st.markdown(f"#### ✅ Action")
                             decision_actions = {
@@ -1160,8 +1174,8 @@ HIGH PRIORITY TASKS (Due in 7 days or less)
                     entity_name=entity_name,
                     task_category="ComplianceCalendar",
                     risk_level=overall_risk,
-                    show_email=True,
-                    email_api_endpoint=f"{API_BASE_URL}/api/v1/export/email"
+                    show_email=True
+                    # email_api_endpoint not needed - email export shows as disabled
                 )
                 
                 st.caption("💾 Files download immediately. Check your browser's downloads folder.")

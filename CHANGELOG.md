@@ -5,7 +5,7 @@ All notable changes to the Agentic Compliance Agent project will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0-agentic-hardened] - 2025-01-27
+## [1.3.0-agentic-hardened] - 2025-11-15
 
 ### Added - Architecture Hardening (Skill I)
 - **Service Layer**: Created `src/services/` with business logic abstraction
@@ -72,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API status endpoint now reads version dynamically
 - Updated VERSION.md to 1.3.0-agentic-hardened
 
-## [1.2.0-agentic-orchestrated] - 2025-01-XX
+## [1.2.0-agentic-orchestrated] - 2025-11-10
 
 ### Added
 - **Test Generator (Skill E)**: Test scenario generation and execution
@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Benchmark Runner (Skill G)**: Performance benchmarking with metrics
 - **Deployment Readiness Checker (Skill H)**: Comprehensive health checks
 
-## [1.1.0-agentic-orchestrated] - 2025-01-XX
+## [1.1.0-agentic-orchestrated] - 2025-11-05
 
 ### Added
 - **Tool Registry**: Intelligent tool selection based on step descriptions

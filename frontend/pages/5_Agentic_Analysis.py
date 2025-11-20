@@ -110,7 +110,7 @@ if "agentic_form_data" not in st.session_state:
 EXAMPLE_ENTITY = {
     "entity_name": "InnovateTech Solutions",
     "entity_type": "Private company (not traded publicly)",
-    "locations": ["United States", "European Union countries"],
+    "locations": ["United States", "European Union"],
     "industry": "Technology and software",
     "employee_count": "150",
     "has_personal_data": True,

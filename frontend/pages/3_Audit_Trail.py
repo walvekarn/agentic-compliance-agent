@@ -27,41 +27,42 @@ st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 from components.ui_helpers import apply_light_theme_css
 apply_light_theme_css()
 
+# Additional light theme overrides for this page
+st.markdown("""
+<style>
+    /* Force sidebar to be light */
+    section[data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+    }
+    
+    section[data-testid="stSidebar"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Force main content area */
+    .main .block-container {
+        background-color: #ffffff !important;
+    }
+    
+    /* Ensure all text is readable */
+    .stDataFrame,
+    .stDataFrame table,
+    .stDataFrame th,
+    .stDataFrame td {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ============================================================================
 # AUTHENTICATION CHECK
 # ============================================================================
 require_auth()
 # ============================================================================
 
-# Fix dropdown text visibility
-st.markdown("""
-<style>
-    /* Fix selectbox text visibility */
-    .stSelectbox [data-baseweb="select"] > div {
-        color: #1f2937 !important;
-        background-color: #ffffff !important;
-    }
-    
-    .stSelectbox [data-baseweb="select"] span {
-        color: #1f2937 !important;
-    }
-    
-    /* Fix multiselect text visibility */
-    .stMultiSelect [data-baseweb="select"] > div {
-        color: #1f2937 !important;
-        background-color: #ffffff !important;
-    }
-    
-    .stMultiSelect [data-baseweb="tag"] {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect span {
-        color: #1f2937 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Note: All component styling is now handled by apply_light_theme_css() in ui_helpers.py
+# No duplicate CSS needed here - base theme covers all components
 
 st.title("📊 Audit Trail")
 st.markdown("View all past decisions with complete reasoning and context.")
@@ -111,8 +112,18 @@ def get_audit_id(entry):
         audit_id = entry.get("audit_id", None)
     return audit_id
 
-# Filters
-st.markdown("### 🔍 Filters")
+# Search and Filters
+st.markdown("### 🔍 Search & Filters")
+
+# Keyword search
+search_query = st.text_input(
+    "🔎 Search by keyword",
+    placeholder="Search by company name, task description, or any text...",
+    help="Search across all fields in the audit trail",
+    key="audit_search_input"
+)
+
+# Filters row
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -167,7 +178,10 @@ with col4:
         help="How many recent records would you like to display?"
     )
 
-st.caption("💡 Tip: Combine the filters above to focus on the decisions you need to review right now.")
+if search_query and search_query.strip():
+    st.caption(f"🔎 Searching for: **{search_query}** | 💡 Tip: Combine search with filters to find exactly what you need.")
+else:
+    st.caption("💡 Tip: Use search to find specific tasks, companies, or keywords. Combine with filters for precise results.")
 
 # ✅ AGENTIC AI: Filters apply automatically (agent responds immediately)
 try:
@@ -216,15 +230,66 @@ try:
         outcome = decision.get("outcome")
         risk_level = decision.get("risk_level")
         
-        if outcome in filter_decision and (risk_level in filter_risk or not risk_level):
+        # Apply decision and risk filters
+        if outcome not in filter_decision:
+            continue
+        if risk_level and risk_level not in filter_risk:
+            continue
+        
+        # Apply keyword search if provided
+        if search_query and search_query.strip():
+            search_lower = search_query.lower().strip()
+            # Search across multiple fields
+            searchable_text = " ".join([
+                str(e.get("task", {}).get("description", "")),
+                str(e.get("entity", {}).get("name", "")),
+                str(e.get("task", {}).get("category", "")),
+                str(e.get("agent_type", "")),
+                str(outcome),
+                str(risk_level),
+            ]).lower()
+            
+            if search_lower not in searchable_text:
+                continue
+        
             filtered_entries.append(e)
     
     # Display summary
     st.markdown("---")
     total_count = data.get('total_count', data.get('count', len(entries)))
+    
+    # Show search results summary
+    if search_query and search_query.strip():
+        if len(filtered_entries) == 0:
+            st.info(f"🔍 No results found for **'{search_query}'**. Try different keywords or clear the search.")
+        else:
+            st.markdown(f"### 📈 Found {len(filtered_entries)} matching record(s) out of {total_count} total")
+    else:
     st.markdown(f"### 📈 Showing {len(filtered_entries)} of {total_count} records")
     
-    if filtered_entries:
+    if not filtered_entries:
+        # Better empty state
+        if search_query and search_query.strip():
+            st.warning(f"🔍 No results found matching **'{search_query}'** with your current filters.")
+            st.markdown("""
+            **Try:**
+            - Clearing the search box
+            - Using different keywords
+            - Adjusting your filters
+            - Checking a different time period
+            """)
+        else:
+            st.info("""
+            📊 **No audit trail entries found**
+            
+            This could mean:
+            - You haven't analyzed any tasks yet
+            - Your filters are too restrictive
+            - No entries match the selected time period
+            
+            **Get started:** Go to "Check One Task" to analyze your first compliance question!
+            """)
+    else:
         # Summary metrics
         col1, col2, col3, col4 = st.columns(4)
         
@@ -280,8 +345,16 @@ try:
                     st.markdown(f"**Decision:** {show_decision_badge(entry['decision']['outcome'])}")
                     if entry['decision'].get('risk_level'):
                         st.markdown(f"**Risk:** {show_risk_badge(entry['decision']['risk_level'])}")
-                        st.markdown(f"**Risk Score (0–100):** {entry['decision'].get('risk_score', 0)*100:.0f}")
-                    st.markdown(f"**Confidence Level:** {entry['decision']['confidence_score']*100:.1f}%")
+                        risk_score = entry['decision'].get('risk_score')
+                        if risk_score is not None:
+                            st.markdown(f"**Risk Score (0–100):** {risk_score*100:.0f}")
+                        else:
+                            st.markdown(f"**Risk Score (0–100):** N/A")
+                    confidence_score = entry['decision'].get('confidence_score', 0)
+                    if confidence_score is not None:
+                        st.markdown(f"**Confidence Level:** {confidence_score*100:.1f}%")
+                    else:
+                        st.markdown(f"**Confidence Level:** N/A")
                 
                 # Use tabs instead of nested expanders
                 st.markdown("---")
@@ -442,8 +515,8 @@ Agent: {entry["agent_type"]}
             entity_name=f"{len(filtered_entries)}Records",
             task_category="AuditTrail",
             risk_level=overall_risk,
-            show_email=True,
-            email_api_endpoint=f"{API_BASE_URL}/api/v1/export/email"
+            show_email=True
+            # email_api_endpoint not needed - email export shows as disabled
         )
         
         st.caption("💾 Files download immediately. Check your browser's downloads folder.")
@@ -454,9 +527,6 @@ Agent: {entry["agent_type"]}
         with col2:
             if st.button("🔄 Refresh Data", type="secondary", width="stretch"):
                 st.rerun()
-        
-    else:
-        st.warning("No audit records match these filters. Try expanding the time period or selecting additional decision types above.")
 
 except Exception as e:
     st.error(f"❌ **Unexpected Error: {type(e).__name__}**")

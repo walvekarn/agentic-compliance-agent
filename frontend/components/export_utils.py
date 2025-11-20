@@ -80,13 +80,86 @@ def generate_filename(
 
 def create_pdf_from_text(text_content: str, title: str) -> bytes:
     """
-    Create a simple PDF from text content
-    Note: This is a placeholder - real PDF generation would use reportlab or similar
-    
-    For now, returns formatted text that can be saved as PDF
+    Create a PDF from text content using reportlab.
+    Falls back to formatted text if reportlab is not available.
     """
-    # Simple PDF-like formatting (would use reportlab in production)
-    pdf_content = f"""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        
+        # Create PDF in memory
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
+                               rightMargin=72, leftMargin=72,
+                               topMargin=72, bottomMargin=18)
+        
+        # Container for PDF content
+        story = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor='#1e40af',
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor='#3b82f6',
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        normal_style = styles['Normal']
+        normal_style.fontSize = 11
+        normal_style.leading = 14
+        
+        # Add title
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Add generation timestamp
+        timestamp_style = ParagraphStyle(
+            'Timestamp',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor='#64748b',
+            alignment=TA_CENTER
+        )
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", timestamp_style))
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Split content into paragraphs and add
+        paragraphs = text_content.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                # Check if it's a heading (starts with #)
+                if para.strip().startswith('#'):
+                    # Remove # and use heading style
+                    heading_text = para.strip().lstrip('#').strip()
+                    story.append(Paragraph(heading_text, heading_style))
+                else:
+                    # Regular paragraph
+                    story.append(Paragraph(para.strip().replace('\n', '<br/>'), normal_style))
+                story.append(Spacer(1, 0.1*inch))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+        
+    except ImportError:
+        # Fallback: Return formatted text (can be saved as .txt and converted to PDF)
+        pdf_content = f"""
 ================================================================================
 {title}
 ================================================================================
@@ -99,7 +172,7 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 End of Report
 ================================================================================
 """
-    return pdf_content.encode('utf-8')
+        return pdf_content.encode('utf-8')
 
 
 def create_excel_from_dataframe(df: pd.DataFrame, sheet_name: str = "Data") -> bytes:
@@ -272,43 +345,49 @@ def render_export_section(
         # Clear pending export after displaying
         del st.session_state.pending_export
     
-    # Email option
-    if show_email and email_api_endpoint:
+    # Email option (currently not implemented - show disabled state)
+    if show_email:
         st.markdown("---")
         st.markdown("#### 📧 Email This Report")
         
+        # Show that email export is not yet available
+        st.info("💡 **Email export is not yet available.** Please use the download options above to share reports. Email functionality requires SMTP configuration and will be available in a future update.")
+        
+        # Disabled email form (for future implementation)
         col1, col2 = st.columns([3, 1])
         
         with col1:
             recipient_email = st.text_input(
                 "Recipient email address",
                 placeholder="colleague@company.com",
-                help="Send this report directly to an email address"
+                help="Email export will be available in a future update",
+                disabled=True
             )
         
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-            if st.button("📧 Send Email", width="stretch", disabled=not recipient_email):
-                with st.spinner("Sending email..."):
-                    try:
-                        # Prepare email data
-                        email_payload = {
-                            "recipient": recipient_email,
-                            "subject": f"Compliance Report: {prefix.title()}",
-                            "body": text_report if text_report else "Please see attached compliance report.",
-                            "attachment_data": json_data if json_data else {}
-                        }
-                        
-                        # Send via API
-                        api = APIClient()
-                        response = api.post(email_api_endpoint.replace(APIClient().base_url, "") if email_api_endpoint.startswith(APIClient().base_url) else email_api_endpoint, email_payload, timeout=10)
-                        
-                        if response.success:
-                            st.success(f"✅ Report sent to {recipient_email}!")
-                        else:
-                            display_api_error(response)
-                    except Exception as e:
-                        st.error(f"❌ Error sending email: {str(e)}")
+            st.button("📧 Send Email", width="stretch", disabled=True, help="Email export not yet implemented")
+        
+        # Note: Email API endpoint is not implemented (returns 501)
+        # When implemented, uncomment the code below:
+        # if email_api_endpoint and recipient_email:
+        #     with st.spinner("Sending email..."):
+        #         try:
+        #             email_payload = {
+        #                 "recipient": recipient_email,
+        #                 "subject": f"Compliance Report: {prefix.title()}",
+        #                 "body": text_report if text_report else "Please see attached compliance report.",
+        #                 "attachment_data": json_data if json_data else {}
+        #             }
+        #             api = APIClient()
+        #             endpoint = email_api_endpoint.replace(api.base_url, "") if email_api_endpoint.startswith(api.base_url) else email_api_endpoint
+        #             response = api.post(endpoint, email_payload, timeout=10)
+        #             if response.success:
+        #                 st.success(f"✅ Report sent to {recipient_email}!")
+        #             else:
+        #                 display_api_error(response)
+        #         except Exception as e:
+        #             st.error(f"❌ Error sending email: {str(e)}")
 
 
 def render_export_history():

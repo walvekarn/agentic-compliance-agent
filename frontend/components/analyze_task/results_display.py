@@ -54,6 +54,23 @@ def render_results(analysis: Dict[str, Any]) -> None:
         st.warning("⚠️ No analysis results available")
         return
     
+    # Add Simple/Detailed view toggle with persistent state
+    if "results_view_mode" not in st.session_state:
+        st.session_state.results_view_mode = "Simple View"
+    
+    view_mode = st.radio(
+        "View Mode:",
+        options=["Simple View", "Detailed View"],
+        index=0 if st.session_state.results_view_mode == "Simple View" else 1,
+        horizontal=True,
+        key="results_view_mode_radio",
+        help="Simple View shows only essential information. Detailed View shows full analysis with all sections."
+    )
+    
+    # Update session state
+    st.session_state.results_view_mode = view_mode
+    is_simple_view = (view_mode == "Simple View")
+    
     # Render results header with clearer structure
     st.markdown("---")
     st.markdown("## 🎯 Your Results")
@@ -74,9 +91,22 @@ def render_results(analysis: Dict[str, Any]) -> None:
         decision_display = decision.replace("_", " ").title() if isinstance(decision, str) else str(decision)
         st.metric("Decision", decision_display, help="The AI's recommended action")
     with col2:
-        # Extract confidence - try confidence_score first (0-1), then confidence
-        confidence_raw = analysis.get("confidence_score") or analysis.get("confidence", 0)
-        if isinstance(confidence_raw, (int, float)):
+        # Extract confidence - try multiple possible field names and paths
+        confidence_raw = None
+        
+        # Try direct fields first
+        if "confidence_score" in analysis:
+            confidence_raw = analysis["confidence_score"]
+        elif "confidence" in analysis:
+            confidence_raw = analysis["confidence"]
+        # Try nested in decision object
+        elif isinstance(analysis.get("decision"), dict) and "confidence_score" in analysis["decision"]:
+            confidence_raw = analysis["decision"]["confidence_score"]
+        # Try nested in decision_analysis
+        elif isinstance(analysis.get("decision_analysis"), dict) and "confidence_score" in analysis["decision_analysis"]:
+            confidence_raw = analysis["decision_analysis"]["confidence_score"]
+        
+        if confidence_raw is not None and isinstance(confidence_raw, (int, float)) and confidence_raw > 0:
             # Normalize to 0-100% for display
             if confidence_raw <= 1.0:
                 confidence_percent = confidence_raw * 100
@@ -84,7 +114,11 @@ def render_results(analysis: Dict[str, Any]) -> None:
                 confidence_percent = confidence_raw
             st.metric("Confidence", f"{confidence_percent:.0f}%", help="How certain the AI is about this decision (0-100%)")
         else:
-            st.metric("Confidence", "N/A", help="How certain the AI is about this decision")
+            # If confidence is 0 or None, show a warning
+            if confidence_raw == 0:
+                st.metric("Confidence", "0%", delta="Low confidence", delta_color="off", help="The AI has low confidence in this decision. Please review carefully.")
+            else:
+                st.metric("Confidence", "N/A", help="Confidence data not available")
     with col3:
         risk = analysis.get("risk_level", "UNKNOWN")
         risk_display = risk.replace("_", " ").title() if isinstance(risk, str) else str(risk)
@@ -104,55 +138,68 @@ def render_results(analysis: Dict[str, Any]) -> None:
     # P0 - Critical: Risk level assessment
     render_risk_level_display(analysis)
     
+    if not is_simple_view:
+        # =========================================================================
+        # AGENTIC AI FEATURES (Entity Memory & Proactive Intelligence)
+        # =========================================================================
+        # P0 - Critical: Proactive AI insights shown BEFORE main results
+        # Note: Should appear early to catch user's attention
+        render_proactive_suggestions(analysis)
+        
+        # P0 - Critical: Entity memory - similar past cases
+        # Core agentic feature showing organizational learning
+        render_similar_cases(analysis)
+        
+        # P1 - Important: Pattern analysis across historical data
+        render_pattern_analysis(analysis)
+        
+        # =========================================================================
+        # DETAILED ANALYSIS
+        # =========================================================================
+        # P1 - Important: Breakdown of all 6 risk factors
+        render_risk_breakdown(analysis)
+        
+        # P0 - Partial: Step-by-step reasoning from AI
+        render_reasoning_chain(analysis)
+        
+        # P0 - Partial: Action recommendations with sources
+        render_recommendations(analysis)
+        
+        # P1 - Important: Action plan specific to decision type
+        render_action_plan(analysis)
+        
+        # P1 - Important: Stakeholder involvement guidance
+        render_stakeholders(analysis)
+        
+        # P1 - Important: Why escalation is needed (if applicable)
+        render_escalation_reason(analysis)
+        
+        # =========================================================================
+        # AI TRANSPARENCY & SELF-AWARENESS
+        # =========================================================================
+        # P0 - Missing: Dynamic warnings based on confidence level
+        render_confidence_warnings(analysis)
+        
+        # P2 - Nice-to-have: How AI reached this decision
+        render_agent_explainability(analysis)
+        
+        # P2 - Nice-to-have: What would change this decision
+        render_counterfactual_explanations(analysis)
+    else:
+        # Simple view - only essential information with expandable sections
+        with st.expander("📊 See Risk Breakdown", expanded=False):
+            render_risk_breakdown(analysis)
+        
+        with st.expander("💡 See Recommendations", expanded=False):
+            render_recommendations(analysis)
+        
+        with st.expander("🔍 See Similar Past Cases", expanded=False):
+            render_similar_cases(analysis)
+        
+        st.info("💡 Switch to 'Detailed View' above to see full analysis including reasoning chain, action plan, pattern analysis, and more.")
+    
     # =========================================================================
-    # AGENTIC AI FEATURES (Entity Memory & Proactive Intelligence)
-    # =========================================================================
-    # P0 - Critical: Proactive AI insights shown BEFORE main results
-    # Note: Should appear early to catch user's attention
-    render_proactive_suggestions(analysis)
-    
-    # P0 - Critical: Entity memory - similar past cases
-    # Core agentic feature showing organizational learning
-    render_similar_cases(analysis)
-    
-    # P1 - Important: Pattern analysis across historical data
-    render_pattern_analysis(analysis)
-    
-    # =========================================================================
-    # DETAILED ANALYSIS
-    # =========================================================================
-    # P1 - Important: Breakdown of all 6 risk factors
-    render_risk_breakdown(analysis)
-    
-    # P0 - Partial: Step-by-step reasoning from AI
-    render_reasoning_chain(analysis)
-    
-    # P0 - Partial: Action recommendations with sources
-    render_recommendations(analysis)
-    
-    # P1 - Important: Action plan specific to decision type
-    render_action_plan(analysis)
-    
-    # P1 - Important: Stakeholder involvement guidance
-    render_stakeholders(analysis)
-    
-    # P1 - Important: Why escalation is needed (if applicable)
-    render_escalation_reason(analysis)
-    
-    # =========================================================================
-    # AI TRANSPARENCY & SELF-AWARENESS
-    # =========================================================================
-    # P0 - Missing: Dynamic warnings based on confidence level
-    render_confidence_warnings(analysis)
-    
-    # P2 - Nice-to-have: How AI reached this decision
-    render_agent_explainability(analysis)
-    
-    # P2 - Nice-to-have: What would change this decision
-    render_counterfactual_explanations(analysis)
-    
-    # =========================================================================
-    # USER INTERACTION
+    # USER INTERACTION (Always shown in both views)
     # =========================================================================
     # P0 - Missing: Human feedback for learning loop
     render_feedback_form(analysis)
@@ -179,7 +226,7 @@ def render_decision_banner(analysis: Dict[str, Any]) -> None:
     Status: ⚠️ PARTIAL - Simplified in new UI
     Priority: P0 - Critical
     
-    TODO: Restore features from old UI:
+    Note: Future enhancements could include:
     - Custom HTML/CSS styling with gradients and shadows
     - Detailed explanation text specific to decision type
     - Action-oriented messaging
@@ -208,7 +255,7 @@ def render_risk_level_display(analysis: Dict[str, Any]) -> None:
     Status: ⚠️ PARTIAL - Basic display
     Priority: P0 - Critical
     
-    TODO: Enhance with:
+    Note: Future enhancements could include:
     - More detailed risk descriptions
     - Visual risk indicators
     - Risk score percentage
@@ -277,7 +324,7 @@ def render_reasoning_chain(analysis: Dict[str, Any]) -> None:
     Status: ⚠️ PARTIAL - Simple list in new UI
     Priority: P0 - Critical
     
-    TODO: Restore features from old UI:
+    Note: Future enhancements could include:
     - Parse reasoning into structured sections (Risk Analysis, Decision Logic)
     - Visual formatting with headers
     - Overall risk score display

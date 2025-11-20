@@ -1,6 +1,6 @@
 # Glossary
 
-**Last Updated:** January 2025  
+**Last Updated:** November 2025  
 **Version:** 1.0
 
 ---
@@ -764,5 +764,5 @@ if factor_variance < 0.1:  # All factors similar
 
 ---
 
-*Last updated: January 2025*  
+*Last updated: November 2025*  
 *For technical architecture details, see [ARCHITECTURE.md](../production_engine/ARCHITECTURE.md)*

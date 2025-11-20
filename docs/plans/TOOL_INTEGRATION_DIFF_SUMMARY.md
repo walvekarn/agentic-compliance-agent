@@ -138,7 +138,7 @@ class ToolRegistry:
 
 1. **In `__init__`:**
 ```python
-from src.agentic_engine.tools import ToolRegistry
+from backend.agentic_engine.tools import ToolRegistry
 
 # After tools initialization:
 self.tool_registry = ToolRegistry(self.tools)

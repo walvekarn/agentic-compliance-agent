@@ -1,6 +1,6 @@
 # Feature Overview
 
-**Last Updated:** January 2025  
+**Last Updated:** November 2025  
 **Version:** 1.0
 
 ---
@@ -1272,5 +1272,5 @@ curl -X POST http://localhost:8000/api/v1/agentic/analyze \
 
 ---
 
-*Last updated: January 2025*  
+*Last updated: November 2025*  
 *For questions or feedback, see [Contact](../../README.md#-contact)*

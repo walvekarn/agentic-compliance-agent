@@ -84,8 +84,8 @@ Fetch similar tasks from audit log.
 ### Usage Example
 
 ```python
-from src.agentic_engine.tools import EntityTool
-from src.db.base import get_db
+from backend.agentic_engine.tools import EntityTool
+from backend.db.base import get_db
 
 # With database session
 db = next(get_db())
@@ -176,7 +176,7 @@ Classify task into appropriate category based on keywords.
 ### Usage Example
 
 ```python
-from src.agentic_engine.tools import TaskTool
+from backend.agentic_engine.tools import TaskTool
 
 tool = TaskTool()
 
@@ -287,7 +287,7 @@ Calculate urgency score based on deadline and task category.
 ### Usage Example
 
 ```python
-from src.agentic_engine.tools import CalendarTool
+from backend.agentic_engine.tools import CalendarTool
 
 tool = CalendarTool()
 
@@ -396,7 +396,7 @@ Synchronous version of POST request.
 ### Usage Example
 
 ```python
-from src.agentic_engine.tools import HTTPTool
+from backend.agentic_engine.tools import HTTPTool
 
 # Initialize with custom settings
 tool = HTTPTool(
@@ -461,7 +461,7 @@ class AgenticAIOrchestrator:
     def _get_tools(self, db_session=None):
         """Lazy load tools when needed."""
         if self._tools is None:
-            from src.agentic_engine.tools import (
+            from backend.agentic_engine.tools import (
                 EntityTool,
                 TaskTool,
                 CalendarTool,
@@ -572,7 +572,7 @@ Tools connect to these production modules:
 - `src.agent.entity_analyzer.EntityAnalyzer`
 - `src.agent.decision_engine.DecisionEngine`
 - `src.agent.risk_models` (EntityContext, TaskContext, etc.)
-- `src.db.models.ComplianceQuery`
+- `backend.db.models.ComplianceQuery`
 
 All connections use lazy loading and include fallbacks if modules are unavailable.
 
