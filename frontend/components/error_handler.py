@@ -8,6 +8,9 @@ we use try/except blocks and this helper to display errors gracefully.
 
 import streamlit as st
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import Callable, Any, Optional
 
 
@@ -47,8 +50,8 @@ def display_error(error: Exception, context: Optional[str] = None):
         st.error(f"⚠️ Error: {error_msg}")
     
     # Log to console
-    print(f"❌ Error{' in ' + context if context else ''}: {error_msg}", flush=True)
-    print(traceback.format_exc(), flush=True)
+    logger.error(f"Error{' in ' + context if context else ''}: {error_msg}")
+    logger.debug(traceback.format_exc())
 
 
 def safe_execute(func: Callable, context: Optional[str] = None, default: Any = None) -> Any:
@@ -68,4 +71,3 @@ def safe_execute(func: Callable, context: Optional[str] = None, default: Any = N
     except Exception as e:
         display_error(e, context)
         return default
-

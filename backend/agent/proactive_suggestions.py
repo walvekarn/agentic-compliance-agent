@@ -11,10 +11,13 @@ Generates contextual suggestions based on triggers:
 
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta, timezone
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from backend.db.models import EntityHistory, AuditTrail
+
+logger = logging.getLogger(__name__)
 
 
 class ProactiveSuggestionService:
@@ -171,7 +174,7 @@ class ProactiveSuggestionService:
                 })
         
         except Exception as e:
-            print(f"Error checking deadlines: {e}")
+            logger.error(f"Error checking deadlines: {e}")
         
         return suggestions
     
@@ -280,7 +283,7 @@ class ProactiveSuggestionService:
                     })
         
         except Exception as e:
-            print(f"Error checking risk trends: {e}")
+            logger.error(f"Error checking risk trends: {e}")
         
         return suggestions
     
@@ -358,7 +361,7 @@ class ProactiveSuggestionService:
                     })
         
         except Exception as e:
-            print(f"Error checking violations: {e}")
+            logger.error(f"Error checking violations: {e}")
         
         return suggestions
     
@@ -448,7 +451,7 @@ class ProactiveSuggestionService:
                     })
         
         except Exception as e:
-            print(f"Error checking multiple incidents: {e}")
+            logger.error(f"Error checking multiple incidents: {e}")
         
         return suggestions
     
@@ -541,7 +544,7 @@ class ProactiveSuggestionService:
                 })
         
         except Exception as e:
-            print(f"Error checking regulatory patterns: {e}")
+            logger.error(f"Error checking regulatory patterns: {e}")
         
         return suggestions
     

@@ -40,6 +40,13 @@ def apply_light_theme_css():
             background-color: #ffffff !important;
         }
         
+        /* Header / top bar */
+        header[data-testid="stHeader"] {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        
         [data-testid="stSidebar"] {
             background-color: #f8fafc !important;
         }
@@ -55,7 +62,7 @@ def apply_light_theme_css():
         /* ====================================================================
            TEXT ELEMENTS
            ==================================================================== */
-        .stText, .stMarkdown, .stWrite, p, span, div, label {
+        .stText, .stMarkdown, .stWrite, p, span, div {
             color: #1e293b !important;
         }
         
@@ -160,6 +167,15 @@ def apply_light_theme_css():
             color: #1e293b !important;
             background-color: #ffffff !important;
         }
+        [data-testid="stExpander"] summary {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #0f172a !important;
+            border-radius: 10px !important;
+        }
+        [data-testid="stExpander"] svg {
+            color: #0f172a !important;
+        }
         
         /* ====================================================================
            CHECKBOXES - Complete Styling (Enhanced for Light Theme)
@@ -168,7 +184,8 @@ def apply_light_theme_css():
             margin-bottom: 0.5rem;
         }
         
-        .stCheckbox label {
+        .stCheckbox > label,
+        .stCheckbox label:first-of-type {
             color: #1e293b !important;
             font-size: 1rem !important;
         }
@@ -247,6 +264,63 @@ def apply_light_theme_css():
             background: #3b82f6 !important;
         }
         
+        /* Force checkbox caret/text to stay horizontal */
+        .stCheckbox [data-baseweb="checkbox"] span {
+            writing-mode: horizontal-tb !important;
+            transform: none !important;
+        }
+        
+        /* ====================================================================
+           CHECKBOXES - Additional Fixes for Black Background Issue
+           ==================================================================== */
+        /* Target ALL nested checkbox elements - Streamlit has 3-4 levels of nesting */
+        .stCheckbox [data-baseweb="checkbox"] *,
+        [data-baseweb="checkbox"] *,
+        .stCheckbox [data-baseweb="checkbox"] > *,
+        .stCheckbox [data-baseweb="checkbox"] > * > *,
+        .stCheckbox [data-baseweb="checkbox"] > * > * > * {
+            background-color: transparent !important;
+        }
+        
+        /* Force white background on ALL unchecked checkbox containers */
+        .stCheckbox [data-baseweb="checkbox"] > div,
+        .stCheckbox [data-baseweb="checkbox"] > div > div,
+        .stCheckbox [data-baseweb="checkbox"] > div > div > div,
+        .stCheckbox [data-baseweb="checkbox"] > div > div > div > div,
+        [data-baseweb="checkbox"] > div,
+        [data-baseweb="checkbox"] > div > div,
+        [data-baseweb="checkbox"] > div > div > div,
+        [data-baseweb="checkbox"] > div > div > div > div {
+            background-color: #ffffff !important;
+            border: 2px solid #cbd5e1 !important;
+        }
+        
+        /* Force blue background on ALL checked checkbox containers */
+        .stCheckbox [data-baseweb="checkbox"]:checked > div,
+        .stCheckbox [data-baseweb="checkbox"]:checked > div > div,
+        .stCheckbox [data-baseweb="checkbox"]:checked > div > div > div,
+        .stCheckbox [data-baseweb="checkbox"]:checked > div > div > div > div,
+        [data-baseweb="checkbox"]:checked > div,
+        [data-baseweb="checkbox"]:checked > div > div,
+        [data-baseweb="checkbox"]:checked > div > div > div,
+        [data-baseweb="checkbox"]:checked > div > div > div > div {
+            background-color: #3b82f6 !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        /* Remove any black box-shadows or outlines */
+        .stCheckbox [data-baseweb="checkbox"],
+        [data-baseweb="checkbox"] {
+            box-shadow: none !important;
+            background-image: none !important;
+        }
+        
+        /* Ensure checkbox input itself is white when unchecked */
+        .stCheckbox input[type="checkbox"]:not(:checked) {
+            background-color: #ffffff !important;
+            border: 2px solid #cbd5e1 !important;
+        }
+        
         /* ====================================================================
            DROPDOWNS/SELECTBOXES - Complete Styling
            ==================================================================== */
@@ -289,6 +363,12 @@ def apply_light_theme_css():
             background-color: #f1f5f9 !important;
         }
         
+        /* Fix rotated/vertical text in Select All chips */
+        [data-baseweb="select"] span {
+            writing-mode: horizontal-tb !important;
+            transform: none !important;
+        }
+        
         /* ====================================================================
            MULTISELECT - Complete Styling
            ==================================================================== */
@@ -317,6 +397,61 @@ def apply_light_theme_css():
             background-color: #3b82f6 !important;
             color: #ffffff !important;
             border-radius: 4px !important;
+        }
+        
+        /* Ensure multiselect dropdown text orientation stays normal */
+        .stMultiSelect [data-baseweb="select"] span {
+            writing-mode: horizontal-tb !important;
+            transform: none !important;
+        }
+        
+        /* ====================================================================
+           PROGRESS BARS
+           ==================================================================== */
+        [data-testid="stProgress"] > div {
+            background-color: #e2e8f0 !important;
+            border-radius: 999px !important;
+        }
+        
+        [data-testid="stProgress"] > div > div {
+            background: linear-gradient(90deg, #3b82f6, #2563eb) !important;
+            border-radius: 999px !important;
+        }
+        
+        /* ====================================================================
+           TOOLTIPS / POPOVERS
+           ==================================================================== */
+        [data-baseweb="tooltip"] {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+        
+        [data-baseweb="tooltip"] > div {
+            color: #e2e8f0 !important;
+        }
+        
+        /* Ensure overlays don't go black */
+        [data-baseweb="popover"], [data-baseweb="tooltip"] {
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15) !important;
+        }
+        
+        /* ====================================================================
+           EXPANDERS - stronger light background
+           ==================================================================== */
+        [data-testid="stExpander"],
+        [data-testid="stExpander"] > div,
+        [data-testid="stExpander"] [data-testid="element-container"],
+        [data-testid="stExpander"] [data-testid="stVerticalBlock"],
+        [data-testid="stExpander"] [data-testid="block-container"],
+        [data-testid="stExpander"] [data-testid="stMarkdownContainer"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        .streamlit-expanderHeader,
+        .streamlit-expander,
+        .streamlit-expanderContent {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
         }
         
         .stMultiSelect label {
@@ -406,7 +541,7 @@ def apply_light_theme_css():
             color: #ffffff !important;
             border: none !important;
             border-radius: 8px !important;
-            padding: 0.5rem 1.5rem !important;
+            padding: 0.75rem 1.5rem !important;
             font-weight: 600 !important;
             transition: all 0.2s !important;
         }
@@ -532,6 +667,95 @@ def apply_light_theme_css():
         }
         
         /* ====================================================================
+           CALENDAR - Complete Styling for Light Theme
+           ==================================================================== */
+        /* Calendar container and all nested elements */
+        [data-baseweb="calendar"],
+        [data-baseweb="calendar"] *,
+        [data-baseweb="calendar"] > div,
+        [data-baseweb="calendar"] > div > div {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        /* Calendar header (month/year) */
+        [data-baseweb="calendar"] header,
+        [data-baseweb="calendar"] [role="heading"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        /* Calendar day cells - all days */
+        [data-baseweb="calendar"] [role="gridcell"],
+        [data-baseweb="calendar"] button[role="gridcell"],
+        [data-baseweb="calendar"] [data-baseweb="button"][role="gridcell"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        
+        /* Calendar day cells - hover state */
+        [data-baseweb="calendar"] [role="gridcell"]:hover,
+        [data-baseweb="calendar"] button[role="gridcell"]:hover {
+            background-color: #f1f5f9 !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        /* Selected date - should be blue, not black */
+        [data-baseweb="calendar"] [role="gridcell"][aria-selected="true"],
+        [data-baseweb="calendar"] button[role="gridcell"][aria-selected="true"],
+        [data-baseweb="calendar"] [data-baseweb="button"][aria-selected="true"],
+        [data-baseweb="calendar"] [aria-selected="true"] {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            border-color: #1d4ed8 !important;
+            box-shadow: none !important;
+        }
+        [data-baseweb="calendar"] [role="gridcell"]::after,
+        [data-baseweb="calendar"] [role="gridcell"]::before {
+            background: none !important;
+        }
+        
+        /* Today's date */
+        [data-baseweb="calendar"] [data-today="true"],
+        [data-baseweb="calendar"] button[data-today="true"] {
+            background-color: #f0f9ff !important;
+            border: 2px solid #3b82f6 !important;
+            color: #1e293b !important;
+        }
+        
+        /* Calendar navigation buttons */
+        [data-baseweb="calendar"] button[aria-label*="Previous"],
+        [data-baseweb="calendar"] button[aria-label*="Next"],
+        [data-baseweb="calendar"] [data-baseweb="button"] {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        
+        /* Calendar navigation buttons hover */
+        [data-baseweb="calendar"] button:hover {
+            background-color: #f1f5f9 !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        /* Calendar popover/overlay container */
+        [data-baseweb="popover"] [data-baseweb="calendar"],
+        [role="dialog"] [data-baseweb="calendar"] {
+            background-color: #ffffff !important;
+        }
+        
+        /* Remove any black backgrounds from calendar */
+        [data-baseweb="calendar"] * {
+            background-color: inherit !important;
+        }
+        
+        /* Force white background on calendar root */
+        [data-baseweb="calendar"] {
+            background: #ffffff !important;
+        }
+        
+        /* ====================================================================
            NUMBER INPUTS - Complete Styling
            ==================================================================== */
         .stNumberInput > div > div > input {
@@ -555,6 +779,37 @@ def apply_light_theme_css():
         
         .stAlert [data-baseweb="notification"] {
             background-color: #f8fafc !important;
+        }
+        
+        /* ====================================================================
+           MOBILE RESPONSIVENESS
+           ==================================================================== */
+        @media (max-width: 768px) {
+            /* Reduce padding on mobile */
+            .stMarkdown h1 {
+                font-size: 2rem !important;
+            }
+            
+            .stMarkdown h2 {
+                font-size: 1.5rem !important;
+            }
+            
+            /* Stack columns on mobile */
+            [data-testid="column"] {
+                min-width: 100% !important;
+                width: 100% !important;
+            }
+            
+            /* Reduce margins on mobile */
+            .stMarkdown {
+                margin-bottom: 1rem !important;
+            }
+            
+            /* Reduce button padding on mobile */
+            .stButton > button {
+                padding: 0.5rem 1rem !important;
+                font-size: 0.9rem !important;
+            }
         }
         
         /* ====================================================================
@@ -738,10 +993,18 @@ def multiselect_with_select_all(
     
     with multiselect_col:
         # Show multiselect - always enabled to fix "No results" bug
+        # Ensure default values are valid (subset of options)
+        current_default = st.session_state[state_key]
+        valid_default = [opt for opt in current_default if opt in options] if current_default else []
+        
+        # If no valid default and default parameter was provided, use it if valid
+        if not valid_default and default:
+            valid_default = [opt for opt in default if opt in options]
+        
         selected = st.multiselect(
             label,
             options=options,
-            default=st.session_state[state_key],
+            default=valid_default,
             key=key or f"ms_{label.replace(' ', '_')}",
             help=help,
             placeholder=placeholder if placeholder else "Choose options..."
@@ -783,3 +1046,236 @@ def get_aria_label(label: str, help_text: Optional[str] = None) -> str:
     if help_text:
         aria = f"{label}. {help_text}"
     return aria
+
+
+# ============================================================================
+# STANDARDIZED UI COMPONENTS
+# ============================================================================
+
+def render_page_header(title: str, icon: str = "", description: str = "", margin_bottom: str = "2rem") -> None:
+    """
+    Render standardized page header with consistent styling.
+    
+    Args:
+        title: Page title
+        icon: Optional icon emoji
+        description: Optional description text
+        margin_bottom: Bottom margin (default: 2rem)
+    """
+    icon_text = f"{icon} " if icon else ""
+    st.markdown(f"""
+    <div style='margin-bottom: {margin_bottom};'>
+        <h1 style='font-size: 2.5rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;'>
+            {icon_text}{title}
+        </h1>
+        {f"<p style='font-size: 1.1rem; color: #64748b; margin: 0;'>{description}</p>" if description else ""}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_section_header(title: str, icon: str = "", level: int = 2, margin_top: str = "2.5rem", margin_bottom: str = "1.5rem") -> None:
+    """
+    Render standardized section header with consistent spacing and icon size.
+    
+    Args:
+        title: Section title (will be title-cased)
+        icon: Optional icon emoji (will be sized to 24px)
+        level: Header level (2 for h2, 3 for h3, etc.)
+        margin_top: Top margin (default: 2.5rem)
+        margin_bottom: Bottom margin (default: 1.5rem)
+    """
+    # Ensure title case
+    title = title.title() if title else ""
+    
+    # Icon styling with 24px size
+    if icon:
+        icon_text = f"<span style='font-size: 24px; display: inline-block; vertical-align: middle; margin-right: 0.5rem;'>{icon}</span>"
+    else:
+        icon_text = ""
+    
+    tag = f"h{level}"
+    st.markdown(f"""
+    <{tag} style='font-size: {"2rem" if level == 2 else "1.5rem"}; font-weight: 700; color: #1e40af; margin-top: {margin_top}; margin-bottom: {margin_bottom}; border-left: 4px solid #3b82f6; padding-left: 1rem;'>
+        {icon_text}{title}
+    </{tag}>
+    """, unsafe_allow_html=True)
+
+
+def render_card(header: str = "", body: Any = None, icon: str = "", collapsible: bool = False, default_expanded: bool = True) -> None:
+    """
+    Render standardized card component.
+    
+    Args:
+        header: Card header text
+        icon: Optional icon emoji
+        body: Card body content (function or content)
+        collapsible: Whether card is collapsible
+        default_expanded: Default expanded state (if collapsible)
+    """
+    icon_text = f"{icon} " if icon else ""
+    
+    if collapsible:
+        with st.expander(f"{icon_text}{header}", expanded=default_expanded):
+            if callable(body):
+                body()
+            else:
+                st.markdown(body if body else "")
+    else:
+        st.markdown(f"""
+        <div style='background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>
+            {f"<h3 style='font-size: 1.25rem; font-weight: 600; color: #0f172a; margin-top: 0; margin-bottom: 1rem;'>{icon_text}{header}</h3>" if header else ""}
+            <div style='color: #1e293b;'>
+        """, unsafe_allow_html=True)
+        
+        if callable(body):
+            body()
+        else:
+            st.markdown(body if body else "")
+        
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+
+def render_empty_state(message: str, icon: str = "📭", submessage: str = "") -> None:
+    """
+    Render standardized empty state with consistent styling.
+    
+    Args:
+        message: Main message
+        icon: Icon emoji (will be sized to 24px)
+        submessage: Optional submessage
+    """
+    st.markdown(f"""
+    <div style='text-align: center; padding: 3rem 2rem; background-color: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; margin: 2.5rem 0 1.5rem 0;'>
+        <div style='font-size: 24px; margin-bottom: 1rem;'>{icon}</div>
+        <p style='font-size: 1.25rem; color: #64748b; margin: 0; font-weight: 600;'>{message}</p>
+        {f"<p style='font-size: 1rem; color: #94a3b8; margin-top: 0.5rem;'>{submessage}</p>" if submessage else ""}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_plotly_chart(fig, title: str = "", height: int = 400, width: str = "stretch", show_title: bool = True, key: str = None) -> None:
+    """
+    Render Plotly chart with consistent styling (400px height, title case, standard margins).
+    
+    Args:
+        fig: Plotly figure
+        title: Chart title (will be title-cased, shown above chart if show_title=True)
+        height: Chart height in pixels (default: 400px)
+        width: Chart width ('stretch' or 'content')
+        show_title: Show title above chart (removes title from chart itself)
+    """
+    # Ensure title case
+    title_cased = title.title() if title else ""
+    
+    # Remove title from chart if showing above
+    if show_title and title_cased:
+        st.markdown(f"<h4 style='font-size: 1.1rem; font-weight: 600; color: #475569; margin: 1rem 0 0.5rem 0;'>{title_cased}</h4>", unsafe_allow_html=True)
+        # Remove title from chart itself
+        if hasattr(fig, 'layout') and hasattr(fig.layout, 'title'):
+            fig.update_layout(title=None)
+    
+    # Standard layout with consistent margins and legend placement
+    fig.update_layout(
+        height=height,
+        template="plotly_white",
+        font=dict(family="Arial, sans-serif", size=12, color="#1e293b"),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=60, r=60, t=40, b=60),  # Consistent margins
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ) if len(fig.data) > 1 else None  # Horizontal legend if multiple series
+    )
+    
+    st.plotly_chart(fig, width=width, key=key)
+
+
+def render_error_message(error_type: str, message: str, details: str = "", show_details: bool = False) -> None:
+    """
+    Render standardized error message.
+    
+    Args:
+        error_type: Error type (e.g., "ValidationError", "APIError")
+        message: User-friendly message
+        details: Technical details (optional)
+        show_details: Whether to show details in expander
+    """
+    st.error(f"**{error_type}**: {message}")
+    
+    if details and show_details:
+        with st.expander("Technical Details"):
+            st.code(details, language="text")
+
+
+def render_info_box(message: str, icon: str = "ℹ️", color: str = "#3b82f6") -> None:
+    """
+    Render standardized info box.
+    
+    Args:
+        message: Info message
+        icon: Icon emoji
+        color: Border color (hex)
+    """
+    st.markdown(f"""
+    <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid {color};'>
+        <p style='font-size: 1rem; color: #1e40af; margin: 0;'>
+            <strong>{icon}</strong> {message}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_divider(margin_top: str = "1rem", margin_bottom: str = "1rem") -> None:
+    """
+    Render standardized divider with consistent spacing.
+    
+    Args:
+        margin_top: Top margin (default: 1rem)
+        margin_bottom: Bottom margin (default: 1rem)
+    """
+    st.markdown(f"<div style='margin-top: {margin_top}; margin-bottom: {margin_bottom}; border-top: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
+
+
+def should_hide_section(data: Any, empty_message: str = "No data available") -> bool:
+    """
+    Check if section should be hidden (empty/None).
+    
+    Args:
+        data: Data to check
+        empty_message: Message to show if empty
+        
+    Returns:
+        True if should hide, False otherwise
+    """
+    if data is None:
+        return True
+    if isinstance(data, (list, dict, str)):
+        if not data or (isinstance(data, str) and not data.strip()):
+            return True
+    return False
+
+
+def render_section_if_not_empty(title: str, data: Any, render_func: callable, icon: str = "", empty_message: str = "No data available") -> None:
+    """
+    Render section only if data is not empty.
+    
+    Args:
+        title: Section title
+        data: Data to check
+        render_func: Function to render content
+        icon: Optional icon
+        empty_message: Message if empty
+    """
+    if should_hide_section(data):
+        st.markdown(f"""
+        <div style='opacity: 0.5; padding: 1rem; background-color: #f8fafc; border-radius: 8px; margin: 1rem 0;'>
+            <p style='color: #94a3b8; margin: 0; font-style: italic;'>{icon} {title}: {empty_message}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        render_section_header(title, icon=icon)
+        render_func(data)

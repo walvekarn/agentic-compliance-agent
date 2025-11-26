@@ -8,10 +8,13 @@ and replanning capabilities.
 
 from typing import Dict, List, Any, Optional
 import time
+import logging
 from datetime import datetime, timezone
 
 from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 from backend.agentic_engine.tools.tool_registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class AgentLoop:
@@ -134,7 +137,7 @@ class AgentLoop:
             return validated_plan
             
         except Exception as e:
-            print(f"Error generating plan: {e}")
+            logger.error(f"Error generating plan: {e}")
             # Return default plan on error
             return [
                 {

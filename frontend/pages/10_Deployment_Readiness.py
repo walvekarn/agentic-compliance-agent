@@ -10,6 +10,12 @@ from pathlib import Path
 from datetime import datetime
 import json
 import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+import plotly.io as pio
+
+# Force light theme for all Plotly charts
+pio.templates.default = "plotly_white"
 
 # Add frontend directory to path
 frontend_dir = Path(__file__).parent.parent
@@ -23,7 +29,7 @@ from components.api_client import APIClient, display_api_error
 st.set_page_config(page_title="Deployment Readiness", page_icon="✅", layout="wide")
 
 # Apply light theme CSS
-from components.ui_helpers import apply_light_theme_css
+from components.ui_helpers import apply_light_theme_css, render_page_header, render_section_header
 apply_light_theme_css()
 
 # Authentication
@@ -89,7 +95,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown('<div class="readiness-header"><h1>✅ Deployment Readiness Checker</h1><p>Comprehensive system health validation</p></div>', unsafe_allow_html=True)
+render_page_header(
+    title="Deployment Readiness Checker",
+    icon="✅",
+    description="Comprehensive system health validation"
+)
 
 # Feature explanation
 st.markdown("""
@@ -125,11 +135,23 @@ if run_button or st.session_state.health_check_running:
     
     st.session_state.health_check_running = False
     
-    if response:
-        st.session_state.health_check_results = response.data
-        st.success("✅ Health check completed!")
+    if response and response.success:
+        # Handle both direct data and nested response formats
+        if isinstance(response.data, dict):
+            st.session_state.health_check_results = response.data
+        elif hasattr(response, 'data') and response.data:
+            st.session_state.health_check_results = response.data
+        else:
+            st.session_state.health_check_results = None
+            st.warning("⚠️ Health check completed but no data returned. Check backend logs.")
+        
+        if st.session_state.health_check_results:
+            st.success("✅ Health check completed!")
     else:
-        display_api_error(response)
+        if response:
+            display_api_error(response)
+        else:
+            st.error("❌ **Error**: No response from health check endpoint. Check that the backend is running.")
         st.session_state.health_check_results = None
 
 # Display results
@@ -137,6 +159,9 @@ if st.session_state.health_check_results:
     results = st.session_state.health_check_results
     summary = results.get("summary", {})
     overall_status = results.get("overall_status", "unknown")
+    readiness_score = results.get("readiness_score")
+    readiness_components = results.get("readiness_components", {})
+    details = results.get("details", {})
     
     # Overall status badge
     status_colors = {
@@ -145,18 +170,138 @@ if st.session_state.health_check_results:
         "warning": "#ffc107"
     }
     
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h2>Overall Status: 
-            <span style="color: {status_colors.get(overall_status, '#6c757d')};">
-                {overall_status.upper()}
-            </span>
-        </h2>
-    </div>
-    """, unsafe_allow_html=True)
+    # Readiness score gauge chart
+    render_section_header("Deployment Readiness Score", icon="🎯", level=2)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        if readiness_score is not None:
+            # Determine readiness level and color
+            if readiness_score >= 0.9:
+                level = "🟢 Ready"
+                color = "#28a745"
+            elif readiness_score >= 0.7:
+                level = "🟡 Needs Review"
+                color = "#ffc107"
+            else:
+                level = "🔴 Failing"
+                color = "#dc3545"
+            
+            # Create gauge chart
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=readiness_score * 100,
+                domain={'x': [0, 1], 'y': [0, 1]},
+                title={'text': f"Readiness Score<br>{level}", 'font': {'size': 20}},
+                delta={'reference': 90, 'position': "top"},
+                gauge={
+                    'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                    'bar': {'color': color},
+                    'bgcolor': "white",
+                    'borderwidth': 2,
+                    'bordercolor': "gray",
+                    'steps': [
+                        {'range': [0, 70], 'color': "#ffe6e6"},
+                        {'range': [70, 90], 'color': "#fff3cd"},
+                        {'range': [90, 100], 'color': "#e6ffe6"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "red", 'width': 4},
+                        'thickness': 0.75,
+                        'value': 90
+                    }
+                }
+            ))
+            
+            fig.update_layout(height=350)
+            st.plotly_chart(fig, width="stretch")
+        else:
+            st.info("Readiness score not available. Run health check to compute.")
+    
+    with col2:
+        st.markdown(f"""
+        <div style="margin-top: 50px;">
+            <h3 style="color: {status_colors.get(overall_status, '#6c757d')};">
+                Overall Status: {overall_status.upper()}
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if readiness_score is not None:
+            st.metric("Readiness Score", f"{readiness_score:.1%}")
+        
+        # Component status badges
+        if readiness_components:
+            st.markdown("### Component Status")
+            for component_name, component_data in readiness_components.items():
+                status = component_data.get("status", "unknown")
+                score = component_data.get("score", 0.0)
+                
+                if status == "pass":
+                    badge = "🟢"
+                elif status == "warning":
+                    badge = "🟡"
+                else:
+                    badge = "🔴"
+                
+                st.markdown(f"{badge} **{component_name.replace('_', ' ').title()}**: {score:.1%}")
+    
+    # Component breakdown bar chart
+    if readiness_components:
+        render_section_header("Component Breakdown", icon="📊", level=2)
+        
+        component_df = pd.DataFrame([
+            {
+                "Component": k.replace("_", " ").title(),
+                "Score": v.get("score", 0.0) * 100,
+                "Weighted Score": v.get("weighted_score", 0.0) * 100,
+                "Weight": v.get("weight", 0.0) * 100,
+                "Status": v.get("status", "unknown")
+            }
+            for k, v in readiness_components.items()
+        ])
+        
+        # Color map for status
+        color_map = {
+            "pass": "#28a745",
+            "warning": "#ffc107",
+            "fail": "#dc3545",
+            "unknown": "#6c757d"
+        }
+        component_df["Color"] = component_df["Status"].map(color_map)
+        
+        # Bar chart
+        fig = px.bar(
+            component_df,
+            x="Component",
+            y="Score",
+            color="Component",
+            color_discrete_map=dict(zip(component_df["Component"], component_df["Color"])),
+            text="Score"
+        )
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="inside")
+        fig.update_layout(
+            height=400,
+            yaxis=dict(range=[0, 100], title="Score (%)"),
+            title=None,
+            margin=dict(l=60, r=60, t=40, b=60)
+        )
+        st.markdown("#### Component Health Scores")
+        st.plotly_chart(fig, width="stretch")
+        
+        # Component details table
+        st.markdown("### Component Details")
+        display_df = component_df[["Component", "Score", "Weight", "Status"]].copy()
+        display_df["Score"] = display_df["Score"].apply(lambda x: f"{x:.1f}%")
+        display_df["Weight"] = display_df["Weight"].apply(lambda x: f"{x:.1f}%")
+        display_df["Status"] = display_df["Status"].apply(
+            lambda s: "🟢 Pass" if s == "pass" else ("🟡 Warning" if s == "warning" else "🔴 Fail")
+        )
+        st.dataframe(display_df, width="stretch", hide_index=True)
     
     # Summary metrics
-    st.markdown("## 📊 Health Check Summary")
+    render_section_header("Health Check Summary", icon="📊", level=2)
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -180,39 +325,153 @@ if st.session_state.health_check_results:
     st.progress(pass_rate)
     st.caption(f"Pass Rate: {pass_rate:.1%}")
     
-    # Individual checks
-    st.markdown("## 🔍 Individual Check Results")
+    # Detailed tables section
+    render_section_header("Detailed Readiness Reports", icon="📋", level=2)
     
-    checks = results.get("checks", [])
-    for check in checks:
-        check_name = check.get("check_name", "unknown")
-        status = check.get("status", "unknown")
-        message = check.get("message", "")
-        details = check.get("details", {})
-        remediation = check.get("remediation")
-        
-        # Determine card class
-        card_class = f"check-{status}"
-        
-        # Status badge
-        status_badge_class = f"status-{status}"
-        status_display = status.upper()
-        
-        with st.container():
+    tab1, tab2, tab3, tab4 = st.tabs(["Health Checks", "Test Suite", "Error Recovery", "All Checks"])
+    
+    with tab1:
+        # Health checks table
+        checks = results.get("checks", [])
+        if checks:
+            health_df = pd.DataFrame([
+                {
+                    "Check": c.get("check_name", "unknown").replace("_", " ").title(),
+                    "Status": "🟢 Pass" if c.get("status") == "pass" else ("🟡 Warning" if c.get("status") == "warning" else "🔴 Fail"),
+                    "Message": c.get("message", ""),
+                    "Details": str(c.get("details", {}))[:100] + "..." if len(str(c.get("details", {}))) > 100 else str(c.get("details", {}))
+                }
+                for c in checks
+            ])
+            st.dataframe(health_df, width="stretch", hide_index=True)
+            
+            # Expandable details for each check
+            for check in checks:
+                check_name = check.get("check_name", "unknown")
+                status = check.get("status", "unknown")
+                message = check.get("message", "")
+                check_details = check.get("details", {})
+                remediation = check.get("remediation")
+                
+                # Status badge
+                if status == "pass":
+                    badge = "🟢"
+                elif status == "warning":
+                    badge = "🟡"
+                else:
+                    badge = "🔴"
+                
+                with st.expander(f"{badge} {check_name.replace('_', ' ').title()}"):
+                    st.markdown(f"**Message:** {message}")
+                    if check_details:
+                        st.json(check_details)
+                    if remediation:
+                        st.info(f"💡 **Remediation:** {remediation}")
+        else:
+            st.info("No health check data available.")
+    
+    with tab2:
+        # Test suite metrics table
+        test_suite_metrics = details.get("test_suite_metrics", {})
+        if test_suite_metrics and test_suite_metrics.get("status") != "unavailable":
+            if test_suite_metrics.get("pass_rate") is not None:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    pass_rate = test_suite_metrics.get("pass_rate", 0.0)
+                    st.metric("Pass Rate", f"{pass_rate:.1%}")
+                with col2:
+                    total_tests = test_suite_metrics.get("total_tests", 0)
+                    st.metric("Total Tests", total_tests)
+                with col3:
+                    confidence_adequacy = test_suite_metrics.get("confidence_deviations", 0.0)
+                    st.metric("Confidence Adequacy", f"{confidence_adequacy:.1%}")
+                
+                # Test suite results table
+                failures = test_suite_metrics.get("failures", [])
+                if failures:
+                    st.markdown("### Test Failures")
+                    failures_df = pd.DataFrame([
+                        {
+                            "Test": f.get("scenario", {}).get("name", "Unknown"),
+                            "Status": "❌ Failed" if not f.get("success", True) else "✅ Passed",
+                            "Error": ", ".join(f.get("errors", []))[:100] if f.get("errors") else "None"
+                        }
+                        for f in failures[:10]  # Show first 10
+                    ])
+                    st.dataframe(failures_df, width="stretch", hide_index=True)
+                else:
+                    st.success("✅ No test failures recorded!")
+            else:
+                st.warning("Test suite metrics not available. Run test suite to get metrics.")
+        else:
+            st.info("Test suite metrics not available.")
+    
+    with tab3:
+        # Error recovery metrics table
+        error_recovery_metrics = details.get("error_recovery_metrics", {})
+        if error_recovery_metrics and error_recovery_metrics.get("status") != "unavailable":
+            if error_recovery_metrics.get("recovery_rate") is not None:
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    recovery_rate = error_recovery_metrics.get("recovery_rate", 0.0)
+                    st.metric("Recovery Rate", f"{recovery_rate:.1%}")
+                with col2:
+                    fallback_quality = error_recovery_metrics.get("fallback_quality", 0.0)
+                    st.metric("Fallback Quality", f"{fallback_quality:.1%}")
+                with col3:
+                    retry_stability = error_recovery_metrics.get("retry_stability", 0.0)
+                    st.metric("Retry Stability", f"{retry_stability:.2f}")
+                with col4:
+                    total_tests = error_recovery_metrics.get("total_tests", 0)
+                    st.metric("Total Tests", total_tests)
+                
+                # Error recovery matrix
+                if readiness_components and "error_recovery_health" in readiness_components:
+                    recovery_component = readiness_components["error_recovery_health"]
+                    if recovery_component.get("metrics"):
+                        st.markdown("### Error Recovery Details")
+                        with st.expander("View Error Recovery Metrics"):
+                            st.json(recovery_component["metrics"])
+            else:
+                st.warning("Error recovery metrics not available. Run error recovery suite to get metrics.")
+        else:
+            st.info("Error recovery metrics not available.")
+    
+    with tab4:
+        # All checks with color-coded badges
+        checks = results.get("checks", [])
+        for check in checks:
+            check_name = check.get("check_name", "unknown")
+            status = check.get("status", "unknown")
+            message = check.get("message", "")
+            check_details = check.get("details", {})
+            remediation = check.get("remediation")
+            
+            # Determine badge and color
+            if status == "pass":
+                badge = "🟢"
+                bg_color = "#e6ffe6"
+                border_color = "#28a745"
+            elif status == "warning":
+                badge = "🟡"
+                bg_color = "#fff3cd"
+                border_color = "#ffc107"
+            else:
+                badge = "🔴"
+                bg_color = "#ffe6e6"
+                border_color = "#dc3545"
+            
             st.markdown(f"""
-            <div class="check-card {card_class}">
-                <h3>
-                    {check_name.replace('_', ' ').title()}
-                    <span class="status-badge {status_badge_class}">{status_display}</span>
-                </h3>
-                <p><strong>Message:</strong> {message}</p>
+            <div style="background-color: {bg_color}; border-left: 4px solid {border_color}; padding: 12px; border-radius: 4px; margin-bottom: 10px;">
+                <h4>{badge} {check_name.replace('_', ' ').title()} - <span style="text-transform: uppercase;">{status}</span></h4>
+                <p>{message}</p>
             </div>
             """, unsafe_allow_html=True)
             
             # Show details if available
-            if details:
+            if check_details:
                 with st.expander(f"View Details for {check_name}"):
-                    st.json(details)
+                    st.json(check_details)
             
             # Show remediation if available
             if remediation:
@@ -235,7 +494,7 @@ if st.session_state.health_check_results:
             """, unsafe_allow_html=True)
     
     # Deployment readiness assessment
-    st.markdown("## 🚀 Deployment Readiness Assessment")
+    render_section_header("Deployment Readiness Assessment", icon="🚀", level=2)
     
     if overall_status == "pass":
         st.success("""
@@ -260,7 +519,7 @@ if st.session_state.health_check_results:
         """)
     
     # Export results
-    st.markdown("## 📥 Export Results")
+    render_section_header("Export Results", icon="📥", level=2)
     if st.button("Download Health Check Report"):
         report_json = json.dumps(results, indent=2)
         st.download_button(

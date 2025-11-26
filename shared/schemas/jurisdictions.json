@@ -1,0 +1,53 @@
+{
+  "jurisdictions": [
+    {
+      "code": "US_FEDERAL",
+      "name": "United States (Federal)",
+      "regulations": ["SOX", "HIPAA", "FTC", "SEC"],
+      "description": "US federal regulations"
+    },
+    {
+      "code": "US_STATE",
+      "name": "United States (State)",
+      "regulations": ["CCPA", "State Privacy Laws"],
+      "description": "US state-level regulations"
+    },
+    {
+      "code": "EU",
+      "name": "European Union",
+      "regulations": ["GDPR", "ePrivacy Directive"],
+      "description": "EU regulations including GDPR"
+    },
+    {
+      "code": "UK",
+      "name": "United Kingdom",
+      "regulations": ["UK GDPR", "Data Protection Act 2018"],
+      "description": "UK-specific regulations"
+    },
+    {
+      "code": "APAC",
+      "name": "Asia-Pacific",
+      "regulations": ["PDPA", "PIPEDA", "Privacy Act"],
+      "description": "Asia-Pacific region regulations"
+    },
+    {
+      "code": "CANADA",
+      "name": "Canada",
+      "regulations": ["PIPEDA", "Provincial Privacy Laws"],
+      "description": "Canadian regulations"
+    },
+    {
+      "code": "MULTI_JURISDICTIONAL",
+      "name": "Multi-Jurisdictional",
+      "regulations": ["Multiple"],
+      "description": "Multiple jurisdictions apply"
+    },
+    {
+      "code": "UNKNOWN",
+      "name": "Unknown",
+      "regulations": [],
+      "description": "Jurisdiction not specified"
+    }
+  ]
+}
+

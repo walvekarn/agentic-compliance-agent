@@ -38,14 +38,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def http_exception_handler(request: Request, exc: HTTPException):
     request_id = getattr(request.state, "request_id", None)
     logger.info(f"[{request_id}] HTTPException {exc.status_code}: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=_error_payload(
-            "HTTPException",
-            str(exc.detail) if exc.detail else "HTTP error",
-            details={"status_code": exc.status_code}
-        ),
+    message = str(exc.detail) if exc.detail else "HTTP error"
+    payload = _error_payload(
+        "HTTPException",
+        message,
+        details={"status_code": exc.status_code}
     )
+    # Preserve a simple detail key for clients/tests that expect FastAPI's default structure
+    payload["detail"] = message
+    return JSONResponse(status_code=exc.status_code, content=payload)
 
 
 async def integrity_error_handler(request: Request, exc: IntegrityError):
@@ -93,5 +94,4 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(IntegrityError, integrity_error_handler)
     app.add_exception_handler(ValueError, value_error_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
-
 

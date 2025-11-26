@@ -3,8 +3,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Path
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime, timedelta, timezone
 
 from backend.agent.decision_engine import DecisionEngine
 from backend.agent.audit_service import AuditService
@@ -14,7 +14,8 @@ from backend.agent.risk_models import (
     EntityType,
     IndustryCategory,
     Jurisdiction,
-    TaskCategory
+    TaskCategory,
+    RiskFactors
 )
 from backend.db.base import get_db
 from backend.auth.security import get_current_user
@@ -61,6 +62,11 @@ class ComplianceTask(BaseModel):
     risk_level: str
     reasoning_summary: str
     audit_id: Optional[int]
+    risk_score: float
+    risk_factors: Dict[str, float]
+    risk_analysis: List[Dict[str, Any]]
+    reasoning_steps: List[str]
+    last_updated: str
 
 
 class ComplianceCalendar(BaseModel):
@@ -261,7 +267,7 @@ def generate_compliance_tasks(
         # Calculate deadline
         deadline = None
         if task_def.get("deadline_offset"):
-            deadline = datetime.utcnow() + timedelta(days=task_def["deadline_offset"])
+            deadline = datetime.now(timezone.utc) + timedelta(days=task_def["deadline_offset"])
         
         tasks.append({
             "task_id": task_id,
@@ -270,6 +276,40 @@ def generate_compliance_tasks(
         })
     
     return tasks
+
+
+def _build_risk_analysis(factors: RiskFactors) -> Tuple[List[Dict[str, Any]], Dict[str, float]]:
+    weights = {
+        'jurisdiction_risk': 0.15,
+        'entity_risk': 0.15,
+        'task_risk': 0.20,
+        'data_sensitivity_risk': 0.20,
+        'regulatory_risk': 0.20,
+        'impact_risk': 0.10
+    }
+    risk_analysis = []
+    risk_factor_dict = {}
+    for name, weight in weights.items():
+        value = getattr(factors, name, 0.0)
+        risk_analysis.append({
+            "factor": name,
+            "score": value,
+            "weight": weight,
+            "explanation": f"{name.replace('_', ' ').title()} risk: {value:.2f}"
+        })
+        risk_factor_dict[name] = value
+    return risk_analysis, risk_factor_dict
+
+
+def _get_reasoning_steps(analysis) -> List[str]:
+    steps = []
+    for reason in analysis.reasoning:
+        text = str(reason).strip()
+        if text:
+            steps.append(text)
+        if len(steps) >= 3:
+            break
+    return steps
 
 
 @router.post("/entity/analyze", response_model=ComplianceCalendar)
@@ -327,9 +367,9 @@ async def analyze_entity(
         # Analyze each task and get decision
         analyzed_tasks = []
         decisions_summary = {
-            "autonomous": 0,
-            "review_required": 0,
-            "escalate": 0
+            "AUTONOMOUS": 0,
+            "REVIEW_REQUIRED": 0,
+            "ESCALATE": 0
         }
         
         for task_info in compliance_tasks:
@@ -361,32 +401,36 @@ async def analyze_entity(
                 }
             )
             
-            # Create reasoning summary (first 3 key points)
-            key_reasoning = []
-            for reason in analysis.reasoning:
-                if any(keyword in reason for keyword in ["RISK", "DECISION", "risk", "decision", "🎯", "🤔", "⚠️", "🚨"]):
-                    key_reasoning.append(reason.strip())
-                    if len(key_reasoning) >= 3:
-                        break
-            
-            reasoning_summary = " | ".join(key_reasoning[:3]) if key_reasoning else "Standard compliance analysis"
-            
-            # Count decisions
-            decisions_summary[analysis.decision.value.lower().replace("_", "")] = \
-                decisions_summary.get(analysis.decision.value.lower().replace("_", ""), 0) + 1
-            
+            # Create sanitized reasoning summary (first 3 reasoning_steps)
+            reasoning_steps = _get_reasoning_steps(analysis)
+            reasoning_summary = " | ".join(reasoning_steps) if reasoning_steps else "Standard compliance analysis"
+
+            # Count decisions (uppercase keys)
+            decisions_summary[analysis.decision.value] = decisions_summary.get(analysis.decision.value, 0) + 1
+
+            # Build risk analysis payloads
+            risk_analysis_list, risk_factors_dict = _build_risk_analysis(analysis.risk_factors)
+           
+            deadline_iso = None
+            if task_info["deadline"]:
+                deadline_iso = task_info["deadline"].strftime("%Y-%m-%dT%H:%M:%SZ")
             analyzed_tasks.append(ComplianceTask(
                 task_id=task_info["task_id"],
                 task_name=task_def["name"],
                 description=task_def["description"],
                 category=task_def["category"].value,
-                deadline=task_info["deadline"].isoformat() if task_info["deadline"] else None,
+                deadline=deadline_iso,
                 frequency=task_def["frequency"],
                 decision=analysis.decision.value,
                 confidence=analysis.confidence,
                 risk_level=analysis.risk_level.value,
                 reasoning_summary=reasoning_summary,
-                audit_id=audit_entry.id
+                audit_id=audit_entry.id,
+                risk_score=analysis.risk_factors.overall_score,
+                risk_factors=risk_factors_dict,
+                risk_analysis=risk_analysis_list,
+                reasoning_steps=reasoning_steps,
+                last_updated=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             ))
         
         # Identify applicable regulations
@@ -409,7 +453,7 @@ async def analyze_entity(
             "low_risk_tasks": sum(1 for t in analyzed_tasks if t.risk_level == "LOW"),
             "last_updated": datetime.utcnow().isoformat(),
             "calculation_timestamp": datetime.utcnow().isoformat(),
-            "autonomous_percentage": (decisions_summary["autonomous"] / len(analyzed_tasks) * 100) if analyzed_tasks else 0
+            "autonomous_percentage": (decisions_summary["AUTONOMOUS"] / len(analyzed_tasks) * 100) if analyzed_tasks else 0
         }
         
         return ComplianceCalendar(
@@ -516,4 +560,3 @@ async def get_audit_log(
             message=f"Failed to retrieve audit log: {str(e)}",
             details={"error_type": type(e).__name__, "task_id": task_id}
         )
-

@@ -6,9 +6,11 @@ Entry point for the Agentic Compliance API backend.
 
 import logging
 from contextlib import asynccontextmanager
+import uuid
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.config import settings
 from backend.core.version import get_version
@@ -39,6 +41,19 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# Environment verification
+logger.info("=" * 60)
+logger.info("ENVIRONMENT VERIFICATION")
+logger.info("=" * 60)
+logger.info(f"OPENAI_API_KEY: {'✅ Set' if settings.OPENAI_API_KEY else '❌ Not set (mock mode)'}")
+if settings.OPENAI_API_KEY:
+    logger.info(f"  Key length: {len(settings.OPENAI_API_KEY)} characters")
+    logger.info(f"  Key prefix: {settings.OPENAI_API_KEY[:7]}...")
+logger.info(f"DATABASE_URL: {settings.DATABASE_URL}")
+logger.info(f"DEBUG: {settings.DEBUG}")
+logger.info(f"ALLOW_DEMO_USER: {settings.ALLOW_DEMO_USER}")
+logger.info("=" * 60)
 
 
 @asynccontextmanager
@@ -90,6 +105,17 @@ app.add_middleware(
 )
 
 
+# Request ID middleware for traceability
+async def add_request_id_middleware(request, call_next):
+    request.state.request_id = str(uuid.uuid4())
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request.state.request_id
+    return response
+
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=add_request_id_middleware)
+
+
 @app.get("/health")
 async def health_check():
     """
@@ -122,19 +148,43 @@ async def health_check():
             "error": str(e)
         }
     
-    # Check OpenAI API key (optional)
-    openai_key = settings.OPENAI_API_KEY
-    if openai_key:
-        health_status["components"]["openai"] = {
-            "status": "configured",
-            "key_present": True
+    # Check LLM connectivity (fast path, skip if no key)
+    try:
+        from backend.utils.llm_client import LLMClient
+        llm_client = LLMClient()
+        if not settings.OPENAI_API_KEY or str(settings.OPENAI_API_KEY).startswith("mock"):
+            health_status["components"]["llm"] = {
+                "status": "not_configured",
+                "key_present": False
+            }
+        else:
+            test_response = await llm_client.run_compliance_analysis_async(
+                prompt="health check",
+                use_json_schema=False,
+                timeout=5.0
+            )
+            test_dict = test_response.to_dict()
+            if test_dict.get("status") == "completed":
+                health_status["components"]["llm"] = {
+                    "status": "healthy",
+                    "key_present": True,
+                    "connectivity": "verified"
+                }
+            else:
+                health_status["components"]["llm"] = {
+                    "status": "degraded",
+                    "key_present": True,
+                    "connectivity": "failed",
+                    "error": test_dict.get("error", "Unknown error")
+                }
+                health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["components"]["llm"] = {
+            "status": "unhealthy",
+            "key_present": bool(settings.OPENAI_API_KEY),
+            "error": str(e)
         }
-    else:
-        health_status["components"]["openai"] = {
-            "status": "not_configured",
-            "key_present": False,
-            "note": "Agentic features will use mock mode"
-        }
+        health_status["status"] = "degraded"
     
     # Check JWT configuration
     if settings.JWT_SECRET and settings.JWT_SECRET != "dev_jwt_secret_change_me":
@@ -148,6 +198,12 @@ async def health_check():
         }
     
     return health_status
+
+
+@app.get("/")
+def root():
+    """Simple root endpoint for smoke checks"""
+    return {"status": "running", "version": get_version()}
 
 
 # Auth router (unversioned, used by frontend auth_client)

@@ -48,16 +48,30 @@ IMPACT_MAP = {
     "Major crisis": "Critical"
 }
 
-JURISDICTION_DISPLAY_TO_CODE = {
-    "United States": "US_FEDERAL",
-    "California (additional state rules)": "US_CA",
-    "New York (additional state rules)": "US_NY",
-    "European Union countries": "EU",
-    "United Kingdom": "UK",
-    "Canada": "CANADA",
-    "Australia": "AUSTRALIA",
-    "Multiple countries worldwide": "MULTI_JURISDICTIONAL"
-}
+# Build from unified schema
+try:
+    from schemas.schema_loader import load_jurisdictions
+    
+    jurisdictions = load_jurisdictions()
+    JURISDICTION_DISPLAY_TO_CODE = {
+        j["name"]: j["code"] for j in jurisdictions if j.get("code") != "UNKNOWN"
+    }
+    # Add state-specific mappings
+    JURISDICTION_DISPLAY_TO_CODE.update({
+        "California (additional state rules)": "US_CA",
+        "New York (additional state rules)": "US_NY"
+    })
+except Exception:
+    # Fallback if schema loading fails
+    JURISDICTION_DISPLAY_TO_CODE = {
+        "United States (Federal)": "US_FEDERAL",
+        "United States (State)": "US_STATE",
+        "European Union": "EU",  # Exact schema name
+        "United Kingdom": "UK",
+        "Canada": "CANADA",
+        "Asia-Pacific": "APAC",
+        "Multi-Jurisdictional": "MULTI_JURISDICTIONAL"
+    }
 
 CODE_TO_JURISDICTION_DISPLAY = {
     code: display for display, code in JURISDICTION_DISPLAY_TO_CODE.items()
@@ -72,7 +86,7 @@ COMPANY_TYPE_OPTIONS = [
     "New startup (less than 3 years old)",
     "Private company (not traded publicly)",
     "Public company (traded on stock exchange)",
-    "Bank or financial institution)",
+    "Bank or financial institution",
     "Hospital, clinic, or healthcare provider",
     "Non-profit or charity",
     "Government agency or department"
@@ -111,16 +125,38 @@ IMPACT_OPTIONS = [
     "Major crisis"
 ]
 
-LOCATION_OPTIONS = [
-    "United States",
-    "California (additional state rules)",
-    "New York (additional state rules)",
-    "European Union countries",
-    "United Kingdom",
-    "Canada",
-    "Australia",
-    "Multiple countries worldwide"
-]
+# Load from unified schema
+try:
+    import sys
+    from pathlib import Path
+    import json
+    
+    # Add shared directory to path
+    shared_dir = Path(__file__).parent.parent.parent / "shared"
+    sys.path.insert(0, str(shared_dir))
+    
+    from schemas.schema_loader import load_jurisdictions
+    
+    # Build LOCATION_OPTIONS from unified schema
+    jurisdictions = load_jurisdictions()
+    LOCATION_OPTIONS = [j["name"] for j in jurisdictions if j.get("code") != "UNKNOWN"]
+    
+    # Add state-specific options (not in schema but needed for US states)
+    LOCATION_OPTIONS.extend([
+        "California (additional state rules)",
+        "New York (additional state rules)"
+    ])
+except Exception:
+    # Fallback if schema loading fails
+    LOCATION_OPTIONS = [
+        "United States (Federal)",
+        "United States (State)",
+        "European Union",  # Exact schema name
+        "United Kingdom",
+        "Canada",
+        "Asia-Pacific",
+        "Multi-Jurisdictional"
+    ]
 
 # ============================================================================
 # EXAMPLE FORM DATA
@@ -131,7 +167,7 @@ EXAMPLE_FORM_VALUES = {
     "company_type": "Private company (not traded publicly)",
     "industry": "Technology and software",
     "employee_count": "250",
-    "locations": ["United States", "European Union countries"],  # Match LOCATION_OPTIONS exactly
+        "locations": ["United States", "European Union"],  # Use exact schema names
     "handles_data": True,
     "is_regulated": False,
     "task_description": "We need to update our privacy policy to include new features we're launching next month. The features involve collecting user preferences and behavior data to personalize the experience.",

@@ -1,0 +1,22 @@
+{
+  "title": "GDPR Article 30 Records",
+  "description": "Test basic GDPR Article 30 records of processing activities requirement",
+  "input": {
+    "entity": {
+      "name": "TestCorp",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["EU"],
+      "industry": "TECHNOLOGY",
+      "has_personal_data": true,
+      "is_regulated": false
+    },
+    "task": {
+      "description": "Implement GDPR Article 30 records of processing activities",
+      "category": "DATA_PRIVACY"
+    }
+  },
+  "expected_decision": "REVIEW_REQUIRED",
+  "expected_risk_level": "MEDIUM",
+  "expected_min_confidence": 0.65
+}
+

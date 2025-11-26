@@ -92,7 +92,7 @@ def _render_case_card(case: dict, case_number: int) -> None:
     # Extract case details
     decision = case.get('decision', 'UNKNOWN')
     risk_level = case.get('risk_level', 'UNKNOWN')
-    confidence = case.get('confidence_score', case.get('confidence'))
+    confidence = case.get('confidence') or case.get('confidence_score')
     task_description = case.get('task_description', '')
     timestamp = case.get('timestamp', case.get('created_at'))
     entity_name = case.get('entity_name', '')
@@ -440,4 +440,3 @@ def get_decision_distribution(analysis: dict) -> dict[str, int]:
             distribution['UNKNOWN'] += 1
     
     return distribution
-

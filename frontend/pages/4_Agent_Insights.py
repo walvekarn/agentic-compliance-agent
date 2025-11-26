@@ -6,16 +6,24 @@ Visualize agent performance, patterns, and learning progress.
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import plotly.io as pio
+
+# Plotly is optional for tests/local runs; if missing, we show a friendly message instead of failing import
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    import plotly.io as pio
+except ImportError:  # pragma: no cover - keeps module importable without plotly installed
+    px = None
+    go = None
+    pio = None
 from datetime import datetime, timedelta
 import json
 import sys
 from pathlib import Path
 
-# Force light theme for all Plotly charts
-pio.templates.default = "plotly_white"
+# Force light theme for all Plotly charts (when available)
+if pio:
+    pio.templates.default = "plotly_white"
 
 # Add frontend directory to path for imports
 frontend_dir = Path(__file__).parent.parent
@@ -24,7 +32,7 @@ sys.path.insert(0, str(frontend_dir))
 from components.chat_assistant import render_chat_panel
 from components.auth_utils import require_auth, show_logout_button
 from components.api_client import APIClient, display_api_error
-from components.demo_data import get_demo_audit_entries, get_demo_feedback_stats, should_use_demo_data
+# Production-ready: No demo data - use real data only
 
 st.set_page_config(
     page_title="Agent Insights",
@@ -34,7 +42,7 @@ st.set_page_config(
 )
 
 # Apply light theme CSS
-from components.ui_helpers import apply_light_theme_css
+from components.ui_helpers import apply_light_theme_css, render_plotly_chart
 apply_light_theme_css()
 
 # Additional light theme overrides for this page
@@ -144,12 +152,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header
-st.title("📊 Agent Insights Dashboard")
-st.markdown("""
-<p style='font-size: 1.5rem; text-align: center; color: #475569; margin-bottom: 2.5rem; font-weight: 500;'>
-Analyze agent performance, patterns, and learning progress over time
-</p>
-""", unsafe_allow_html=True)
+from components.ui_helpers import render_page_header
+render_page_header(
+    title="Agent Insights Dashboard",
+    icon="📊",
+    description="Analyze agent performance, patterns, and learning progress over time"
+)
 
 # Check API connection
 api = APIClient()
@@ -164,24 +172,34 @@ except Exception as e:
     st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try refreshing the page")
     st.stop()
 
+# Check for mock mode / empty DB warnings
+import os
+warnings = []
+if not os.getenv("OPENAI_API_KEY"):
+    warnings.append("⚠️ **Mock Mode**: OPENAI_API_KEY not set - insights may be limited")
+if not os.getenv("DATABASE_URL") or os.getenv("DATABASE_URL") == "sqlite:///./compliance.db":
+    # Check if DB file exists and is writable
+    db_path = os.getenv("DATABASE_URL", "sqlite:///./compliance.db").replace("sqlite:///", "")
+    if db_path and not os.path.exists(db_path):
+        warnings.append("⚠️ **Database**: Audit trail database not found - no historical data available")
+
+if warnings:
+    st.warning("\n\n".join(warnings))
+
 # Fetch data from API
 @st.cache_data(ttl=60)  # Cache for 60 seconds
 def fetch_audit_data():
-    """Fetch audit trail data with demo data fallback"""
+    """Fetch audit trail data"""
     try:
         resp = api.get("/api/v1/audit/entries", params={"limit": 1000}, timeout=10)
         if resp.success:
             data = resp.data or {}
             entries = data.get("entries", [])
-            if isinstance(entries, list) and len(entries) > 0:
-                return entries, False  # Return entries and demo flag
-            # Use demo data if empty
-            return get_demo_audit_entries(15), True
-        # Use demo data on error
-        return get_demo_audit_entries(15), True
+            if isinstance(entries, list):
+                return entries
+        return []
     except Exception as e:
-        # Use demo data on exception
-        return get_demo_audit_entries(15), True
+        return []
 
 @st.cache_data(ttl=60)
 def fetch_feedback_data():
@@ -190,29 +208,24 @@ def fetch_feedback_data():
         resp = api.get("/api/v1/feedback", params={"limit": 1000}, timeout=10)
         if resp.success:
             data = resp.data
-            if isinstance(data, list) and len(data) > 0:
-                return data, False
-            return [], True  # Empty but not demo
-        return [], True
+            if isinstance(data, list):
+                return data
+        return []
     except Exception as e:
-        return [], True
+        return []
 
 @st.cache_data(ttl=60)
 def fetch_feedback_stats():
-    """Fetch feedback statistics with demo data fallback"""
+    """Fetch feedback statistics"""
     try:
         resp = api.get("/api/v1/feedback/stats", timeout=10)
         if resp.success:
             data = resp.data
-            if isinstance(data, dict) and data.get('total_feedback_count', 0) > 0:
-                return data, False
-            # Use demo data if empty
-            return get_demo_feedback_stats(), True
-        # Use demo data on error
-        return get_demo_feedback_stats(), True
+            if isinstance(data, dict):
+                return data
+        return {}
     except Exception as e:
-        # Use demo data on exception
-        return get_demo_feedback_stats(), True
+        return {}
 
 def flatten_audit_entry(entry):
     """Flatten nested API response into flat dictionary with improved error handling"""
@@ -238,14 +251,38 @@ def flatten_audit_entry(entry):
         if not isinstance(entity_context, dict):
             entity_context = {}
         
-        # Safely extract decision confidence and risk score with defaults
-        decision_confidence = decision.get('confidence_score', 0)
+        # Unified schema uses "confidence_score" at top level, legacy uses nested
+        decision_confidence = entry.get('confidence_score') or decision.get('confidence_score', 0)
         if not isinstance(decision_confidence, (int, float)):
             decision_confidence = 0
+        # Normalize to 0-1 range if needed
+        if decision_confidence > 1.0:
+            decision_confidence = decision_confidence / 100.0
         
-        risk_score = decision.get('risk_score', 0)
+        # Unified schema may have risk_score at top level
+        risk_score = entry.get('risk_score') or decision.get('risk_score', 0)
         if not isinstance(risk_score, (int, float)):
             risk_score = 0
+        
+        # Risk factors (unified schema uses risk_analysis list, convert to dict)
+        risk_analysis = entry.get('risk_analysis', [])
+        risk_factors = entry.get('risk_factors', {})
+        if risk_analysis and isinstance(risk_analysis, list) and len(risk_analysis) > 0:
+            risk_factors = {}
+            for item in risk_analysis:
+                if isinstance(item, dict):
+                    factor_name = item.get('factor', '')
+                    score = item.get('score', 0.0)
+                    if factor_name:
+                        risk_factors[factor_name] = score
+        
+        # Reasoning chain (unified schema uses why.reasoning_steps)
+        why = entry.get('why', {})
+        reasoning_steps = []
+        if isinstance(why, dict):
+            reasoning_steps = why.get('reasoning_steps', [])
+        if not reasoning_steps:
+            reasoning_steps = entry.get('reasoning_chain', [])
         
         return {
             'audit_id': entry.get('audit_id') or entry.get('id'),
@@ -266,25 +303,22 @@ def flatten_audit_entry(entry):
             'jurisdictions': entity_context.get('jurisdictions', []) if isinstance(entity_context.get('jurisdictions'), list) else [],
             'industry': entity_context.get('industry', ''),
             # Risk factors (keep as dict for detailed analysis)
-            'risk_factors': entry.get('risk_factors', {}) if isinstance(entry.get('risk_factors'), dict) else {},
+            'risk_factors': risk_factors if isinstance(risk_factors, dict) else {},
             # Reasoning chain
-            'reasoning_chain': entry.get('reasoning_chain', []) if isinstance(entry.get('reasoning_chain'), list) else [],
+            'reasoning_chain': reasoning_steps if isinstance(reasoning_steps, list) else [],
             'escalation_reason': entry.get('escalation_reason', ''),
         }
     except Exception as e:
         # Log error but don't crash - return None to skip this entry
-        print(f"Error flattening audit entry: {e}")
+        import logging
+        logging.getLogger(__name__).warning(f"Error flattening audit entry: {e}")
         return None
 
 # Load data
 with st.spinner("Loading agent data..."):
-    audit_entries, is_audit_demo = fetch_audit_data()
-    feedback_entries, is_feedback_demo = fetch_feedback_data()
-    feedback_stats, is_stats_demo = fetch_feedback_stats()
-
-# Show demo data notice if applicable
-if is_audit_demo:
-    st.info("📊 **Demo Data**: Showing sample analytics. Real charts and insights will appear once you start analyzing tasks.")
+    audit_entries = fetch_audit_data()
+    feedback_entries = fetch_feedback_data()
+    feedback_stats = fetch_feedback_stats()
 
 if not audit_entries or len(audit_entries) == 0:
     st.info("""
@@ -309,7 +343,8 @@ df_audit['timestamp'] = pd.to_datetime(df_audit['timestamp'])
 df_audit['date'] = df_audit['timestamp'].dt.date
 
 # Summary Metrics
-st.markdown("## 📈 Key Metrics")
+from components.ui_helpers import render_section_header
+render_section_header("Key Metrics", icon="📈", level=2)
 
 # Add explanation box for metrics
 st.markdown("""
@@ -347,8 +382,6 @@ with col4:
     if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
         ai_accuracy = feedback_stats.get('accuracy_percent', 0)
         metric_label = "AI Accuracy ℹ️"
-        if is_stats_demo:
-            metric_label += " (Demo)"
         st.metric(
             metric_label, 
             f"{ai_accuracy:.1f}%", 
@@ -396,15 +429,10 @@ fig_confidence.add_hline(
 )
 
 fig_confidence.update_layout(
-    height=400,
-    hovermode='x unified',
-    template="plotly_white",
-    plot_bgcolor='white',
-    paper_bgcolor='white',
-    font=dict(size=12, color='#1e293b')
+    hovermode='x unified'
 )
 
-st.plotly_chart(fig_confidence, width="stretch")
+render_plotly_chart(fig_confidence, title="Confidence Over Time", height=400, show_title=True, key="ai_confidence_over_time")
 
 # Show insight
 recent_confidence = confidence_by_date['mean'].iloc[-1] if len(confidence_by_date) > 0 else 0
@@ -439,16 +467,11 @@ fig_escalations = px.area(
 )
 
 fig_escalations.update_layout(
-    height=400,
     hovermode='x unified',
-    template="plotly_white",
-    plot_bgcolor='white',
-    paper_bgcolor='white',
-    font=dict(color='#1e293b'),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
 
-st.plotly_chart(fig_escalations, width="stretch")
+render_plotly_chart(fig_escalations, title="Decision Types Over Time", height=400, show_title=True, key="decision_types_over_time")
 
 # Calculate escalation trend
 if len(df_audit) >= 10:
@@ -484,19 +507,32 @@ if len(high_risk_entries) > 0:
     }
     
     for _, row in high_risk_entries.iterrows():
+        # Unified schema uses "risk_analysis" (list), legacy uses "risk_factors" (dict)
+        risk_analysis = row.get('risk_analysis', [])
         risk_factors = row.get('risk_factors', {})
-        if isinstance(risk_factors, dict):
-            if risk_factors.get('jurisdiction_risk', 0) > 0.6:
+        
+        # Convert unified schema format if needed
+        if risk_analysis and isinstance(risk_analysis, list) and len(risk_analysis) > 0:
+            risk_factors = {}
+            for item in risk_analysis:
+                if isinstance(item, dict):
+                    factor_name = item.get('factor', '')
+                    score = item.get('score', 0.0)
+                    if factor_name:
+                        risk_factors[factor_name] = score
+        
+        if isinstance(risk_factors, dict) and len(risk_factors) > 0:
+            if (risk_factors.get('jurisdiction_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Jurisdiction Risk'] += 1
-            if risk_factors.get('entity_risk', 0) > 0.6:
+            if (risk_factors.get('entity_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Entity Risk'] += 1
-            if risk_factors.get('task_risk', 0) > 0.6:
+            if (risk_factors.get('task_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Task Risk'] += 1
-            if risk_factors.get('data_sensitivity_risk', 0) > 0.6:
+            if (risk_factors.get('data_sensitivity_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Data Sensitivity'] += 1
-            if risk_factors.get('regulatory_risk', 0) > 0.6:
+            if (risk_factors.get('regulatory_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Regulatory Risk'] += 1
-            if risk_factors.get('impact_risk', 0) > 0.6:
+            if (risk_factors.get('impact_risk', 0) or 0) > 0.6:
                 risk_factor_counts['Impact Risk'] += 1
     
     # Create DataFrame for plotting
@@ -516,16 +552,9 @@ if len(high_risk_entries) > 0:
         color_continuous_scale='Reds'
     )
     
-    fig_risk_factors.update_layout(
-        height=400,
-        showlegend=False,
-        template="plotly_white",
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font=dict(color='#1e293b')
-    )
+    fig_risk_factors.update_layout(showlegend=False)
     
-    st.plotly_chart(fig_risk_factors, width="stretch")
+    render_plotly_chart(fig_risk_factors, title="High-Risk Factors (>60% threshold) in High-Risk Decisions", height=400, show_title=True, key="high_risk_factors")
     
     # Show top risk factor
     top_factor = df_risk_factors.iloc[-1]
@@ -582,14 +611,9 @@ if jurisdiction_counts:
         hover_data={'Count': True}
     )
     
-    fig_jurisdictions.update_layout(
-        height=500,
-        template="plotly_white",
-        paper_bgcolor='white',
-        font=dict(color='#1e293b')
-    )
+    fig_jurisdictions.update_layout(height=500)
     
-    st.plotly_chart(fig_jurisdictions, width="stretch")
+    render_plotly_chart(fig_jurisdictions, title="Jurisdiction Distribution (Treemap)", height=500, show_title=True, key="jurisdiction_distribution")
     
     # Show top jurisdictions
     col1, col2 = st.columns(2)
@@ -633,16 +657,9 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
             hole=0.4
         )])
         
-        fig_agreement.update_layout(
-            title='AI Accuracy: Agreement vs Override',
-            height=400,
-            showlegend=True,
-            template="plotly_white",
-            paper_bgcolor='white',
-            font=dict(color='#1e293b')
-        )
+        fig_agreement.update_layout(showlegend=True)
         
-        st.plotly_chart(fig_agreement, width="stretch")
+        render_plotly_chart(fig_agreement, title="AI Accuracy: Agreement vs Override", height=400, show_title=True, key="ai_accuracy_agreement")
     
     with col2:
         # Bar chart of override breakdown by decision type
@@ -664,16 +681,9 @@ if feedback_stats and feedback_stats.get('total_feedback_count', 0) > 0:
                 color_continuous_scale='Reds'
             )
             
-            fig_overrides.update_layout(
-                height=400,
-                showlegend=False,
-                template="plotly_white",
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                font=dict(color='#1e293b')
-            )
+            fig_overrides.update_layout(showlegend=False)
             
-            st.plotly_chart(fig_overrides, width="stretch")
+            render_plotly_chart(fig_overrides, title="Override Count by Decision Type", height=400, show_title=True, key="override_count_by_type")
     
     # Summary metrics
     st.markdown("### Learning Progress")
@@ -758,13 +768,8 @@ with col1:
         }
     )
     
-    fig_decisions.update_layout(
-        height=350,
-        template="plotly_white",
-        paper_bgcolor='white',
-        font=dict(color='#1e293b')
-    )
-    st.plotly_chart(fig_decisions, width="stretch")
+    fig_decisions.update_layout(height=350)
+    render_plotly_chart(fig_decisions, title="Overall Decision Distribution", height=350, show_title=True, key="overall_decision_distribution")
 
 with col2:
     st.markdown("### Risk Level Distribution")
@@ -782,13 +787,8 @@ with col2:
         }
     )
     
-    fig_risks.update_layout(
-        height=350,
-        template="plotly_white",
-        paper_bgcolor='white',
-        font=dict(color='#1e293b')
-    )
-    st.plotly_chart(fig_risks, width="stretch")
+    fig_risks.update_layout(height=350)
+    render_plotly_chart(fig_risks, title="Overall Risk Level Distribution", height=350, show_title=True, key="overall_risk_distribution")
 
 st.markdown("---")
 

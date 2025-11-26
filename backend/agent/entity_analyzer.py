@@ -102,7 +102,7 @@ class EntityAnalyzer:
                     "👥 Small organization (<50 employees): "
                     "Limited compliance resources, may need external guidance"
                 )
-                risk_factors.append(0.4)
+                risk_factors.append(0.35)
         
         # Previous violations increase risk
         if entity.previous_violations > 0:
@@ -169,8 +169,8 @@ class EntityAnalyzer:
             confidence = 0.7
             capability = "Moderate-High - Should have compliance resources"
         elif entity.employee_count and entity.employee_count < 50:
-            confidence = 0.4
-            capability = "Low - May need external guidance"
+            confidence = 0.65  # Allow autonomy for simple/low-risk cases
+            capability = "Moderate - Small team but can handle simple tasks"
         else:
             capability = "Moderate - Standard compliance capability"
         
@@ -180,4 +180,3 @@ class EntityAnalyzer:
             capability += f" (Note: {entity.previous_violations} previous violations)"
         
         return capability, confidence
-

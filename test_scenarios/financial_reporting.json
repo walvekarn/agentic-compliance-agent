@@ -1,0 +1,22 @@
+{
+  "title": "Financial Reporting Compliance",
+  "description": "Test financial reporting compliance requirements",
+  "input": {
+    "entity": {
+      "name": "FinanceCorp",
+      "entity_type": "PUBLIC_COMPANY",
+      "locations": ["US_FEDERAL"],
+      "industry": "FINANCIAL_SERVICES",
+      "has_personal_data": false,
+      "is_regulated": true
+    },
+    "task": {
+      "description": "Prepare quarterly financial reports for SEC filing",
+      "category": "FINANCIAL_REPORTING"
+    }
+  },
+  "expected_decision": "ESCALATE",
+  "expected_risk_level": "HIGH",
+  "expected_min_confidence": 0.70
+}
+

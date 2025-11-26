@@ -1,388 +1,316 @@
 """
 Test Suite Engine Module
 
-Generates and runs test scenarios through the orchestrator, collecting metrics.
+Runs curated test scenarios and compares actual vs expected results.
 """
 
 import time
-import random
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from backend.agentic_engine.orchestrator import AgenticAIOrchestrator
-from .test_scenario import TestScenario, ComplexityLevel
+from backend.agent.decision_engine import DecisionEngine
+from backend.agent.risk_models import EntityContext, TaskContext, DecisionAnalysis
+from .scenario_loader import load_scenarios_from_directory
+
+
+class TestResult:
+    """Result of a single test scenario"""
+    
+    def __init__(
+        self,
+        scenario: Dict[str, Any],
+        actual_result: Optional[DecisionAnalysis] = None,
+        execution_time: float = 0.0,
+        error: Optional[str] = None
+    ):
+        self.scenario = scenario
+        self.actual_result = actual_result
+        self.execution_time = execution_time
+        self.error = error
+        
+        # Expected values
+        self.expected_decision = scenario.get("expected_decision")
+        self.expected_risk_level = scenario.get("expected_risk_level")
+        self.expected_min_confidence = scenario.get("expected_min_confidence", 0.0)
+        
+        # Actual values
+        if actual_result:
+            self.actual_decision = actual_result.decision.value
+            self.actual_risk_level = actual_result.risk_level.value
+            self.actual_confidence = actual_result.confidence
+        else:
+            self.actual_decision = None
+            self.actual_risk_level = None
+            self.actual_confidence = None
+        
+        # Scoring
+        self.decision_correct = self._check_decision()
+        self.risk_level_correct = self._check_risk_level()
+        self.confidence_adequate = self._check_confidence()
+        self.passed = self.decision_correct and self.risk_level_correct and self.confidence_adequate
+    
+    def _check_decision(self) -> bool:
+        """Check if decision matches expected"""
+        if not self.actual_decision or not self.expected_decision:
+            return False
+        return self.actual_decision == self.expected_decision
+    
+    def _check_risk_level(self) -> bool:
+        """Check if risk level matches expected"""
+        if not self.actual_risk_level or not self.expected_risk_level:
+            return False
+        return self.actual_risk_level == self.expected_risk_level
+    
+    def _check_confidence(self) -> bool:
+        """Check if confidence meets minimum threshold"""
+        if self.actual_confidence is None:
+            return False
+        return self.actual_confidence >= self.expected_min_confidence
+    
+    def get_diff(self) -> Dict[str, Any]:
+        """Get differences between expected and actual"""
+        diff = {}
+        
+        if not self.decision_correct:
+            diff["decision"] = {
+                "expected": self.expected_decision,
+                "actual": self.actual_decision
+            }
+        
+        if not self.risk_level_correct:
+            diff["risk_level"] = {
+                "expected": self.expected_risk_level,
+                "actual": self.actual_risk_level
+            }
+        
+        if not self.confidence_adequate:
+            diff["confidence"] = {
+                "expected_min": self.expected_min_confidence,
+                "actual": self.actual_confidence,
+                "deviation": self.actual_confidence - self.expected_min_confidence if self.actual_confidence is not None else None
+            }
+        
+        return diff
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "scenario": self.scenario,
+            "passed": self.passed,
+            "decision_correct": self.decision_correct,
+            "risk_level_correct": self.risk_level_correct,
+            "confidence_adequate": self.confidence_adequate,
+            "expected": {
+                "decision": self.expected_decision,
+                "risk_level": self.expected_risk_level,
+                "min_confidence": self.expected_min_confidence
+            },
+            "actual": {
+                "decision": self.actual_decision,
+                "risk_level": self.actual_risk_level,
+                "confidence": self.actual_confidence
+            },
+            "diff": self.get_diff(),
+            "execution_time": self.execution_time,
+            "error": self.error
+        }
 
 
 class TestSuiteEngine:
     """
-    Engine for generating and running test scenarios through the orchestrator.
+    Engine for running curated test scenarios and comparing results.
     
-    Generates both random and deterministic test scenarios, executes them
-    through the orchestrator, and collects comprehensive metrics.
+    Loads scenarios from JSON files, runs them through the decision engine,
+    and compares actual vs expected results.
     """
     
-    def __init__(self, orchestrator: Optional[AgenticAIOrchestrator] = None, db_session: Optional[Any] = None):
+    def __init__(self, db_session: Optional[Any] = None):
         """
         Initialize the test suite engine.
         
         Args:
-            orchestrator: Optional orchestrator instance (creates new if None)
-            db_session: Optional database session for orchestrator
+            db_session: Optional database session
         """
-        self.orchestrator = orchestrator or AgenticAIOrchestrator(db_session=db_session)
+        self.decision_engine = DecisionEngine()
         self.db_session = db_session
-        
-        # Predefined deterministic scenarios
-        self.deterministic_scenarios = self._create_deterministic_scenarios()
-    
-    def _create_deterministic_scenarios(self) -> List[TestScenario]:
-        """Create a set of deterministic test scenarios"""
-        return [
-            TestScenario(
-                title="GDPR Article 30 Records",
-                description="Test basic GDPR Article 30 records of processing activities requirement",
-                required_tools=["entity_tool", "task_tool"],
-                complexity=ComplexityLevel.LOW,
-                expected_outputs={
-                    "plan": "Should generate 3-7 step plan",
-                    "entity_analysis": "Should analyze entity context",
-                    "recommendation": "Should provide actionable recommendation"
-                },
-                task_description="Implement GDPR Article 30 records of processing activities",
-                entity_context={
-                    "entity_name": "TestCorp",
-                    "entity_type": "PRIVATE_COMPANY",
-                    "locations": ["EU"],
-                    "industry": "TECHNOLOGY",
-                    "has_personal_data": True
-                },
-                task_context={
-                    "task_description": "Implement GDPR Article 30 records",
-                    "task_category": "DATA_PROTECTION"
-                }
-            ),
-            TestScenario(
-                title="Multi-Jurisdiction Compliance",
-                description="Test compliance analysis across multiple jurisdictions",
-                required_tools=["entity_tool", "calendar_tool", "task_tool"],
-                complexity=ComplexityLevel.MEDIUM,
-                expected_outputs={
-                    "plan": "Should handle multiple jurisdictions",
-                    "jurisdiction_analysis": "Should analyze each jurisdiction",
-                    "recommendation": "Should provide jurisdiction-specific guidance"
-                },
-                task_description="Analyze compliance requirements for US, EU, and UK operations",
-                entity_context={
-                    "entity_name": "GlobalTech",
-                    "entity_type": "PRIVATE_COMPANY",
-                    "locations": ["US", "EU", "UK"],
-                    "industry": "TECHNOLOGY",
-                    "has_personal_data": True,
-                    "is_regulated": True
-                },
-                task_context={
-                    "task_description": "Multi-jurisdiction compliance analysis",
-                    "task_category": "DATA_PROTECTION"
-                }
-            ),
-            TestScenario(
-                title="High-Risk Entity Analysis",
-                description="Test analysis for high-risk entity with violations",
-                required_tools=["entity_tool", "task_tool"],
-                complexity=ComplexityLevel.HIGH,
-                expected_outputs={
-                    "plan": "Should include risk assessment steps",
-                    "risk_analysis": "Should identify high-risk factors",
-                    "recommendation": "Should prioritize risk mitigation"
-                },
-                task_description="Analyze compliance posture for entity with previous violations",
-                entity_context={
-                    "entity_name": "RiskCorp",
-                    "entity_type": "PRIVATE_COMPANY",
-                    "locations": ["US", "EU"],
-                    "industry": "FINANCE",
-                    "has_personal_data": True,
-                    "is_regulated": True,
-                    "previous_violations": 3
-                },
-                task_context={
-                    "task_description": "Comprehensive risk assessment",
-                    "task_category": "DATA_PROTECTION"
-                }
-            )
-        ]
-    
-    def generate_random_scenario(self, complexity: Optional[ComplexityLevel] = None) -> TestScenario:
-        """
-        Generate a random test scenario.
-        
-        Args:
-            complexity: Optional complexity level (random if None)
-            
-        Returns:
-            Randomly generated test scenario
-        """
-        if complexity is None:
-            complexity = random.choice(list(ComplexityLevel))
-        
-        # Random entity types
-        entity_types = ["PRIVATE_COMPANY", "PUBLIC_COMPANY", "NONPROFIT"]
-        industries = ["TECHNOLOGY", "FINANCE", "HEALTHCARE", "RETAIL"]
-        locations_pools = [
-            ["US"],
-            ["EU"],
-            ["US", "EU"],
-            ["US", "EU", "UK"],
-            ["US", "CA", "MX"]
-        ]
-        
-        # Random task categories
-        task_categories = ["DATA_PROTECTION", "FINANCIAL_COMPLIANCE", "HEALTHCARE_COMPLIANCE"]
-        task_templates = [
-            "Implement {category} compliance framework",
-            "Analyze {category} requirements for {location}",
-            "Assess {category} risk for entity operations"
-        ]
-        
-        entity_type = random.choice(entity_types)
-        industry = random.choice(industries)
-        locations = random.choice(locations_pools)
-        task_category = random.choice(task_categories)
-        task_template = random.choice(task_templates)
-        
-        task_description = task_template.format(
-            category=task_category,
-            location=locations[0] if locations else "US"
-        )
-        
-        # Determine required tools based on complexity
-        required_tools = ["entity_tool", "task_tool"]
-        if complexity == ComplexityLevel.MEDIUM or complexity == ComplexityLevel.HIGH:
-            required_tools.append("calendar_tool")
-        if complexity == ComplexityLevel.HIGH:
-            required_tools.append("http_tool")
-        
-        return TestScenario(
-            title=f"Random {complexity.value.title()} Scenario",
-            description=f"Randomly generated {complexity.value} complexity test scenario",
-            required_tools=required_tools,
-            complexity=complexity,
-            expected_outputs={
-                "plan": "Should generate valid plan",
-                "execution": "Should complete execution",
-                "recommendation": "Should provide recommendation"
-            },
-            task_description=task_description,
-            entity_context={
-                "entity_name": f"TestEntity_{random.randint(1000, 9999)}",
-                "entity_type": entity_type,
-                "locations": locations,
-                "industry": industry,
-                "has_personal_data": random.choice([True, False]),
-                "is_regulated": random.choice([True, False]),
-                "previous_violations": random.randint(0, 5) if complexity == ComplexityLevel.HIGH else 0
-            },
-            task_context={
-                "task_description": task_description,
-                "task_category": task_category
-            },
-            metadata={
-                "generated_at": datetime.utcnow().isoformat(),
-                "random_seed": random.randint(1, 10000)
-            }
-        )
     
     def run_scenario(
-        self, 
-        scenario: TestScenario,
-        max_iterations: int = 10
-    ) -> Dict[str, Any]:
+        self,
+        scenario: Dict[str, Any]
+    ) -> TestResult:
         """
-        Run a single test scenario through the orchestrator.
+        Run a single test scenario through the decision engine.
         
         Args:
-            scenario: The test scenario to run
-            max_iterations: Maximum iterations for orchestrator
+            scenario: Scenario dictionary with input and expected results
             
         Returns:
-            Dictionary containing execution results and metrics
+            TestResult with comparison and scoring
         """
         start_time = time.time()
         
-        # Prepare context
-        context = {
-            "entity": scenario.entity_context,
-            "task": scenario.task_context
-        }
-        
-        # Prepare task description
-        task_description = scenario.task_description
-        if not task_description:
-            task_description = f"Test scenario: {scenario.title}"
-        
-        # Run orchestrator
         try:
-            result = self.orchestrator.run(
-                task=task_description,
-                context=context,
-                max_iterations=max_iterations
+            # Extract input
+            input_data = scenario.get("input", {})
+            entity_data = input_data.get("entity", {})
+            task_data = input_data.get("task", {})
+            
+            # Create EntityContext
+            from backend.agent.risk_models import EntityType, IndustryCategory, Jurisdiction, TaskCategory
+            
+            # Convert location strings to Jurisdiction enum
+            location_strings = entity_data.get("locations", ["US_FEDERAL"])
+            jurisdictions = []
+            for loc in location_strings:
+                try:
+                    # Try direct match first
+                    jurisdictions.append(Jurisdiction(loc))
+                except ValueError:
+                    # Try common mappings
+                    loc_mapping = {
+                        "US": "US_FEDERAL",
+                        "EU": "EU",
+                        "UK": "UK",
+                        "CA": "CANADA",
+                        "AU": "AUSTRALIA"
+                    }
+                    mapped = loc_mapping.get(loc.upper(), "UNKNOWN")
+                    try:
+                        jurisdictions.append(Jurisdiction(mapped))
+                    except ValueError:
+                        jurisdictions.append(Jurisdiction.UNKNOWN)
+            
+            entity = EntityContext(
+                name=entity_data.get("name", "TestEntity"),
+                entity_type=EntityType(entity_data.get("entity_type", "PRIVATE_COMPANY")),
+                industry=IndustryCategory(entity_data.get("industry", "TECHNOLOGY")),
+                jurisdictions=jurisdictions,
+                has_personal_data=entity_data.get("has_personal_data", False),
+                is_regulated=entity_data.get("is_regulated", False),
+                previous_violations=entity_data.get("previous_violations", 0)
             )
+            
+            # Create TaskContext
+            task = TaskContext(
+                description=task_data.get("description", ""),
+                category=TaskCategory(task_data.get("category", "GENERAL_INQUIRY"))
+            )
+            
+            # Run decision engine
+            analysis = self.decision_engine.analyze_and_decide(entity, task)
             
             execution_time = time.time() - start_time
             
-            # Extract metrics
-            tools_used = []
-            reasoning_passes = 0
-            errors = []
-            success = True
-            
-            # Collect tools used from step outputs
-            for step_output in result.get("step_outputs", []):
-                step_tools = step_output.get("tools_used", [])
-                tools_used.extend(step_tools)
-                
-                if step_output.get("status") != "success":
-                    success = False
-                    if "error" in step_output:
-                        errors.append(step_output["error"])
-            
-            # Count reasoning passes (reflections)
-            reasoning_passes = len(result.get("reflections", []))
-            
-            # Get tool metrics from orchestrator
-            tool_metrics = self.orchestrator.tool_metrics.copy()
-            
-            # Check if required tools were used
-            tools_used_set = set(tools_used)
-            required_tools_set = set(scenario.required_tools)
-            missing_tools = required_tools_set - tools_used_set
-            
-            return {
-                "scenario": scenario.to_dict(),
-                "status": "success" if success else "partial",
-                "execution_time": execution_time,
-                "tools_used": list(set(tools_used)),  # Unique tools
-                "required_tools": scenario.required_tools,
-                "missing_tools": list(missing_tools),
-                "reasoning_passes": reasoning_passes,
-                "success": success,
-                "errors": errors,
-                "result": result,
-                "tool_metrics": tool_metrics,
-                "confidence_score": result.get("confidence_score", 0.0),
-                "plan_steps": len(result.get("plan", [])),
-                "executed_steps": len(result.get("step_outputs", [])),
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            return TestResult(
+                scenario=scenario,
+                actual_result=analysis,
+                execution_time=execution_time
+            )
             
         except Exception as e:
             execution_time = time.time() - start_time
-            return {
-                "scenario": scenario.to_dict(),
-                "status": "error",
-                "execution_time": execution_time,
-                "tools_used": [],
-                "required_tools": scenario.required_tools,
-                "missing_tools": scenario.required_tools,
-                "reasoning_passes": 0,
-                "success": False,
-                "errors": [str(e)],
-                "result": None,
-                "tool_metrics": {},
-                "confidence_score": 0.0,
-                "plan_steps": 0,
-                "executed_steps": 0,
-                "timestamp": datetime.utcnow().isoformat(),
-                "exception": str(e)
-            }
+            return TestResult(
+                scenario=scenario,
+                actual_result=None,
+                execution_time=execution_time,
+                error=str(e)
+            )
     
     def run_test_suite(
         self,
-        scenarios: Optional[List[TestScenario]] = None,
-        num_random: int = 5,
-        complexity_distribution: Optional[Dict[ComplexityLevel, int]] = None,
-        max_iterations: int = 10
+        scenarios: Optional[List[Dict[str, Any]]] = None,
+        scenarios_dir: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Run a suite of test scenarios.
         
         Args:
-            scenarios: Optional list of specific scenarios to run
-            num_random: Number of random scenarios to generate and run
-            complexity_distribution: Optional dict mapping complexity to count
-            max_iterations: Maximum iterations per scenario
+            scenarios: Optional list of scenario dictionaries (loads from files if None)
+            scenarios_dir: Optional path to scenarios directory
             
         Returns:
             Dictionary containing all test results and aggregated metrics
         """
-        all_results = []
-        
-        # Run deterministic scenarios
+        # Load scenarios if not provided
         if scenarios is None:
-            scenarios = self.deterministic_scenarios.copy()
+            from pathlib import Path
+            if scenarios_dir:
+                scenarios_path = Path(scenarios_dir)
+            else:
+                scenarios_path = None
+            scenarios = load_scenarios_from_directory(scenarios_path)
         
-        for scenario in scenarios:
-            result = self.run_scenario(scenario, max_iterations)
-            all_results.append(result)
-        
-        # Generate and run random scenarios
-        if complexity_distribution is None:
-            complexity_distribution = {
-                ComplexityLevel.LOW: num_random // 3,
-                ComplexityLevel.MEDIUM: num_random // 3,
-                ComplexityLevel.HIGH: num_random - 2 * (num_random // 3)
+        if not scenarios:
+            return {
+                "test_results": [],
+                "summary": {
+                    "total_tests": 0,
+                    "passed_tests": 0,
+                    "failed_tests": 0,
+                    "pass_rate": 0.0,
+                    "decision_accuracy": 0.0,
+                    "risk_level_accuracy": 0.0,
+                    "confidence_adequacy": 0.0,
+                    "avg_execution_time": 0.0,
+                    "confidence_deviations": []
+                },
+                "timestamp": datetime.utcnow().isoformat()
             }
         
-        for complexity, count in complexity_distribution.items():
-            for _ in range(count):
-                random_scenario = self.generate_random_scenario(complexity)
-                result = self.run_scenario(random_scenario, max_iterations)
-                all_results.append(result)
+        # Run all scenarios
+        test_results = []
+        for scenario in scenarios:
+            result = self.run_scenario(scenario)
+            test_results.append(result)
         
         # Calculate aggregated metrics
-        total_tests = len(all_results)
-        successful_tests = sum(1 for r in all_results if r["success"])
-        failed_tests = total_tests - successful_tests
+        total_tests = len(test_results)
+        passed_tests = sum(1 for r in test_results if r.passed)
+        failed_tests = total_tests - passed_tests
         
-        total_execution_time = sum(r["execution_time"] for r in all_results)
+        decision_correct = sum(1 for r in test_results if r.decision_correct)
+        risk_level_correct = sum(1 for r in test_results if r.risk_level_correct)
+        confidence_adequate = sum(1 for r in test_results if r.confidence_adequate)
+        
+        total_execution_time = sum(r.execution_time for r in test_results)
         avg_execution_time = total_execution_time / total_tests if total_tests > 0 else 0
         
-        total_reasoning_passes = sum(r["reasoning_passes"] for r in all_results)
-        avg_reasoning_passes = total_reasoning_passes / total_tests if total_tests > 0 else 0
+        # Calculate confidence deviations
+        confidence_deviations = []
+        for result in test_results:
+            if result.actual_confidence is not None and result.expected_min_confidence is not None:
+                deviation = result.actual_confidence - result.expected_min_confidence
+                confidence_deviations.append({
+                    "scenario": result.scenario.get("title", "Unknown"),
+                    "expected_min": result.expected_min_confidence,
+                    "actual": result.actual_confidence,
+                    "deviation": deviation,
+                    "adequate": deviation >= 0
+                })
         
-        total_confidence = sum(r["confidence_score"] for r in all_results)
-        avg_confidence = total_confidence / total_tests if total_tests > 0 else 0
-        
-        # Tool usage statistics
-        all_tools_used = []
-        for result in all_results:
-            all_tools_used.extend(result["tools_used"])
-        
-        tool_usage_counts = {}
-        for tool in all_tools_used:
-            tool_usage_counts[tool] = tool_usage_counts.get(tool, 0) + 1
-        
-        # Error distribution
-        error_types = {}
-        for result in all_results:
-            for error in result["errors"]:
-                error_type = error.split(":")[0] if ":" in error else "Unknown"
-                error_types[error_type] = error_types.get(error_type, 0) + 1
+        # Get failures with diffs
+        failures = []
+        for result in test_results:
+            if not result.passed:
+                failures.append({
+                    "scenario": result.scenario.get("title", "Unknown"),
+                    "diff": result.get_diff(),
+                    "error": result.error
+                })
         
         return {
-            "test_results": all_results,
+            "test_results": [r.to_dict() for r in test_results],
             "summary": {
                 "total_tests": total_tests,
-                "successful_tests": successful_tests,
+                "passed_tests": passed_tests,
                 "failed_tests": failed_tests,
-                "success_rate": successful_tests / total_tests if total_tests > 0 else 0,
-                "total_execution_time": total_execution_time,
+                "pass_rate": passed_tests / total_tests if total_tests > 0 else 0.0,
+                "decision_accuracy": decision_correct / total_tests if total_tests > 0 else 0.0,
+                "risk_level_accuracy": risk_level_correct / total_tests if total_tests > 0 else 0.0,
+                "confidence_adequacy": confidence_adequate / total_tests if total_tests > 0 else 0.0,
                 "avg_execution_time": avg_execution_time,
-                "avg_reasoning_passes": avg_reasoning_passes,
-                "avg_confidence": avg_confidence,
-                "tool_usage_counts": tool_usage_counts,
-                "error_distribution": error_types
+                "confidence_deviations": confidence_deviations,
+                "failures": failures
             },
             "timestamp": datetime.utcnow().isoformat()
         }
-

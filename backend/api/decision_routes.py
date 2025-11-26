@@ -14,6 +14,8 @@ from backend.agent.risk_models import (
     DecisionAnalysis,
     # Unused direct enums removed to reduce lints
 )
+from backend.utils.schema_converter import convert_decision_analysis_to_analysis_result
+from shared.schemas.analysis_result import AnalysisResult
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from backend.db.base import get_db
@@ -28,7 +30,7 @@ decision_engine = DecisionEngine()
 what_if_engine = WhatIfEngine(decision_engine)
 
 
-@router.post("/analyze", response_model=DecisionAnalysis)
+@router.post("/analyze")
 @limiter.limit(AUTH_RATE)
 async def analyze_compliance_decision(
     request: Request,
@@ -97,6 +99,19 @@ async def analyze_compliance_decision(
         # STEP 2: Run decision engine analysis
         analysis = decision_engine.analyze_and_decide(entity, task)
         
+        # Diagnostic logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "Decision API result",
+            extra={
+                "overall_score": analysis.risk_factors.overall_score,
+                "risk_level": analysis.risk_level.value,
+                "decision": analysis.decision.value,
+                "confidence": analysis.confidence,
+            }
+        )
+        
         # STEP 3: Add historical context to analysis
         analysis.similar_cases = similar_cases
         analysis.pattern_analysis = pattern_analysis
@@ -164,7 +179,8 @@ async def analyze_compliance_decision(
         db.add(db_query)
         db.commit()
         
-        return analysis
+        # Convert to unified schema format
+        return convert_decision_analysis_to_analysis_result(analysis, detailed=True)
         
     except Exception as e:
         db.rollback()
@@ -180,7 +196,8 @@ async def analyze_compliance_decision(
 @router.post("/quick-check")
 async def quick_risk_check(
     entity: EntityContext,
-    task: TaskContext
+    task: TaskContext,
+    db: Session = Depends(get_db)
 ) -> dict:
     """
     Quick risk check without full analysis (faster endpoint)
@@ -191,21 +208,24 @@ async def quick_risk_check(
     try:
         analysis = decision_engine.analyze_and_decide(entity, task)
         
-        return {
-            "risk_level": analysis.risk_level.value,
-            "decision": analysis.decision.value,
-            "confidence": analysis.confidence,
-            "overall_risk_score": analysis.risk_factors.overall_score,
-            "key_factors": {
-                "jurisdiction_risk": analysis.risk_factors.jurisdiction_risk,
-                "entity_risk": analysis.risk_factors.entity_risk,
-                "task_risk": analysis.risk_factors.task_risk,
-                "data_sensitivity_risk": analysis.risk_factors.data_sensitivity_risk,
-            },
-            "action_required": analysis.escalation_reason if analysis.escalation_reason else "Proceed as recommended"
-        }
+        # STEP: Log to audit trail (required for all decisions)
+        audit_entry = AuditService.log_decision_analysis(
+            db=db,
+            analysis=analysis,
+            agent_type="decision_engine",
+            metadata={
+                "api_endpoint": "/decision/quick-check",
+                "version": "v1",
+                "quick_check": True
+            }
+        )
+        db.commit()
+        
+        # Convert to unified schema format (simple view)
+        return convert_decision_analysis_to_analysis_result(analysis, detailed=False)
         
     except Exception as e:
+        db.rollback()
         from backend.api.error_utils import raise_standardized_error
         raise_standardized_error(
             status_code=500,
@@ -398,7 +418,13 @@ async def what_if_analysis(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"What-if analysis failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="WhatIfAnalysisError",
+            message=f"What-if analysis failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )
 
 
 class CompareScenariosRequest(BaseModel):
@@ -454,7 +480,13 @@ async def compare_scenarios(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Scenario comparison failed: {str(e)}")
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="ScenarioComparisonError",
+            message=f"Scenario comparison failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )
 
 
 class TriggerCheckRequest(BaseModel):
@@ -534,5 +566,10 @@ async def check_triggers(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Trigger check failed: {str(e)}")
-
+        from backend.api.error_utils import raise_standardized_error
+        raise_standardized_error(
+            status_code=500,
+            error_type="TriggerCheckError",
+            message=f"Trigger check failed: {str(e)}",
+            details={"error_type": type(e).__name__}
+        )

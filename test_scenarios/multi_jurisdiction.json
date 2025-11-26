@@ -1,0 +1,22 @@
+{
+  "title": "Multi-Jurisdiction Compliance",
+  "description": "Test compliance analysis across multiple jurisdictions",
+  "input": {
+    "entity": {
+      "name": "GlobalTech",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["US_FEDERAL", "EU", "UK"],
+      "industry": "TECHNOLOGY",
+      "has_personal_data": true,
+      "is_regulated": true
+    },
+    "task": {
+      "description": "Analyze compliance requirements for US, EU, and UK operations",
+      "category": "DATA_PRIVACY"
+    }
+  },
+  "expected_decision": "REVIEW_REQUIRED",
+  "expected_risk_level": "HIGH",
+  "expected_min_confidence": 0.70
+}
+

@@ -7,7 +7,6 @@ Generate a complete compliance calendar for any organization.
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import json
 import sys
 from pathlib import Path
 
@@ -19,7 +18,6 @@ from components.chat_assistant import render_chat_panel
 from components.auth_utils import require_auth, show_logout_button
 from components.export_utils import render_export_section, render_export_history
 from components.api_client import APIClient, display_api_error
-from components.constants import API_BASE_URL
 
 st.set_page_config(page_title="Compliance Calendar", page_icon="📋", layout="wide")
 
@@ -429,7 +427,6 @@ if submitted:
                 
                 # Add timestamp for data freshness tracking if not present
                 if "last_updated" not in result:
-                    from datetime import datetime
                     result["last_updated"] = datetime.now().isoformat()
                 
                 st.success(f"✅ Calendar generated for {result['entity_name']}!")
@@ -450,9 +447,9 @@ if submitted:
                 
                 # Helper function to calculate days until deadline (define before use)
                 def days_until_deadline(task):
-                    """Calculate days until deadline from TODAY, ensuring accurate date comparison."""
+                    """Calculate normalized and raw days until deadline from TODAY for accurate comparison."""
                     if not task.get("deadline"):
-                        return 999  # Tasks without deadlines go to low priority
+                        return 999, 999  # Tasks without deadlines go to low priority
                     try:
                         # Parse deadline (handle both ISO format and date strings)
                         deadline_str = task["deadline"]
@@ -470,17 +467,59 @@ if submitted:
                         today = datetime.now().date()
                         days_left = (deadline_date_only - today).days
                         
-                        # Return max(0, days_left) to avoid negative days
-                        return max(0, days_left)
+                        # Return normalized and raw days
+                        return max(0, days_left), days_left
                     except Exception as e:
                         # Log error but don't crash - return 999 for low priority
                         print(f"Error calculating days until deadline: {e}")
-                        return 999
+                        return 999, 999
                 
-                # Calculate priority breakdown for summary
-                high_priority_count = len([t for t in result["tasks"] if days_until_deadline(t) <= 7 or (t.get("risk_level") == "HIGH" and days_until_deadline(t) <= 30)])
-                medium_priority_count = len([t for t in result["tasks"] if (8 <= days_until_deadline(t) <= 60) or (t.get("risk_level") in ["HIGH", "MEDIUM"] and 8 <= days_until_deadline(t) <= 90)])
-                low_priority_count = len([t for t in result["tasks"] if days_until_deadline(t) > 60 or days_until_deadline(t) == 999])
+                # Helper function to determine priority with URGENT bucket
+                def calculate_priority(task):
+                    """
+                    Composite priority scoring:
+                    - Uses `risk_score` if provided, otherwise falls back to `risk_level`
+                    - Adds urgency bonus based on how soon the deadline is
+                    - Categorizes into URGENT/HIGH/MEDIUM/LOW
+                    """
+                    days_left, raw_days_left = days_until_deadline(task)
+                    risk_score = task.get("risk_score")
+                    if risk_score is None:
+                        risk_score_map = {"HIGH": 85, "MEDIUM": 55, "LOW": 30}
+                        risk_score = risk_score_map.get(task.get("risk_level", "LOW"), 30)
+                    else:
+                        try:
+                            risk_score = float(risk_score)
+                        except (TypeError, ValueError):
+                            risk_score = 30
+
+                    urgency_bonus = 0
+                    if raw_days_left <= 0:
+                        urgency_bonus = 40
+                    elif days_left <= 3:
+                        urgency_bonus = 30
+                    elif days_left <= 7:
+                        urgency_bonus = 20
+                    elif days_left <= 14:
+                        urgency_bonus = 10
+                    elif days_left <= 30:
+                        urgency_bonus = 5
+
+                    total_score = min(100, max(0, risk_score + urgency_bonus))
+
+                    if total_score >= 90:
+                        return "URGENT", days_left
+                    if total_score >= 70:
+                        return "HIGH", days_left
+                    if total_score >= 50:
+                        return "MEDIUM", days_left
+                    return "LOW", days_left
+
+                # Calculate priority breakdown for summary using the unified helper
+                priority_counts = {"URGENT": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+                for task in result["tasks"]:
+                    priority, _ = calculate_priority(task)
+                    priority_counts[priority] += 1
                 
                 col1, col2, col3, col4 = st.columns(4)
                 
@@ -497,14 +536,16 @@ if submitted:
                 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("🔴 High Priority", high_priority_count, help="Due in ≤7 days OR high risk + due in ≤30 days")
+                    st.metric("🚨 Urgent Priority", priority_counts["URGENT"], help="Immediate action required tasks")
                 with col2:
-                    st.metric("🟡 Medium Priority", medium_priority_count, help="Due in 8-60 days OR medium/high risk + due in 8-90 days")
+                    st.metric("🔴 High Priority", priority_counts["HIGH"], help="Due in ≤7 days OR high risk + due in ≤30 days")
                 with col3:
-                    st.metric("🟢 Low Priority", low_priority_count, help="Due in 61+ days or no deadline")
+                    st.metric("🟡 Medium Priority", priority_counts["MEDIUM"], help="Due in 8-60 days OR medium/high risk + due in 8-90 days")
                 with col4:
-                    autonomy_pct = summary.get("autonomous_percentage", 0)
-                    st.metric("Autonomy Rate", f"{autonomy_pct:.1f}%", help="Percentage of tasks you can handle independently")
+                    st.metric("🟢 Low Priority", priority_counts["LOW"], help="Due in 61+ days or no deadline")
+                st.markdown("---")
+                autonomy_pct = summary.get("autonomous_percentage", 0)
+                st.metric("Autonomy Rate", f"{autonomy_pct:.1f}%", help="Percentage of tasks you can handle independently")
                 
                 st.markdown("---")
                 
@@ -574,35 +615,8 @@ if submitted:
                 st.markdown("## 📋 Your Compliance Tasks by Priority")
                 st.markdown("Tasks are organized by urgency based on deadlines and risk levels. Focus on high-priority items first.")
                 
-                # Helper function to determine priority based on deadline AND risk
-                def calculate_priority(task):
-                    """
-                    Priority calculation with more inclusive logic:
-                    - HIGH: Due in ≤7 days OR High risk + due in ≤30 days
-                    - MEDIUM: Due in 8-60 days OR Medium/High risk + due in 8-90 days
-                    - LOW: Due in 61+ days OR no deadline
-                    """
-                    days_left = days_until_deadline(task)
-                    risk_level = task.get("risk_level", "LOW")
-                    
-                    # HIGH PRIORITY rules
-                    if days_left <= 7:
-                        return "HIGH", days_left
-                    if risk_level == "HIGH" and days_left <= 30:
-                        return "HIGH", days_left
-                    
-                    # MEDIUM PRIORITY rules - more inclusive
-                    # Due in 8-60 days (expanded from 8-30)
-                    if days_left <= 60:
-                        return "MEDIUM", days_left
-                    # Medium/High risk tasks due in 8-90 days
-                    if risk_level in ["HIGH", "MEDIUM"] and days_left <= 90:
-                        return "MEDIUM", days_left
-                    
-                    # LOW PRIORITY (everything else - 61+ days)
-                    return "LOW", days_left
-                
                 # Categorize tasks by priority with enhanced logic
+                urgent_priority = []
                 high_priority = []
                 medium_priority = []
                 low_priority = []
@@ -611,8 +625,9 @@ if submitted:
                 show_debug = st.checkbox("🔍 Show Priority Calculation Debug", value=False, help="See how each task is prioritized")
                 
                 for task in result["tasks"]:
-                    days_left = days_until_deadline(task)
+                    days_left, raw_days_left = days_until_deadline(task)
                     task["days_until_deadline"] = days_left
+                    task["raw_days_until_deadline"] = raw_days_left
                     
                     priority, _ = calculate_priority(task)
                     task["calculated_priority"] = priority
@@ -621,20 +636,23 @@ if submitted:
                     if show_debug:
                         st.write(f"**Task:** {task.get('task_name', 'Unknown')[:50]}... | **Risk:** {task.get('risk_level')} | **Days:** {days_left} → **Priority:** {priority}")
                     
-                    if priority == "HIGH":
+                    if priority == "URGENT":
+                        urgent_priority.append(task)
+                    elif priority == "HIGH":
                         high_priority.append(task)
                     elif priority == "MEDIUM":
                         medium_priority.append(task)
                     else:
                         low_priority.append(task)
-                
+
                 # Sort each priority group by days left (most urgent first)
+                urgent_priority.sort(key=lambda x: x["days_until_deadline"])
                 high_priority.sort(key=lambda x: x["days_until_deadline"])
                 medium_priority.sort(key=lambda x: x["days_until_deadline"])
                 low_priority.sort(key=lambda x: x["days_until_deadline"])
                 
                 if show_debug:
-                    st.info(f"✅ Priority Sorting Complete: {len(high_priority)} HIGH, {len(medium_priority)} MEDIUM, {len(low_priority)} LOW")
+                    st.info(f"✅ Priority Sorting Complete: {len(urgent_priority)} URGENT, {len(high_priority)} HIGH, {len(medium_priority)} MEDIUM, {len(low_priority)} LOW")
                     st.markdown("---")
                 
                 # Filtering Controls
@@ -645,8 +663,8 @@ if submitted:
                     from components.ui_helpers import multiselect_with_select_all
                     filter_priority = multiselect_with_select_all(
                         "Priority",
-                        options=["HIGH", "MEDIUM", "LOW"],
-                        default=["HIGH", "MEDIUM", "LOW"],
+                        options=["URGENT", "HIGH", "MEDIUM", "LOW"],
+                        default=["URGENT", "HIGH", "MEDIUM", "LOW"],
                         key="filter_priority_calendar",
                         help="Filter by priority level",
                         inside_form=False
@@ -710,7 +728,8 @@ if submitted:
                         
                         # Days filter
                         days_left = task.get("days_until_deadline", 999)
-                        if filter_days == "Overdue" and days_left >= 0:
+                        raw_days = task.get("raw_days_until_deadline", days_left)
+                        if filter_days == "Overdue" and raw_days >= 0:
                             continue
                         elif filter_days == "This week (≤7 days)" and days_left > 7:
                             continue
@@ -724,12 +743,13 @@ if submitted:
                     return filtered
                 
                 # Apply filters to each priority group
+                urgent_priority = apply_filters(urgent_priority, filter_priority, filter_risk, filter_regulation, filter_days)
                 high_priority = apply_filters(high_priority, filter_priority, filter_risk, filter_regulation, filter_days)
                 medium_priority = apply_filters(medium_priority, filter_priority, filter_risk, filter_regulation, filter_days)
                 low_priority = apply_filters(low_priority, filter_priority, filter_risk, filter_regulation, filter_days)
                 
                 # Show filter summary
-                total_after_filter = len(high_priority) + len(medium_priority) + len(low_priority)
+                total_after_filter = len(urgent_priority) + len(high_priority) + len(medium_priority) + len(low_priority)
                 if total_after_filter < len(result["tasks"]):
                     st.caption(f"📊 Showing {total_after_filter} of {len(result['tasks'])} tasks after filters")
                 
@@ -749,10 +769,11 @@ if submitted:
                 }
                 
                 # Helper function to get color-coded due date badge
-                def get_due_date_badge(days_left):
-                    if days_left < 0:
-                        return "🔴", f"OVERDUE by {abs(days_left)} day{'s' if abs(days_left) != 1 else ''}", "#fee2e2"
-                    elif days_left == 0:
+                def get_due_date_badge(days_left, raw_days_left=None):
+                    raw = days_left if raw_days_left is None else raw_days_left
+                    if raw < 0:
+                        return "🔴", f"OVERDUE by {abs(raw)} day{'s' if abs(raw) != 1 else ''}", "#fee2e2"
+                    elif raw == 0:
                         return "🔴", "DUE TODAY", "#fee2e2"
                     elif days_left <= 3:
                         return "🔴", f"{days_left} day{'s' if days_left != 1 else ''} remaining", "#fee2e2"
@@ -765,10 +786,77 @@ if submitted:
                     else:
                         return "🟢", f"{days_left} days remaining", "#d1fae5"
                 
+                # Display URGENT PRIORITY tasks
+                st.markdown("### 🚨 URGENT PRIORITY (Immediate action required)")
+                if not urgent_priority:
+                    st.success("✅ No urgent tasks - you're all caught up for this week!")
+                else:
+                    st.error(f"🚨 **{len(urgent_priority)} urgent tasks need your immediate attention**")
+                    st.caption(f"ℹ️ **Urgent Tasks**: Immediate deadlines or elevated risk requiring rapid response. Generated: {result.get('last_updated', 'N/A')}")
+                    for task in urgent_priority:
+                        days_left = task["days_until_deadline"]
+                        deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%B %d, %Y") if task.get("deadline") else "No deadline"
+                        emoji, urgency_text, bg_color = get_due_date_badge(days_left, task.get("raw_days_until_deadline"))
+                        risk_emoji = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(task.get("risk_level"), "⚪")
+                        expander_title = f"{risk_emoji} {task['task_name']} — {emoji} {urgency_text}"
+                        with st.expander(expander_title, expanded=True):
+                            st.markdown(f"#### 📌 What")
+                            st.markdown(f"**{task['task_name']}**")
+                            st.markdown(task['description'])
+                            st.markdown(f"#### When")
+                            st.markdown(f"**Deadline:** {deadline_str} ({urgency_text})")
+                            st.markdown(f"**Frequency:** {task['frequency'].title()}")
+                            st.markdown(f"#### 📜 Why")
+                            category_name = category_friendly.get(task['category'], task['category'])
+                            st.markdown(f"**Category:** {category_name}")
+                            if task.get("reasoning_summary"):
+                                reasons = task["reasoning_summary"].split("|")
+                                for reason in reasons[:2]:
+                                    if reason.strip():
+                                        st.markdown(f"- {reason.strip()}")
+                            st.markdown(f"#### 🎯 Risk Analysis")
+                            risk_level = task.get('risk_level', 'MEDIUM')
+                            risk_factors = task.get('risk_factors', {})
+                            risk_explanations = {
+                                "HIGH": "⚠️ **High Risk**: This task has significant compliance implications. Non-compliance could result in penalties, legal action, or regulatory sanctions. Expert review is strongly recommended.",
+                                "MEDIUM": "🟡 **Medium Risk**: This task has moderate compliance requirements. Review recommended before proceeding, especially if you're unsure about specific regulations.",
+                                "LOW": "🟢 **Low Risk**: This task has minimal compliance risk. Standard procedures should be sufficient, but always verify requirements for your specific jurisdiction."
+                            }
+                            st.markdown(risk_explanations.get(risk_level, f"**Risk Level:** {show_risk_badge(risk_level)}"))
+                            has_risk_data = False
+                            if risk_factors and isinstance(risk_factors, dict) and risk_factors:
+                                st.markdown("**Key Risk Factors:**")
+                                for factor, value in list(risk_factors.items())[:3]:
+                                    if value:
+                                        st.markdown(f"- **{factor.replace('_', ' ').title()}**: {value}")
+                                        has_risk_data = True
+                            if not has_risk_data and task.get("reasoning_summary"):
+                                reasons = task["reasoning_summary"].split("|")
+                                if reasons and any(r.strip() for r in reasons):
+                                    st.markdown("**Risk Considerations:**")
+                                    for reason in reasons[:3]:
+                                        if reason.strip():
+                                            st.markdown(f"- {reason.strip()}")
+                                            has_risk_data = True
+                            if not has_risk_data:
+                                category = task.get('category', '')
+                                if category:
+                                    st.caption(f"**Task Category:** {category.replace('_', ' ').title()} - {risk_level} risk level based on category classification.")
+                                else:
+                                    st.caption(f"Risk analysis details will be available after task generation.")
+                            st.markdown(f"#### ✅ Action")
+                            decision_actions = {
+                                "AUTONOMOUS": "✅ **You can proceed independently** - Handle this task on your own",
+                                "REVIEW_REQUIRED": "👥 **Get approval first** - Consult with your manager or compliance team before proceeding",
+                                "ESCALATE": "🚨 **Expert required** - This needs a compliance specialist or legal counsel"
+                            }
+                            st.markdown(decision_actions.get(task['decision'], task['decision']))
+                            st.markdown(f"**Confidence:** {task.get('confidence', 0.7)*100:.1f}%")
+                st.markdown("---")
                 # Display HIGH PRIORITY tasks
                 st.markdown("### 🔴 HIGH PRIORITY (Urgent - Action Required)")
                 if not high_priority:
-                    st.success("✅ No urgent tasks - you're all caught up for this week!")
+                    st.success("✅ No high-priority tasks at this time - you're all caught up!")
                 else:
                     # Note: This count uses frontend priority calculation (days + risk), not just risk level
                     # Priority calculation: HIGH = ≤7 days OR High risk + ≤30 days
@@ -780,7 +868,7 @@ if submitted:
                         deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%B %d, %Y") if task.get("deadline") else "No deadline"
                         
                         # Get color-coded badge
-                        emoji, urgency_text, bg_color = get_due_date_badge(days_left)
+                        emoji, urgency_text, bg_color = get_due_date_badge(days_left, task.get("raw_days_until_deadline"))
                         
                         # Enhanced expander title with visual indicators
                         risk_emoji = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(task.get("risk_level"), "⚪")
@@ -867,7 +955,7 @@ if submitted:
                         deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%B %d, %Y") if task.get("deadline") else "No deadline"
                         
                         # Get color-coded badge
-                        emoji, urgency_text, bg_color = get_due_date_badge(days_left)
+                        emoji, urgency_text, bg_color = get_due_date_badge(days_left, task.get("raw_days_until_deadline"))
                         
                         # Enhanced expander title with visual indicators
                         risk_emoji = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(task.get("risk_level"), "⚪")
@@ -989,37 +1077,32 @@ if submitted:
                 st.markdown("Download your complete compliance calendar in multiple formats for easy sharing and project management.")
                 
                 # Priority summary for user
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("🔴 High Priority", len(high_priority), help="Due in 7 days or less")
+                    st.metric("🚨 Urgent Priority", len(urgent_priority), help="Immediate action required tasks")
                 with col2:
-                    st.metric("🟡 Medium Priority", len(medium_priority), help="Due in 8-30 days")
+                    st.metric("🔴 High Priority", len(high_priority), help="Due in 7 days or less")
                 with col3:
-                    st.metric("🟢 Low Priority", len(low_priority), help="Due in 31+ days")
+                    st.metric("🟡 Medium Priority", len(medium_priority), help="Due in 8-60 days")
+                with col4:
+                    st.metric("🟢 Low Priority", len(low_priority), help="Due after 60 days or no deadline")
                 
                 st.markdown("---")
                 
                 # Prepare data for export
                 export_data = []
+                decision_labels = {
+                    "AUTONOMOUS": "✅ Proceed",
+                    "REVIEW_REQUIRED": "⚠️ Review",
+                    "ESCALATE": "🚨 Escalate"
+                }
                 for task in result["tasks"]:
                     deadline = datetime.fromisoformat(task["deadline"]).strftime("%Y-%m-%d") if task.get("deadline") else "N/A"
                     frequency_friendly = task["frequency"].title()
-                    
-                    # Determine priority based on deadline
-                    days_left = days_until_deadline(task)
-                    if days_left <= 7:
-                        priority = "HIGH"
-                    elif days_left <= 30:
-                        priority = "MEDIUM"
-                    else:
-                        priority = "LOW"
+                    days_left, _ = days_until_deadline(task)
+                    priority, _ = calculate_priority(task)
                     
                     # Friendly decision labels
-                    decision_labels = {
-                        "AUTONOMOUS": "✅ Proceed",
-                        "REVIEW_REQUIRED": "⚠️ Review",
-                        "ESCALATE": "🚨 Escalate"
-                    }
                     decision_label = decision_labels.get(task["decision"], task["decision"])
                     
                     export_data.append({
@@ -1039,7 +1122,8 @@ if submitted:
                 df = pd.DataFrame(export_data)
                 
                 # Create enhanced text report
-                friendly_jurisdictions = [location_code_to_label.get(code, code) for code in result['jurisdictions']]
+                jurisdictions = result.get('jurisdictions', location_codes)
+                friendly_jurisdictions = [location_code_to_label.get(code, code) for code in jurisdictions]
                 enhanced_report = f"""
 COMPLIANCE CALENDAR - PRIORITY VIEW
 ====================================
@@ -1050,8 +1134,9 @@ Jurisdictions: {', '.join(friendly_jurisdictions)}
 SUMMARY
 -------
 Total Tasks: {summary['total_tasks']}
+  - Urgent Priority (Immediate action required): {len(urgent_priority)}
   - High Priority (≤7 days): {len(high_priority)}
-  - Medium Priority (8-30 days): {len(medium_priority)}
+  - Medium Priority (8-60 days): {len(medium_priority)}
   - Low Priority (31+ days): {len(low_priority)}
 
 Risk Breakdown:
@@ -1065,26 +1150,38 @@ Decisions:
   - Escalate: {summary['decisions'].get('ESCALATE', 0)}
   - Autonomy Rate: {summary['autonomous_percentage']:.1f}%
 
-HIGH PRIORITY TASKS (Due in 7 days or less)
---------------------------------------------
-"""
+                """
+                enhanced_report += "\n\nURGENT PRIORITY TASKS (Immediate action required)\n----------------------------------------------\n"
+                if not urgent_priority:
+                    enhanced_report += "✓ No urgent priority tasks\n"
+                else:
+                    for task in urgent_priority:
+                        days_left = task["days_until_deadline"]
+                        raw_days = task.get("raw_days_until_deadline", days_left)
+                        if raw_days < 0:
+                            urgency = f"OVERDUE by {abs(raw_days)} days"
+                        elif raw_days == 0:
+                            urgency = "DUE TODAY"
+                        else:
+                            urgency = f"Due in {days_left} days"
+                        enhanced_report += f"\n🚨 {task['task_name']}\n"
+                        enhanced_report += f"   Category: {category_friendly.get(task['category'], task['category'])}\n"
+                        enhanced_report += f"   Deadline: {datetime.fromisoformat(task['deadline']).strftime('%Y-%m-%d') if task.get('deadline') else 'N/A'} ({urgency})\n"
+                        enhanced_report += f"   Action: {decision_labels.get(task['decision'], task['decision'])} | Risk: {task['risk_level']}\n"
+                enhanced_report += "\n\nHIGH PRIORITY TASKS (Due in 7 days or less)\n--------------------------------------------\n"
                 # Add high priority tasks
                 if not high_priority:
-                    enhanced_report += "✓ No urgent tasks - all caught up!\n"
+                    enhanced_report += "✓ No high-priority tasks at this time - you're all caught up!\n"
                 else:
                     for task in high_priority:
                         days_left = task["days_until_deadline"]
+                        raw_days = task.get("raw_days_until_deadline", days_left)
                         deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%Y-%m-%d") if task.get("deadline") else "N/A"
-                        decision_labels = {
-                            "AUTONOMOUS": "✅ Proceed",
-                            "REVIEW_REQUIRED": "⚠️ Review",
-                            "ESCALATE": "🚨 Escalate"
-                        }
                         decision_label = decision_labels.get(task["decision"], task["decision"])
                         
-                        if days_left < 0:
-                            urgency = f"OVERDUE by {abs(days_left)} days"
-                        elif days_left == 0:
+                        if raw_days < 0:
+                            urgency = f"OVERDUE by {abs(raw_days)} days"
+                        elif raw_days == 0:
                             urgency = "DUE TODAY"
                         else:
                             urgency = f"Due in {days_left} days"
@@ -1095,19 +1192,15 @@ HIGH PRIORITY TASKS (Due in 7 days or less)
                         enhanced_report += f"   Why: {category_friendly.get(task['category'], task['category'])}\n"
                         enhanced_report += f"   Action: {decision_label} | Risk: {task['risk_level']}\n"
                 
-                enhanced_report += "\n\nMEDIUM PRIORITY TASKS (Due in 8-30 days)\n"
+                enhanced_report += "\n\nMEDIUM PRIORITY TASKS (Due in 8-60 days)\n"
                 enhanced_report += "-------------------------------------------\n"
                 if not medium_priority:
                     enhanced_report += "✓ No medium-priority tasks\n"
                 else:
                     for task in medium_priority:
                         days_left = task["days_until_deadline"]
+                        raw_days = task.get("raw_days_until_deadline", days_left)
                         deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%Y-%m-%d") if task.get("deadline") else "N/A"
-                        decision_labels = {
-                            "AUTONOMOUS": "✅ Proceed",
-                            "REVIEW_REQUIRED": "⚠️ Review",
-                            "ESCALATE": "🚨 Escalate"
-                        }
                         decision_label = decision_labels.get(task["decision"], task["decision"])
                         enhanced_report += f"\n🟡 {task['task_name']} (in {days_left} days)\n"
                         enhanced_report += f"   Category: {category_friendly.get(task['category'], task['category'])}\n"
@@ -1125,11 +1218,6 @@ HIGH PRIORITY TASKS (Due in 7 days or less)
                             deadline_str = "No deadline"
                         else:
                             deadline_str = datetime.fromisoformat(task["deadline"]).strftime("%Y-%m-%d")
-                        decision_labels = {
-                            "AUTONOMOUS": "✅ Proceed",
-                            "REVIEW_REQUIRED": "⚠️ Review",
-                            "ESCALATE": "🚨 Escalate"
-                        }
                         decision_label = decision_labels.get(task["decision"], task["decision"])
                         enhanced_report += f"\n🟢 {task['task_name']}\n"
                         enhanced_report += f"   Category: {category_friendly.get(task['category'], task['category'])}\n"
@@ -1146,6 +1234,7 @@ HIGH PRIORITY TASKS (Due in 7 days or less)
                     "calendar": result,
                     "statistics": {
                         "total_tasks": summary['total_tasks'],
+                        "urgent_priority": len(urgent_priority),
                         "high_priority": len(high_priority),
                         "medium_priority": len(medium_priority),
                         "low_priority": len(low_priority),
@@ -1242,4 +1331,3 @@ with st.expander("❓ How does this work?"):
     - **JSON**: Use with other systems or APIs
     - **Text Report**: Print or share with stakeholders
     """)
-

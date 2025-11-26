@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8501",
         "http://0.0.0.0:8501",
     ]
-    DEBUG: bool = True
+    DEBUG: bool = False
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
 
@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Caching Configuration
     CACHE_TTL_SECONDS: int = 300  # 5 minutes default
     CACHE_MAX_SIZE: int = 100  # Maximum cache entries
+    
+    # Local/demo bypass flag (dangerous outside dev)
+    ALLOW_DEMO_USER: bool = False
     
     # Agentic Engine Timeouts (in seconds)
     AGENTIC_OPERATION_TIMEOUT: int = 120  # Default timeout for agentic operations (test suite, benchmarks, recovery)
@@ -80,5 +83,4 @@ class Settings(BaseSettings):
 
 # Singleton settings instance
 settings = Settings()
-
 

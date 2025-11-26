@@ -1,0 +1,22 @@
+{
+  "title": "Simple General Inquiry",
+  "description": "Test simple general compliance inquiry",
+  "input": {
+    "entity": {
+      "name": "SimpleCorp",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["US_FEDERAL"],
+      "industry": "TECHNOLOGY",
+      "has_personal_data": false,
+      "is_regulated": false
+    },
+    "task": {
+      "description": "What are the basic compliance requirements for a small tech startup?",
+      "category": "GENERAL_INQUIRY"
+    }
+  },
+  "expected_decision": "AUTONOMOUS",
+  "expected_risk_level": "LOW",
+  "expected_min_confidence": 0.85
+}
+

@@ -11,14 +11,15 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from backend.agentic_engine.openai_helper import call_openai_sync, STANDARD_MODEL
+from backend.config import settings
+from backend.utils.llm_client import LLMClient, STANDARD_MODEL
 from backend.agentic_engine.agent_loop import AgentLoop
-from backend.agentic_engine.memory.memory_store import MemoryStore
 from backend.agentic_engine.tools.entity_tool import EntityTool
 from backend.agentic_engine.tools.calendar_tool import CalendarTool
 from backend.agentic_engine.tools.http_tool import HTTPTool
 from backend.agentic_engine.tools.task_tool import TaskTool
 from backend.agentic_engine.tools.tool_registry import ToolRegistry
+from backend.utils.text_sanitizer import sanitize_user_text
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +44,33 @@ class AgenticAIOrchestrator:
         
         # Initialize OpenAI configuration using existing environment variables
         # Support mock mode when API key is not set
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", STANDARD_MODEL)
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "4096"))
+        # Use centralized settings loader (supports .env) instead of raw os.getenv
+        self.api_key = settings.OPENAI_API_KEY
+        # Prefer settings; fall back to env for optional overrides
+        self.model = getattr(settings, "OPENAI_MODEL", os.getenv("OPENAI_MODEL", STANDARD_MODEL))
+        self.temperature = getattr(settings, "OPENAI_TEMPERATURE", float(os.getenv("OPENAI_TEMPERATURE", "0.7")))
+        self.max_tokens = getattr(settings, "OPENAI_MAX_TOKENS", int(os.getenv("OPENAI_MAX_TOKENS", "4096")))
         self.mock_mode = not self.api_key or self.api_key == "mock" or (isinstance(self.api_key, str) and self.api_key.startswith("sk-mock"))
         
         if self.mock_mode:
-            logger.warning("Running in mock mode - OpenAI API key not set. Agentic features will use simulated responses.")
+            logger.warning("⚠️ AGENTIC ORCHESTRATOR: Running in mock mode")
+            logger.warning(f"   API Key present: {bool(self.api_key)}")
+            logger.warning(f"   API Key value: {'Set' if self.api_key else 'Not set'}")
+            if self.api_key:
+                logger.warning(f"   API Key length: {len(self.api_key)} characters")
+                logger.warning(f"   API Key prefix: {self.api_key[:7]}...")
+            logger.warning("   Agentic features will use simulated responses")
+            logger.warning("   Set OPENAI_API_KEY environment variable to enable real LLM calls")
+        
+        self.llm_client = LLMClient(api_key=self.api_key, model=self.model)
+        # If an API key is present but client is unavailable, downgrade to mock and log details
+        if self.api_key and not self.llm_client.available:
+            logger.error("⚠️ LLMClient unavailable despite API key being set. Forcing mock mode.")
+            logger.error(f"   API key length: {len(self.api_key)}")
+            logger.error(f"   API key prefix: {self.api_key[:7]}...")
+            self.mock_mode = True
+        self.main_timeout = settings.AGENTIC_OPERATION_TIMEOUT
+        self.secondary_timeout = settings.AGENTIC_SECONDARY_TASK_TIMEOUT
         
         # Initialize components
         self.agent_loop = AgentLoop(
@@ -58,8 +78,6 @@ class AgenticAIOrchestrator:
             enable_reflection=True,
             enable_memory=True
         )
-        self.memory_store = MemoryStore()
-        
         # Initialize tools
         self.tools = {
             "entity_tool": EntityTool(db_session=db_session),
@@ -116,7 +134,7 @@ class AgenticAIOrchestrator:
                 with open(reflection_path, 'r') as f:
                     prompts['reflection'] = f.read()
         except Exception as e:
-            print(f"Warning: Could not load prompts: {e}")
+            logger.warning(f"Could not load prompts: {e}")
         
         return prompts
     
@@ -151,6 +169,15 @@ class AgenticAIOrchestrator:
                 result.append(tool)
         
         return result
+
+    def _call_llm(self, prompt: str, use_json_schema: bool, timeout: float) -> Dict[str, Any]:
+        """Call unified LLM client with standard response dict and timeout."""
+        response = self.llm_client.run_compliance_analysis(
+            prompt=prompt,
+            use_json_schema=use_json_schema,
+            timeout=timeout
+        ).to_dict()
+        return response
     
     def _execute_tools(
         self, 
@@ -269,7 +296,7 @@ class AgenticAIOrchestrator:
             
             except Exception as e:
                 error_msg = f"Tool {tool_name} failed: {e}"
-                print(f"Warning: {error_msg}")
+                logger.warning(error_msg)
                 tool_errors.append(error_msg)
                 tool_results[f"{tool_name}_error"] = str(e)
                 # Track tool error
@@ -332,6 +359,10 @@ class AgenticAIOrchestrator:
             List of plan steps, each containing step description, rationale,
             required tools, and expected outcomes
         """
+        # Sanitize task/context inputs
+        task = sanitize_user_text(task)
+        if context:
+            context = {k: sanitize_user_text(v) if isinstance(v, str) else v for k, v in context.items()}
         # Build planning prompt
         planner_prompt = self.prompts.get('planner', 
             'You are an AI planner. Break the compliance task into 3-7 steps.')
@@ -353,36 +384,27 @@ Please provide a plan as a JSON array with 3-7 steps. Each step should have:
 Respond ONLY with valid JSON array format."""
         
         try:
-            # Use standardized OpenAI helper (main task - 120s timeout)
-            openai_response = call_openai_sync(
+            llm_response = self._call_llm(
                 prompt=full_prompt,
-                is_main_task=True,  # Planning is a main task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                use_json_schema=False,
+                timeout=self.main_timeout
             )
-            
-            # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI planning failed: {openai_response.get('error')}")
-                # Fallback to default plan (will be handled by exception handler below)
-                raise json.JSONDecodeError("Planning failed", "", 0)
-            
-            # Extract response content
-            result_content = openai_response.get("result", {})
-            if isinstance(result_content, dict):
-                response_text = result_content.get("content", str(result_content))
-            else:
-                response_text = str(result_content)
-            
-            # Try to parse JSON from response
+            if self.mock_mode:
+                raise json.JSONDecodeError("Planning failed (mock mode)", "", 0)
+            if llm_response.get("status") != "completed":
+                error_msg = llm_response.get("error", "Unknown LLM error during planning")
+                logger.error(f"LLM planning call failed: {error_msg}")
+                raise ValueError(f"LLM planning failed: {error_msg}")
+
+            response_text = llm_response.get("raw_text") or ""
+            if not response_text and llm_response.get("parsed_json"):
+                response_text = json.dumps(llm_response["parsed_json"])
             # Handle markdown code blocks if present
             if "```json" in response_text:
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
-            
+
             plan = json.loads(response_text)
             
             # Ensure plan has 3-7 steps
@@ -416,36 +438,82 @@ Respond ONLY with valid JSON array format."""
             return plan
             
         except json.JSONDecodeError:
-            # Fallback: create a simple plan
-            return [
-                {
+            # Fallback: create a richer, context-aware mock plan
+            entity_name = context.get("entity", {}).get("entity_name") if context else None
+            task_desc = context.get("task", {}).get("task_description") if context else task
+            entity_type = context.get("entity", {}).get("entity_type", "").lower() if context else ""
+            jurisdictions = context.get("entity", {}).get("jurisdictions", []) if context else []
+            industry = context.get("entity", {}).get("industry", "").lower() if context else ""
+            
+            # Build context-aware plan based on entity and task
+            plan_steps = []
+            
+            # Step 1: Context-specific scoping
+            if "eu" in str(jurisdictions).lower() or "european" in str(jurisdictions).lower():
+                plan_steps.append({
                     "step_id": "step_1",
-                    "description": "Analyze the compliance task requirements",
-                    "rationale": "Understand what needs to be evaluated",
-                    "expected_outcome": "Clear understanding of requirements"
-                },
-                {
+                    "description": f"Identify GDPR and EU regulatory requirements for {entity_name or 'the entity'}",
+                    "rationale": "EU operations trigger GDPR Article 30, data processing records, and cross-border transfer requirements",
+                    "expected_outcome": "List of applicable GDPR articles and EU regulations with compliance obligations"
+                })
+            elif "us" in str(jurisdictions).lower() or "federal" in str(jurisdictions).lower():
+                plan_steps.append({
+                    "step_id": "step_1",
+                    "description": f"Identify US Federal compliance requirements (CCPA, state privacy laws, industry-specific regulations)",
+                    "rationale": "US operations require CCPA compliance, state-level privacy laws, and industry-specific regulations",
+                    "expected_outcome": "Comprehensive list of US federal and state compliance obligations"
+                })
+            else:
+                plan_steps.append({
+                    "step_id": "step_1",
+                    "description": f"Scope compliance requirements for {entity_name or 'the entity'}: {task_desc}",
+                    "rationale": "Identify applicable regulations, jurisdictions, and compliance frameworks",
+                    "expected_outcome": "Clear scope of compliance requirements and regulatory obligations"
+                })
+            
+            # Step 2: Industry-specific analysis
+            if "healthcare" in industry or "health" in industry:
+                plan_steps.append({
                     "step_id": "step_2",
-                    "description": "Gather relevant compliance data and context",
-                    "rationale": "Collect necessary information for analysis",
-                    "expected_outcome": "Complete dataset for evaluation"
-                },
-                {
-                    "step_id": "step_3",
-                    "description": f"Execute compliance analysis: {task}",
-                    "rationale": "Perform the core compliance evaluation",
-                    "expected_outcome": "Detailed compliance assessment"
-                },
-                {
-                    "step_id": "step_4",
-                    "description": "Generate recommendations and final report",
-                    "rationale": "Provide actionable guidance",
-                    "expected_outcome": "Complete compliance recommendation"
-                }
-            ]
+                    "description": "Assess HIPAA compliance requirements and health data protection obligations",
+                    "rationale": "Healthcare entities must comply with HIPAA Privacy and Security Rules for PHI protection",
+                    "expected_outcome": "HIPAA compliance assessment with identified gaps and required safeguards"
+                })
+            elif "financial" in industry or "bank" in industry:
+                plan_steps.append({
+                    "step_id": "step_2",
+                    "description": "Evaluate financial services regulations (SOX, GLBA, FINRA requirements)",
+                    "rationale": "Financial institutions face strict regulatory oversight requiring comprehensive compliance programs",
+                    "expected_outcome": "Financial regulatory compliance assessment with control requirements"
+                })
+            else:
+                plan_steps.append({
+                    "step_id": "step_2",
+                    "description": "Gather applicable regulations and industry-specific compliance policies",
+                    "rationale": "Collect jurisdiction and industry requirements to build comprehensive compliance framework",
+                    "expected_outcome": "List of applicable controls, regulations, and industry standards"
+                })
+            
+            # Step 3: Risk assessment
+            plan_steps.append({
+                "step_id": "step_3",
+                "description": "Assess compliance risks, gaps, and required controls with impact analysis",
+                "rationale": "Map risks to controls, identify data flow vulnerabilities, and quantify compliance gaps",
+                "expected_outcome": "Risk/control summary with prioritized gaps and remediation recommendations"
+            })
+            
+            # Step 4: Actionable recommendations
+            plan_steps.append({
+                "step_id": "step_4",
+                "description": "Produce specific compliance recommendations with implementation steps and ownership",
+                "rationale": "Deliver actionable guidance with clear owners, deadlines, and success criteria",
+                "expected_outcome": "Action plan with assigned owners, deadlines, and measurable compliance milestones"
+            })
+            
+            return plan_steps
         except Exception as e:
             # Fallback on any error
-            print(f"Error in planning: {e}")
+            logger.error(f"Error in planning: {e}")
             return [
                 {
                     "step_id": "step_1",
@@ -498,8 +566,8 @@ Respond ONLY with valid JSON array format."""
         if tool_results:
             tool_context_str = f"\n\nAvailable Tool Results:\n{json.dumps(tool_results, indent=2)}"
         
-        step_description = step.get('description', str(step))
-        step_rationale = step.get('rationale', '')
+        step_description = sanitize_user_text(step.get('description', str(step)))
+        step_rationale = sanitize_user_text(step.get('rationale', ''))
         
         # Add retry context if this is a retry
         retry_note = ""
@@ -527,44 +595,39 @@ Please execute this step and provide:
 Respond in JSON format with keys: output, findings, risks, confidence"""
         
         try:
-            # Use standardized OpenAI helper (main task - 120s timeout)
-            openai_response = call_openai_sync(
+            llm_response = self._call_llm(
                 prompt=full_prompt,
-                is_main_task=True,  # Step execution is a main task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                use_json_schema=False,
+                timeout=self.main_timeout
             )
-            
-            # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI step execution failed: {openai_response.get('error')}")
-                # Fallback execution data
+            if self.mock_mode:
                 execution_data = {
-                    "output": f"Step execution failed: {openai_response.get('error', 'Unknown error')}",
-                    "findings": [],
+                    "output": "Step execution completed (mock mode)",
+                    "findings": ["Mock execution - real LLM not available"],
                     "risks": [],
-                    "confidence": 0.5
+                    "confidence": 0.7
+                }
+            elif llm_response.get("status") != "completed":
+                error_msg = llm_response.get("error", "Unknown LLM error during step execution")
+                logger.error(f"LLM step execution failed: {error_msg}")
+                execution_data = {
+                    "output": f"Step execution failed: {error_msg}",
+                    "findings": [],
+                    "risks": [f"LLM call failed: {error_msg}"],
+                    "confidence": 0.0,
+                    "error": error_msg
                 }
             else:
-                # Extract response content
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
-                
-                # Try to parse JSON from response
+                response_text = llm_response.get("raw_text") or ""
+                if not response_text and llm_response.get("parsed_json"):
+                    response_text = json.dumps(llm_response["parsed_json"])
                 if "```json" in response_text:
                     response_text = response_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in response_text:
                     response_text = response_text.split("```")[1].split("```")[0].strip()
-                
                 try:
                     execution_data = json.loads(response_text)
                 except json.JSONDecodeError:
-                    # If JSON parsing fails, use the text as output
                     execution_data = {
                         "output": response_text,
                         "findings": [],
@@ -602,11 +665,11 @@ Respond in JSON format with keys: output, findings, risks, confidence"""
             
         except Exception as e:
             error_msg = str(e)
-            print(f"Error executing step {step.get('step_id')}: {error_msg}")
+            logger.error(f"Error executing step {step.get('step_id')}: {error_msg}")
             
             # Check if we should retry
             if retry_count < max_retries:
-                print(f"Retrying step {step.get('step_id')} (attempt {retry_count + 1}/{max_retries})...")
+                logger.info(f"Retrying step {step.get('step_id')} (attempt {retry_count + 1}/{max_retries})...")
                 
                 # Add error context to step for retry
                 retry_step = step.copy()
@@ -654,17 +717,18 @@ Respond in JSON format with keys: output, findings, risks, confidence"""
             Reflection analysis containing quality scores, identified issues,
             suggested improvements, and whether the step needs re-execution
         """
-        # Build reflection prompt
+        # Build reflection prompt with sanitized input
         reflection_prompt = self.prompts.get('reflection',
             'You are an AI critic. Evaluate the previous step.')
-        
+        safe_step = sanitize_user_text(json.dumps(step, indent=2), max_length=4000)
+        safe_execution = sanitize_user_text(json.dumps(execution_result, indent=2), max_length=4000)
         full_prompt = f"""{reflection_prompt}
 
 Step That Was Executed:
-{json.dumps(step, indent=2)}
+{safe_step}
 
 Execution Result:
-{json.dumps(execution_result, indent=2)}
+{safe_execution}
 
 Please evaluate this execution on the following criteria:
 1. Correctness: Is the output factually correct and logically sound?
@@ -686,20 +750,12 @@ Provide your evaluation in JSON format with:
 Respond ONLY with valid JSON."""
         
         try:
-            # Use standardized OpenAI helper (secondary task - 30s timeout)
-            openai_response = call_openai_sync(
+            llm_response = self._call_llm(
                 prompt=full_prompt,
-                is_main_task=False,  # Reflection is a secondary task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                use_json_schema=False,
+                timeout=self.secondary_timeout
             )
-            
-            # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI reflection failed: {openai_response.get('error')}")
-                # Fallback reflection
+            if self.mock_mode:
                 reflection = {
                     "correctness_score": 0.7,
                     "completeness_score": 0.7,
@@ -710,24 +766,30 @@ Respond ONLY with valid JSON."""
                     "requires_retry": False,
                     "missing_data": []
                 }
+            elif llm_response.get("status") != "completed":
+                error_msg = llm_response.get("error", "Unknown LLM error during reflection")
+                logger.error(f"LLM reflection failed: {error_msg}")
+                reflection = {
+                    "correctness_score": 0.0,
+                    "completeness_score": 0.0,
+                    "overall_quality": 0.0,
+                    "confidence_score": 0.0,
+                    "issues": [f"Reflection LLM call failed: {error_msg}"],
+                    "suggestions": ["Retry the analysis or check LLM connectivity"],
+                    "requires_retry": True,
+                    "missing_data": ["Reflection analysis unavailable due to LLM error"]
+                }
             else:
-                # Extract response content
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
-                
-                # Try to parse JSON from response
+                response_text = llm_response.get("raw_text") or ""
+                if not response_text and llm_response.get("parsed_json"):
+                    response_text = json.dumps(llm_response["parsed_json"])
                 if "```json" in response_text:
                     response_text = response_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in response_text:
                     response_text = response_text.split("```")[1].split("```")[0].strip()
-                
                 try:
                     reflection = json.loads(response_text)
                 except json.JSONDecodeError:
-                    # Fallback reflection
                     reflection = {
                         "correctness_score": 0.7,
                         "completeness_score": 0.7,
@@ -845,11 +907,11 @@ Respond ONLY with valid JSON."""
         
         try:
             # Step 1: Generate plan (3-7 steps)
-            print(f"Generating plan for task: {task}")
+            logger.info(f"Generating plan for task: {task}")
             plan = self.plan(task, context)
             self.execution_state["plan"] = plan
             
-            print(f"Plan generated with {len(plan)} steps")
+            logger.info(f"Plan generated with {len(plan)} steps")
             
             # Step 2: Execute each step with reflection
             iteration = 0
@@ -857,29 +919,29 @@ Respond ONLY with valid JSON."""
             
             for step_idx, step in enumerate(plan):
                 if iteration >= max_iterations:
-                    print(f"Max iterations ({max_iterations}) reached")
+                    logger.info(f"Max iterations ({max_iterations}) reached")
                     break
                 
                 if high_confidence_reached:
-                    print("High confidence reached, stopping early")
+                    logger.info("High confidence reached, stopping early")
                     break
                 
-                print(f"\nExecuting step {step_idx + 1}/{len(plan)}: {step.get('description')}")
+                logger.info(f"Executing step {step_idx + 1}/{len(plan)}: {step.get('description')}")
                 
                 # Execute the step using agent_loop.execute_step()
                 execution_result = self.execute_step(step, context)
                 self.execution_state["step_outputs"].append(execution_result)
                 
-                print(f"Step {step_idx + 1} executed with status: {execution_result.get('status')}")
+                logger.info(f"Step {step_idx + 1} executed with status: {execution_result.get('status')}")
                 
                 # Step 3: Run reflection after each step
-                print(f"Reflecting on step {step_idx + 1}")
+                logger.info(f"Reflecting on step {step_idx + 1}")
                 reflection = self.reflect(step, execution_result)
                 self.execution_state["reflections"].append(reflection)
                 
                 # Check if retry is needed based on reflection
                 if reflection.get("requires_retry", False) and iteration < max_iterations:
-                    print(f"Step {step_idx + 1} requires retry based on reflection (quality: {reflection.get('overall_quality', 0.0):.2f})")
+                    logger.info(f"Step {step_idx + 1} requires retry based on reflection (quality: {reflection.get('overall_quality', 0.0):.2f})")
                     
                     # Improve step based on reflection suggestions
                     improved_step = self._improve_step_from_reflection(step, reflection)
@@ -892,31 +954,26 @@ Respond ONLY with valid JSON."""
                     reflection = self.reflect(improved_step, execution_result)
                     self.execution_state["reflections"][-1] = reflection  # Replace previous reflection
                     
-                    print(f"Step {step_idx + 1} retry completed. New quality: {reflection.get('overall_quality', 0.0):.2f}")
+                    logger.info(f"Step {step_idx + 1} retry completed. New quality: {reflection.get('overall_quality', 0.0):.2f}")
                 
                 # Step 4: Update memory (call agent_loop.update_memory)
-                self.agent_loop.update_memory(
-                    step=step,
-                    result=execution_result,
-                    reflection=reflection,
-                    memory_store=self.memory_store
-                )
+                # Memory integration (PHASE 3) not implemented
                 
                 # Check if high confidence reached (stop condition)
                 reflection_confidence = reflection.get("confidence_score", 0.0)
                 overall_quality = reflection.get("overall_quality", 0.0)
                 
-                print(f"Reflection confidence: {reflection_confidence}, quality: {overall_quality}")
+                logger.info(f"Reflection confidence: {reflection_confidence}, quality: {overall_quality}")
                 
                 # Stop if reflection shows high confidence (>= 0.85) and high quality (>= 0.85)
                 if reflection_confidence >= 0.85 and overall_quality >= 0.85:
                     high_confidence_reached = True
-                    print("High confidence and quality achieved")
+                    logger.info("High confidence and quality achieved")
                 
                 iteration += 1
             
             # Step 5: Generate final recommendation
-            print("\nGenerating final recommendation")
+            logger.info("Generating final recommendation")
             final_recommendation = self._generate_final_recommendation(task, context)
             self.execution_state["final_recommendation"] = final_recommendation
             
@@ -930,7 +987,7 @@ Respond ONLY with valid JSON."""
             else:
                 self.execution_state["confidence_score"] = 0.5
             
-            print(f"\nWorkflow complete. Final confidence: {self.execution_state['confidence_score']}")
+            logger.info(f"Workflow complete. Final confidence: {self.execution_state['confidence_score']}")
             
             # Return the execution state in the required format
             return {
@@ -942,7 +999,7 @@ Respond ONLY with valid JSON."""
             }
             
         except Exception as e:
-            print(f"Error in orchestrator run: {e}")
+            logger.error(f"Error in orchestrator run: {e}")
             return {
                 "plan": self.execution_state.get("plan", []),
                 "step_outputs": self.execution_state.get("step_outputs", []),
@@ -968,9 +1025,10 @@ Respond ONLY with valid JSON."""
             Final recommendation string
         """
         try:
+            safe_task = sanitize_user_text(task)
             prompt = f"""Based on the following task execution, provide a final recommendation:
 
-Original Task: {task}
+Original Task: {safe_task}
 
 Plan Executed:
 {json.dumps(self.execution_state['plan'], indent=2)}
@@ -990,30 +1048,22 @@ Please provide a comprehensive final recommendation that:
 
 Be clear, concise, and actionable."""
             
-            # Use standardized OpenAI helper (main task - 120s timeout)
-            openai_response = call_openai_sync(
+            llm_response = self._call_llm(
                 prompt=prompt,
-                is_main_task=True,  # Final recommendation is a main task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                use_json_schema=False,
+                timeout=self.main_timeout
             )
-            
-            # Extract response content
-            if openai_response["status"] == "completed":
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    return result_content.get("content", str(result_content))
-                else:
-                    return str(result_content) if result_content else "No recommendation generated"
+            if llm_response.get("status") == "completed":
+                result_content = llm_response.get("raw_text") or ""
+                if not result_content and llm_response.get("parsed_json"):
+                    result_content = json.dumps(llm_response["parsed_json"])
+                return result_content if result_content else "No recommendation generated"
             else:
-                # Fallback on error or timeout
-                error_msg = openai_response.get("error", "Unknown error")
-                logger.error(f"OpenAI final recommendation failed: {error_msg}")
+                error_msg = llm_response.get("error", "Unknown error")
+                logger.error(f"LLM final recommendation failed: {error_msg}")
                 return f"Completed analysis of task: {task}. Review step outputs for detailed findings."
             
         except Exception as e:
             # Fallback recommendation
             logger.error(f"Error generating final recommendation: {str(e)}")
             return f"Completed analysis of task: {task}. Review step outputs for detailed findings."
-

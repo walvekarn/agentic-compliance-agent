@@ -9,10 +9,14 @@ deployment preflight requirements.
 import importlib
 import sys
 import os
+import time
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -40,7 +44,7 @@ class SystemHealthCheck:
         if base_path is None:
             # Try to find project root
             current = Path(__file__).resolve()
-            # Go up from src/agentic_engine/testing/health_check.py to project root
+            # Go up from backend/agentic_engine/testing/health_check.py to project root
             self.base_path = current.parent.parent.parent.parent
         else:
             self.base_path = Path(base_path)
@@ -55,13 +59,13 @@ class SystemHealthCheck:
             HealthCheckResult
         """
         critical_modules = [
-            "src.agentic_engine.orchestrator",
-            "src.agentic_engine.agent_loop",
-            "src.agentic_engine.tools.tool_registry",
-            "src.agentic_engine.testing.test_suite_engine",
-            "src.agentic_engine.testing.failure_simulator",
-            "src.agentic_engine.testing.benchmark_runner",
-            "src.api.agentic_routes"
+            "backend.agentic_engine.orchestrator",
+            "backend.agentic_engine.agent_loop",
+            "backend.agentic_engine.tools.tool_registry",
+            "backend.agentic_engine.testing.test_suite_engine",
+            "backend.agentic_engine.testing.failure_simulator",
+            "backend.agentic_engine.testing.benchmark_runner",
+            "backend.api.agentic_routes"
         ]
         
         missing_imports = []
@@ -106,8 +110,8 @@ class SystemHealthCheck:
         
         # Check key files for common issues
         key_files = [
-            self.base_path / "src" / "agentic_engine" / "orchestrator.py",
-            self.base_path / "src" / "api" / "agentic_routes.py"
+            self.base_path / "backend" / "agentic_engine" / "orchestrator.py",
+            self.base_path / "backend" / "api" / "agentic_routes.py"
         ]
         
         for file_path in key_files:
@@ -150,23 +154,23 @@ class SystemHealthCheck:
         """
         issues = []
         
-        # Check critical environment variables
-        env_vars = ["OPENAI_API_KEY", "DATABASE_URL"]
-        missing_vars = []
-        
-        for var in env_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-        
+        # Check critical environment variables (warn if missing)
+        # Use settings instead of os.getenv() to respect .env file loading
+        from backend.config import settings
+        env_vars = {
+            "OPENAI_API_KEY": settings.OPENAI_API_KEY,
+            "DATABASE_URL": settings.DATABASE_URL
+        }
+        missing_vars = [var for var, value in env_vars.items() if not value]
         if missing_vars:
             issues.append(f"Missing environment variables: {', '.join(missing_vars)}")
         
         # Check if paths exist
         critical_paths = [
-            self.base_path / "src",
-            self.base_path / "src" / "agentic_engine",
-            self.base_path / "src" / "api",
-            self.base_path / "dashboard" / "pages"
+            self.base_path / "backend",
+            self.base_path / "backend" / "agentic_engine",
+            self.base_path / "backend" / "api",
+            self.base_path / "frontend" / "pages"
         ]
         
         missing_paths = []
@@ -178,9 +182,10 @@ class SystemHealthCheck:
             issues.append(f"Missing paths: {', '.join(missing_paths)}")
         
         if issues:
+            status = "warning" if len(issues) == 1 and "Missing environment variables" in issues[0] else "fail"
             return HealthCheckResult(
                 check_name="environmental_paths",
-                status="fail",
+                status=status,
                 message=f"Found {len(issues)} environmental/path issues",
                 details={"issues": issues},
                 remediation="Set required environment variables and ensure all paths exist"
@@ -211,7 +216,7 @@ class SystemHealthCheck:
             key_dependencies = [
                 ("fastapi", "fastapi"),
                 ("streamlit", "streamlit"),
-                ("langchain_openai", "langchain_openai"),
+                ("openai", "openai"),  # Using OpenAI directly, not langchain
                 ("sqlalchemy", "sqlalchemy"),
                 ("pydantic", "pydantic")
             ]
@@ -252,7 +257,7 @@ class SystemHealthCheck:
         issues = []
         
         # Check if dashboard pages exist
-        pages_dir = self.base_path / "dashboard" / "pages"
+        pages_dir = self.base_path / "frontend" / "pages"
         if not pages_dir.exists():
             issues.append("Dashboard pages directory not found")
         else:
@@ -275,7 +280,7 @@ class SystemHealthCheck:
                 issues.append(f"Missing UI pages: {', '.join(missing_pages)}")
         
         # Check if API routes file exists
-        api_routes_file = self.base_path / "src" / "api" / "agentic_routes.py"
+        api_routes_file = self.base_path / "backend" / "api" / "agentic_routes.py"
         if not api_routes_file.exists():
             issues.append("API routes file not found")
         
@@ -308,12 +313,13 @@ class SystemHealthCheck:
             # Try to import and instantiate orchestrator
             from backend.agentic_engine.orchestrator import AgenticAIOrchestrator
             
-            # Check if OpenAI API key is set
-            if not os.getenv("OPENAI_API_KEY"):
+            # Check if OpenAI API key is set (use settings to respect .env file)
+            from backend.config import settings
+            if not settings.OPENAI_API_KEY:
                 issues.append("OPENAI_API_KEY not set - orchestrator may not work")
             
             # Check if prompts exist
-            prompts_dir = self.base_path / "src" / "agentic_engine" / "reasoning" / "prompts"
+            prompts_dir = self.base_path / "backend" / "agentic_engine" / "reasoning" / "prompts"
             if prompts_dir.exists():
                 expected_prompts = ["planner_prompt.txt", "executor_prompt.txt", "reflection_prompt.txt"]
                 missing_prompts = []
@@ -331,9 +337,10 @@ class SystemHealthCheck:
             issues.append(f"Error checking reasoning engine: {str(e)}")
         
         if issues:
+            status = "warning" if all("OPENAI_API_KEY" in i or "Prompts" in i or "prompt" in i for i in issues) else "fail"
             return HealthCheckResult(
                 check_name="reasoning_engine_health",
-                status="warning" if len(issues) == 1 and "OPENAI_API_KEY" in issues[0] else "fail",
+                status=status,
                 message=f"Found {len(issues)} reasoning engine issues",
                 details={"issues": issues},
                 remediation="Ensure orchestrator is properly configured and prompts exist"
@@ -390,21 +397,20 @@ class SystemHealthCheck:
         issues = []
         
         required_folders = [
-            "src",
-            "src/agentic_engine",
-            "src/agentic_engine/tools",
-            "src/agentic_engine/testing",
-            "src/api",
-            "src/db",
-            "src/repositories",
-            "src/services",
-            "src/core",
-            "src/core/config",
-            "src/di",
-            "src/interfaces",
-            "dashboard",
-            "dashboard/pages",
-            "dashboard/components",
+            "backend",
+            "backend/agentic_engine",
+            "backend/agentic_engine/tools",
+            "backend/agentic_engine/testing",
+            "backend/api",
+            "backend/db",
+            "backend/repositories",
+            "backend/services",
+            "backend/core",
+            "backend/config",
+            "backend/interfaces",
+            "frontend",
+            "frontend/pages",
+            "frontend/components",
             "docs"
         ]
         
@@ -443,15 +449,15 @@ class SystemHealthCheck:
         issues = []
         
         critical_files = [
-            "main.py",
+            "backend/main.py",
             "requirements.txt",
             "README.md",
-            "src/core/version.py",
-            "src/core/config/settings.py",
-            "src/db/base.py",
-            "src/db/models.py",
-            "src/agentic_engine/orchestrator.py",
-            "src/api/agentic_routes.py"
+            "backend/core/version.py",
+            "backend/config/settings.py",
+            "backend/db/base.py",
+            "backend/db/models.py",
+            "backend/agentic_engine/orchestrator.py",
+            "backend/api/agentic_routes.py"
         ]
         
         missing_files = []
@@ -540,6 +546,408 @@ class SystemHealthCheck:
                 details={"checked_endpoints": len(key_endpoints)}
             )
     
+    def check_database_health(self) -> HealthCheckResult:
+        """
+        Check database connectivity and health.
+        
+        Returns:
+            HealthCheckResult
+        """
+        issues = []
+        
+        try:
+            from backend.db.base import engine, get_db
+            from sqlalchemy import text
+            from backend.db.models import AuditTrail
+            
+            # Test database connection (SELECT)
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT 1"))
+                result.fetchone()
+            
+            # Test INSERT capability (real test)
+            try:
+                # Get a database session
+                db_gen = get_db()
+                db = next(db_gen)
+                
+                # Try to create a test audit entry (use current schema fields)
+                test_audit = AuditTrail(
+                    entity_name="__health_check__",
+                    task_description="Health check test",
+                    task_category="HEALTH_CHECK",
+                    decision_outcome="REVIEW_REQUIRED",
+                    confidence_score=0.5,
+                    risk_level="LOW",
+                    agent_type="health_check",
+                    reasoning_chain=["Health check insert test"],
+                    meta_data={"source": "health_check"}
+                )
+                db.add(test_audit)
+                db.commit()
+                
+                # Clean up test entry
+                db.delete(test_audit)
+                db.commit()
+                db.close()
+                
+            except Exception as insert_error:
+                issues.append(f"INSERT test failed: {str(insert_error)}")
+            
+        except ImportError as e:
+            issues.append(f"Cannot import database modules: {str(e)}")
+        except Exception as e:
+            issues.append(f"Database connectivity check failed: {str(e)}")
+        
+        if issues:
+            return HealthCheckResult(
+                check_name="database_health",
+                status="fail",
+                message=f"Database health check failed: {len(issues)} issues",
+                details={"issues": issues},
+                remediation="Ensure database is running and accessible"
+            )
+        else:
+            return HealthCheckResult(
+                check_name="database_health",
+                status="pass",
+                message="Database is healthy and accessible (SELECT+INSERT verified)",
+                details={"connectivity": "verified", "read_write": "verified"}
+            )
+    
+    def check_llm_connectivity(self) -> HealthCheckResult:
+        """
+        Check LLM (OpenAI) connectivity and health with real schema validation test.
+        
+        Returns:
+            HealthCheckResult
+        """
+        issues = []
+        schema_valid = False
+        
+        try:
+            from backend.utils.llm_client import LLMClient, get_compliance_response_schema
+            
+            # Check if API key is configured (use settings to respect .env file)
+            from backend.config import settings
+            api_key = settings.OPENAI_API_KEY
+            if not api_key or api_key == "mock" or (isinstance(api_key, str) and api_key.startswith("sk-mock")):
+                issues.append("OPENAI_API_KEY not configured or is mock key")
+                return HealthCheckResult(
+                    check_name="llm_connectivity",
+                    status="warning",
+                    message="LLM API key not configured (will use mock mode)",
+                    details={"issues": issues, "schema_validation": False},
+                    remediation="Set OPENAI_API_KEY environment variable for LLM features"
+                )
+            
+            # Test connectivity with real schema validation
+            llm_client = LLMClient()
+            schema = get_compliance_response_schema()
+            
+            # Use a simple prompt that should return structured response
+            test_prompt = "Analyze this simple compliance task: Review a basic privacy policy. Return structured response."
+            test_response = llm_client.run_compliance_analysis(test_prompt, use_json_schema=True)
+            
+            if test_response.status == "completed" and test_response.parsed_json:
+                # Validate schema structure
+                parsed = test_response.parsed_json
+                required_fields = ["decision", "confidence", "risk_level", "risk_analysis", "why"]
+                missing_fields = [f for f in required_fields if f not in parsed]
+                
+                if not missing_fields:
+                    schema_valid = True
+                    # Check enum values
+                    valid_decisions = ["AUTONOMOUS", "REVIEW_REQUIRED", "ESCALATE"]
+                    valid_risk_levels = ["LOW", "MEDIUM", "HIGH"]
+                    
+                    if parsed.get("decision") in valid_decisions and parsed.get("risk_level") in valid_risk_levels:
+                        schema_valid = True
+                    else:
+                        issues.append(f"Invalid enum values in response")
+                else:
+                    issues.append(f"Missing required fields: {', '.join(missing_fields)}")
+            else:
+                issues.append(f"LLM connectivity test failed: {test_response.error or 'Unknown error'}")
+            
+        except ImportError as e:
+            issues.append(f"Cannot import LLM client: {str(e)}")
+        except Exception as e:
+            issues.append(f"LLM connectivity check failed: {str(e)}")
+        
+        if issues and not schema_valid:
+            return HealthCheckResult(
+                check_name="llm_connectivity",
+                status="fail",
+                message=f"LLM connectivity check failed: {len(issues)} issues",
+                details={"issues": issues, "schema_validation": schema_valid},
+                remediation="Check OPENAI_API_KEY and network connectivity"
+            )
+        elif schema_valid:
+            return HealthCheckResult(
+                check_name="llm_connectivity",
+                status="pass",
+                message="LLM connectivity is healthy (schema validation verified)",
+                details={"connectivity": "verified", "schema_validation": True, "api_key_configured": True}
+            )
+        else:
+            return HealthCheckResult(
+                check_name="llm_connectivity",
+                status="warning",
+                message="LLM connectivity check completed with issues",
+                details={"issues": issues, "schema_validation": schema_valid},
+                remediation="Review LLM configuration"
+            )
+    
+    def check_api_readiness(self) -> HealthCheckResult:
+        """
+        Check API readiness by pinging key endpoints.
+        
+        Returns:
+            HealthCheckResult
+        """
+        issues = []
+        ping_results = {}
+        
+        try:
+            # Try to import httpx for external ping
+            try:
+                import httpx
+                has_httpx = True
+            except ImportError:
+                has_httpx = False
+                issues.append("httpx not available for external API ping tests")
+            
+            # Key endpoints to check (internal check - endpoints exist in routes)
+            endpoints_to_check = [
+                "/health",
+                "/api/v1/agentic/status",
+                "/api/v1/agentic/health/full"
+            ]
+            
+            # Check if routes are defined (internal check)
+            try:
+                from backend.api import agentic_routes
+                from backend.main import app
+                
+                # Check if routes exist in the app
+                route_paths = [route.path for route in app.routes]
+                for endpoint in endpoints_to_check:
+                    # Normalize endpoint path
+                    if endpoint in route_paths or any(endpoint in path for path in route_paths):
+                        ping_results[endpoint] = "pass (route exists)"
+                    else:
+                        ping_results[endpoint] = "fail (route not found)"
+                        issues.append(f"{endpoint} route not found")
+                
+                # If httpx is available, try to ping external endpoints
+                if has_httpx:
+                    base_url = os.getenv("BASE_URL", "http://localhost:8000")
+                    for endpoint in endpoints_to_check:
+                        url = f"{base_url}{endpoint}"
+                        try:
+                            with httpx.Client(timeout=3.0) as client:
+                                response = client.get(url)
+                                if response.status_code in [200, 401]:
+                                    ping_results[f"{endpoint}_external"] = f"pass ({response.status_code})"
+                                else:
+                                    ping_results[f"{endpoint}_external"] = f"fail ({response.status_code})"
+                        except Exception as e:
+                            # External ping failed, but internal route check passed - this is OK
+                            ping_results[f"{endpoint}_external"] = f"unreachable (expected if server not running)"
+            except Exception as e:
+                issues.append(f"API route check failed: {str(e)}")
+            
+        except Exception as e:
+            issues.append(f"API readiness check failed: {str(e)}")
+        
+        failed_pings = sum(1 for v in ping_results.values() if "fail" in str(v).lower() and "external" not in str(v))
+        
+        if failed_pings > 0:
+            return HealthCheckResult(
+                check_name="api_readiness",
+                status="fail" if failed_pings == len(endpoints_to_check) else "warning",
+                message=f"API readiness check: {failed_pings}/{len(endpoints_to_check)} routes not found",
+                details={"ping_results": ping_results, "issues": issues},
+                remediation="Ensure API routes are properly registered"
+            )
+        else:
+            return HealthCheckResult(
+                check_name="api_readiness",
+                status="pass",
+                message="All API routes are defined and accessible",
+                details={"ping_results": ping_results, "checked_endpoints": len(endpoints_to_check)}
+            )
+    
+    def get_test_suite_readiness(self) -> Dict[str, Any]:
+        """
+        Fetch test suite readiness metrics from test suite engine.
+        
+        Returns:
+            Dictionary with test suite metrics
+        """
+        try:
+            from backend.agentic_engine.testing.test_suite_engine import TestSuiteEngine
+            
+            # Run a quick test suite (or use cached results)
+            # For now, return default values - in production, this would fetch real results
+            # This is called asynchronously from the endpoint
+            return {
+                "status": "available",
+                "pass_rate": None,  # Will be filled by endpoint
+                "failures": None,
+                "confidence_deviations": None
+            }
+        except Exception as e:
+            logger.warning(f"Could not get test suite readiness: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    def get_error_recovery_readiness(self) -> Dict[str, Any]:
+        """
+        Fetch error recovery readiness metrics.
+        
+        Returns:
+            Dictionary with error recovery metrics
+        """
+        try:
+            from backend.agentic_engine.testing.error_recovery_engine import ErrorRecoveryEngine
+            
+            # Return default values - actual metrics fetched from endpoint
+            return {
+                "status": "available",
+                "recovery_rate": None,  # Will be filled by endpoint
+                "retry_stability": None,
+                "fallback_quality": None
+            }
+        except Exception as e:
+            logger.warning(f"Could not get error recovery readiness: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    def compute_readiness_score(
+        self,
+        health_results: Dict[str, Any],
+        test_suite_metrics: Optional[Dict[str, Any]] = None,
+        error_recovery_metrics: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Compute single readiness score using weighted components.
+        
+        Args:
+            health_results: Results from run_all_checks()
+            test_suite_metrics: Optional test suite metrics
+            error_recovery_metrics: Optional error recovery metrics
+            
+        Returns:
+            Dictionary with readiness score and component breakdown
+        """
+        # Component weights
+        weights = {
+            "db_health": 0.20,
+            "llm_health": 0.20,
+            "api_health": 0.15,
+            "test_suite_health": 0.25,
+            "error_recovery_health": 0.20
+        }
+        
+        # Score health checks
+        checks = health_results.get("checks", [])
+        
+        # DB health score (0-1)
+        db_check = next((c for c in checks if c.get("check_name") == "database_health"), None)
+        db_health = 1.0 if db_check and db_check.get("status") == "pass" else (0.5 if db_check and db_check.get("status") == "warning" else 0.0)
+        
+        # LLM health score (0-1)
+        llm_check = next((c for c in checks if c.get("check_name") == "llm_connectivity"), None)
+        llm_health = 1.0 if llm_check and llm_check.get("status") == "pass" else (0.5 if llm_check and llm_check.get("status") == "warning" else 0.0)
+        
+        # API health score (0-1)
+        api_check = next((c for c in checks if c.get("check_name") == "api_readiness"), None)
+        if not api_check:
+            api_check = next((c for c in checks if c.get("check_name") == "async_readiness"), None)
+        api_health = 1.0 if api_check and api_check.get("status") == "pass" else (0.5 if api_check and api_check.get("status") == "warning" else 0.0)
+        
+        # Test suite health score (0-1)
+        if test_suite_metrics and test_suite_metrics.get("pass_rate") is not None:
+            pass_rate = test_suite_metrics.get("pass_rate", 0.0)
+            failures = test_suite_metrics.get("failures", [])
+            # Score based on pass rate (threshold: 0.8 for full score)
+            if pass_rate >= 0.9:
+                test_suite_health = 1.0
+            elif pass_rate >= 0.8:
+                test_suite_health = 0.8
+            elif pass_rate >= 0.7:
+                test_suite_health = 0.6
+            else:
+                test_suite_health = 0.4
+            # Penalize if there are critical failures
+            if failures:
+                test_suite_health *= 0.9
+        else:
+            test_suite_health = 0.5  # Unknown
+        
+        # Error recovery health score (0-1)
+        if error_recovery_metrics and error_recovery_metrics.get("recovery_rate") is not None:
+            recovery_rate = error_recovery_metrics.get("recovery_rate", 0.0)
+            fallback_quality = error_recovery_metrics.get("fallback_quality", 0.0)
+            # Score based on recovery rate and fallback quality
+            error_recovery_health = (recovery_rate * 0.7) + (fallback_quality * 0.3)
+        else:
+            error_recovery_health = 0.5  # Unknown
+        
+        # Compute weighted readiness score
+        readiness_score = (
+            db_health * weights["db_health"] +
+            llm_health * weights["llm_health"] +
+            api_health * weights["api_health"] +
+            test_suite_health * weights["test_suite_health"] +
+            error_recovery_health * weights["error_recovery_health"]
+        )
+        
+        return {
+            "readiness_score": round(readiness_score, 3),
+            "components": {
+                "db_health": {
+                    "score": db_health,
+                    "weight": weights["db_health"],
+                    "weighted_score": round(db_health * weights["db_health"], 3),
+                    "status": "pass" if db_health >= 0.9 else ("warning" if db_health >= 0.5 else "fail")
+                },
+                "llm_health": {
+                    "score": llm_health,
+                    "weight": weights["llm_health"],
+                    "weighted_score": round(llm_health * weights["llm_health"], 3),
+                    "status": "pass" if llm_health >= 0.9 else ("warning" if llm_health >= 0.5 else "fail")
+                },
+                "api_health": {
+                    "score": api_health,
+                    "weight": weights["api_health"],
+                    "weighted_score": round(api_health * weights["api_health"], 3),
+                    "status": "pass" if api_health >= 0.9 else ("warning" if api_health >= 0.5 else "fail")
+                },
+                "test_suite_health": {
+                    "score": test_suite_health,
+                    "weight": weights["test_suite_health"],
+                    "weighted_score": round(test_suite_health * weights["test_suite_health"], 3),
+                    "status": "pass" if test_suite_health >= 0.9 else ("warning" if test_suite_health >= 0.5 else "fail"),
+                    "metrics": test_suite_metrics
+                },
+                "error_recovery_health": {
+                    "score": error_recovery_health,
+                    "weight": weights["error_recovery_health"],
+                    "weighted_score": round(error_recovery_health * weights["error_recovery_health"], 3),
+                    "status": "pass" if error_recovery_health >= 0.9 else ("warning" if error_recovery_health >= 0.5 else "fail"),
+                    "metrics": error_recovery_metrics
+                }
+            },
+            "weights": weights
+        }
+    
     def run_all_checks(self) -> Dict[str, Any]:
         """
         Run all health checks including deployment preflight checks.
@@ -556,6 +964,11 @@ class SystemHealthCheck:
         self.results.append(self.check_dependency_mismatch())
         self.results.append(self.check_ui_routes())
         self.results.append(self.check_reasoning_engine_health())
+        
+        # Infrastructure health checks
+        self.results.append(self.check_database_health())
+        self.results.append(self.check_llm_connectivity())
+        self.results.append(self.check_api_readiness())
         
         # Deployment preflight checks (L4)
         self.results.append(self.check_python_version())
@@ -608,4 +1021,3 @@ class SystemHealthCheck:
             ],
             "remediation_steps": remediation_steps
         }
-

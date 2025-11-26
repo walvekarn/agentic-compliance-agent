@@ -24,13 +24,19 @@ from components.constants import (
 )
 from components.analyze_task.form_validator import FormValidator
 from components.analyze_task.results_display import render_results
-from components.ui_helpers import multiselect_with_select_all, add_tooltip, get_aria_label
+from components.ui_helpers import (
+    multiselect_with_select_all, 
+    add_tooltip, 
+    get_aria_label,
+    apply_light_theme_css,
+    render_page_header,
+    render_info_box
+)
 
 # Page config
 st.set_page_config(page_title="Check a Task", page_icon="✅", layout="wide")
 
-# Apply light theme CSS
-from components.ui_helpers import apply_light_theme_css
+# Force light theme for consistent UI (avoids dark bleed on inputs/progress/checkboxes)
 apply_light_theme_css()
 
 # Authentication
@@ -47,18 +53,17 @@ SessionManager.init()
 # Initialize API client
 api_client = APIClient()
 
-st.title("✅ Check a Task - Get Instant Guidance")
-st.markdown("""
-<div style='background-color: #f0f9ff; padding: 1.5rem; border-radius: 10px; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;'>
-    <p style='font-size: 1.1rem; color: #1e40af; margin: 0; line-height: 1.6;'>
-        <strong>What this does:</strong> Answer a few questions about your company and the compliance task you're working on. 
-        Our AI will analyze the situation and tell you if you can proceed independently, need approval, or should escalate to an expert.
-    </p>
-    <p style='font-size: 1rem; color: #64748b; margin: 0.75rem 0 0 0;'>
-        💡 <strong>New here?</strong> Click "⚡ Load Example" below to see how it works with sample data.
-    </p>
-</div>
-""", unsafe_allow_html=True)
+
+render_page_header(
+    title="Analyze Task",
+    icon="✅",
+    description="Get instant AI-powered compliance guidance for your tasks"
+)
+
+render_info_box(
+    "Answer a few questions about your company and the compliance task you're working on. Our AI will analyze the situation and tell you if you can proceed independently, need approval, or should escalate to an expert.",
+    icon="💡"
+)
 
 # ============================================================================
 # SHOW PREVIOUS ANALYSIS NOTICE
@@ -77,11 +82,29 @@ with action_col1:
         # Save example values to form data and draft
         SessionManager.save_form_data(EXAMPLE_FORM_VALUES)
         SessionManager.save_draft(EXAMPLE_FORM_VALUES, "analyze_task")
+        # Push example values into widget state so they render immediately
+        st.session_state.company_name_input = EXAMPLE_FORM_VALUES["company_name"]
+        st.session_state.company_type_select = EXAMPLE_FORM_VALUES["company_type"]
+        st.session_state.industry_select = EXAMPLE_FORM_VALUES["industry"]
+        st.session_state.locations_multiselect = EXAMPLE_FORM_VALUES["locations"]
+        st.session_state.task_description_textarea = EXAMPLE_FORM_VALUES["task_description"]
+        st.session_state.task_type_select = EXAMPLE_FORM_VALUES["task_type"]
+        st.session_state.deadline_date_input = None
+        st.session_state.impact_level_select = EXAMPLE_FORM_VALUES["impact_level"]
+        st.session_state.people_affected_input = EXAMPLE_FORM_VALUES["people_affected"]
+        st.session_state.employee_count_input = EXAMPLE_FORM_VALUES["employee_count"]
         # Clear any previous form errors
         if "form_errors" in st.session_state:
             del st.session_state.form_errors
         if "form_warnings" in st.session_state:
             del st.session_state.form_warnings
+        # Clear multiselect state to force example defaults to show
+        for key in [
+            "locations_multiselect",
+            "multiselect_state_locations_multiselect"
+        ]:
+            if key in st.session_state:
+                del st.session_state[key]
         # Force immediate rerun to show the data
         st.session_state["example_loaded"] = True
         st.success("✅ Example data loaded! Scroll down to see the form.")
@@ -112,7 +135,7 @@ if SessionManager.has_draft("analyze_task"):
         st.info(f"💾 **Draft found!** Your previous form data has been restored. Last saved: {draft_timestamp}")
         col1, col2 = st.columns([1, 5])
         with col1:
-            if st.button("🗑️ Clear Draft", use_container_width=True):
+            if st.button("🗑️ Clear Draft", width="stretch"):
                 SessionManager.clear_draft("analyze_task")
                 st.rerun()
         # Merge draft with form defaults
@@ -121,6 +144,9 @@ if SessionManager.has_draft("analyze_task"):
         form_defaults = SessionManager.get_form_data()
 else:
     form_defaults = SessionManager.get_form_data()
+# If user just clicked Load Example, ensure defaults are the example values
+if st.session_state.get("example_loaded"):
+    form_defaults = {**EXAMPLE_FORM_VALUES}
 
 # ============================================================================
 # MAIN FORM
@@ -129,7 +155,8 @@ with st.form("task_check_form", clear_on_submit=False):
     # Progress indicator
     st.progress(0.5, text="Step 1 of 2: Company Information")
     
-    st.markdown("## 📋 Step 1: Your Company Information")
+    from components.ui_helpers import render_section_header
+    render_section_header("Your Company Information", icon="📋", level=2)
     
     col1, col2 = st.columns(2)
     
@@ -196,7 +223,7 @@ with st.form("task_check_form", clear_on_submit=False):
     st.markdown("---")
     # Update progress indicator
     st.progress(1.0, text="Step 2 of 2: Task Details")
-    st.markdown("## 📝 Step 2: About This Task")
+    render_section_header("About This Task", icon="📝", level=2)
     
     task_description = st.text_area(
         "What do you need to do? *",
@@ -303,16 +330,18 @@ if submitted:
     if "form_warnings" in st.session_state:
         del st.session_state.form_warnings
     
-    # Convert locations to codes
-    selected_location_codes = [JURISDICTION_DISPLAY_TO_CODE[loc] for loc in locations if loc in JURISDICTION_DISPLAY_TO_CODE]
-    
     # Save form data
+    # Use current widget state to avoid stale values
+    company_type_value = st.session_state.get("company_type_select", company_type)
+    industry_value = st.session_state.get("industry_select", industry)
+    locations_value = st.session_state.get("locations_multiselect", locations)
+    
     form_data = {
         'company_name': company_name,
-        'company_type': company_type,
-        'industry': industry,
+        'company_type': company_type_value,
+        'industry': industry_value,
         'employee_count': employee_count,
-        'locations': locations,
+        'locations': locations_value,
         'handles_data': handles_customer_data,
         'is_regulated': is_regulated,
         'task_description': task_description,
@@ -325,6 +354,8 @@ if submitted:
         'impact_level': impact_level,
         'people_affected': people_affected
     }
+    # Convert locations to codes based on current selection
+    selected_location_codes = [JURISDICTION_DISPLAY_TO_CODE[loc] for loc in locations_value if loc in JURISDICTION_DISPLAY_TO_CODE]
     SessionManager.save_form_data(form_data)
     # Also save as draft
     SessionManager.save_draft(form_data, "analyze_task")
@@ -368,22 +399,26 @@ if submitted:
                     # Validate response structure with graceful error handling
                     try:
                         analysis = response.data
-                        # Validate required fields exist
-                        required_fields = ["decision", "risk_level", "confidence_score"]
+                        # Validate required fields exist (unified schema format)
+                        required_fields = ["decision", "risk_level", "confidence", "risk_analysis", "why"]
                         missing_fields = [field for field in required_fields if field not in analysis]
                         
                         if missing_fields:
                             st.warning(f"⚠️ **Partial Response**: Missing fields: {', '.join(missing_fields)}. Some features may not work correctly.")
-                            # Set defaults for missing fields
-                            if "risk_level" not in analysis:
-                                analysis["risk_level"] = "UNKNOWN"
-                            if "confidence_score" not in analysis:
-                                analysis["confidence_score"] = 0.0
+                            # Set defaults for missing fields using unified schema format
                             if "decision" not in analysis:
                                 analysis["decision"] = "REVIEW_REQUIRED"
+                            if "risk_level" not in analysis:
+                                analysis["risk_level"] = "MEDIUM"
+                            if "confidence" not in analysis:
+                                analysis["confidence"] = 0.5  # Default to 50% confidence
+                            if "risk_analysis" not in analysis:
+                                analysis["risk_analysis"] = []
+                            if "why" not in analysis:
+                                analysis["why"] = {"reasoning_steps": []}
                         
                         SessionManager.save_analysis(analysis)
-                        st.success("✅ Analysis complete! Results below:")
+                        st.success("✅ Analysis complete! Results are shown below.")
                         st.rerun()  # Rerun to show results cleanly and clear any errors
                     except (KeyError, TypeError, AttributeError) as validation_error:
                         st.error(f"❌ **Invalid Response Format**: The API returned data in an unexpected format: {str(validation_error)}")
@@ -429,4 +464,3 @@ with st.expander("❓ Need Help?"):
     
     **Get Your Answer**: Click the button and the AI will analyze your situation instantly.
     """)
-

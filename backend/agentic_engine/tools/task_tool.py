@@ -6,6 +6,7 @@ Connects to the production decision engine for risk analysis.
 """
 
 from typing import Dict, Any, Optional
+import logging
 
 
 class TaskTool:
@@ -20,6 +21,7 @@ class TaskTool:
     def __init__(self):
         """Initialize task tool."""
         self._decision_engine = None
+        self._logger = logging.getLogger(__name__)
     
     @property
     def name(self) -> str:
@@ -133,7 +135,7 @@ class TaskTool:
                 from backend.agent.decision_engine import DecisionEngine
                 self._decision_engine = DecisionEngine()
             except ImportError as e:
-                print(f"Warning: Could not import DecisionEngine: {e}")
+                self._logger.warning(f"Could not import DecisionEngine: {e}")
                 self._decision_engine = None
         return self._decision_engine
     

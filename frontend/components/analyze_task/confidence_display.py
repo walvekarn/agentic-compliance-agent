@@ -107,11 +107,7 @@ def _extract_confidence(analysis: dict) -> float:
         Raw confidence value (could be 0-1 or 0-100 format)
     """
     # Try primary key
-    confidence = analysis.get('confidence_score')
-    
-    # Try fallback key
-    if confidence is None:
-        confidence = analysis.get('confidence')
+    confidence = analysis.get('confidence') or analysis.get('confidence_score')
     
     # Default to medium confidence if missing
     if confidence is None:
@@ -308,4 +304,3 @@ def get_confidence_interpretation(confidence: float) -> tuple[str, str, str]:
     confidence_normalized = _normalize_confidence(confidence)
     emoji, label, color, _ = _get_confidence_visual(confidence_normalized)
     return emoji, label, color
-

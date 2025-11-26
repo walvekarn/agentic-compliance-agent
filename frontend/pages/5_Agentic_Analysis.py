@@ -20,6 +20,7 @@ from components.api_client import APIClient, display_api_error, parseAgenticResp
 from components.constants import (
     COMPANY_TYPE_OPTIONS, INDUSTRY_OPTIONS, LOCATION_OPTIONS
 )
+from components.theme import apply_agentic_page_css
 
 # Page config
 st.set_page_config(page_title="Agentic Analysis", page_icon="🤖", layout="wide")
@@ -27,6 +28,7 @@ st.set_page_config(page_title="Agentic Analysis", page_icon="🤖", layout="wide
 # Apply light theme CSS
 from components.ui_helpers import apply_light_theme_css
 apply_light_theme_css()
+apply_agentic_page_css()
 
 # Authentication
 require_auth()
@@ -37,62 +39,32 @@ SessionManager.init()
 # Initialize API client
 api_client = APIClient()
 
-# Custom CSS for experimental badge
-st.markdown("""
-<style>
-.experimental-badge {
-    display: inline-block;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-left: 10px;
-    vertical-align: middle;
-}
-.phase-info {
-    background-color: #f0f2f6;
-    border-left: 4px solid #667eea;
-    padding: 12px 16px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-}
-.step-card {
-    background-color: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
-}
-.reflection-card {
-    background-color: #f8f9fa;
-    border-left: 4px solid #28a745;
-    padding: 12px 16px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-}
-.recommendation-box {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin-top: 20px;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # Header
-st.markdown('<h1>🤖 Agentic Analysis ℹ️ <span class="experimental-badge">EXPERIMENTAL</span></h1>', unsafe_allow_html=True)
-st.markdown("Advanced AI reasoning with transparent plan-execute-reflect cycles for deep compliance analysis.")
+from components.ui_helpers import render_page_header
+render_page_header(
+    title="Agentic Analysis",
+    icon="🤖",
+    description="Advanced AI reasoning with transparent plan-execute-reflect cycles for deep compliance analysis"
+)
 st.caption("ℹ️ **Agentic**: AI systems that can autonomously plan, execute, and reflect on tasks. This experimental feature uses multi-step reasoning to provide deeper analysis.")
+
+# Environment warnings
+import os
+env_warnings = []
+if not os.getenv("OPENAI_API_KEY"):
+    env_warnings.append("⚠️ **Mock Mode Active**: OPENAI_API_KEY not set. Agentic analysis will use simulated responses.")
+if not os.getenv("DATABASE_URL"):
+    env_warnings.append("⚠️ **Database**: DATABASE_URL not set. Results may not be persisted.")
+
+if env_warnings:
+    st.warning("\n\n".join(env_warnings))
 
 # Experimental notice
 st.markdown("""
 <div class="phase-info">
-    <strong>🧪 Experimental Feature - PHASE 1 Complete</strong><br>
-    This is an experimental agentic AI engine that uses advanced reasoning patterns. 
-    PHASE 1 structure is complete. PHASE 2 will implement full orchestrator logic.
+    <strong>🧪 Experimental Feature - PHASE 2 Complete</strong><br>
+    Agentic plan-execute-reflect loop is implemented with safety/timeouts. PHASE 3 will focus on memory and deeper learning.
 </div>
 """, unsafe_allow_html=True)
 
@@ -110,7 +82,7 @@ if "agentic_form_data" not in st.session_state:
 EXAMPLE_ENTITY = {
     "entity_name": "InnovateTech Solutions",
     "entity_type": "Private company (not traded publicly)",
-    "locations": ["United States", "European Union"],
+    "locations": ["United States (Federal)", "European Union"],
     "industry": "Technology and software",
     "employee_count": "150",
     "has_personal_data": True,
@@ -200,6 +172,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
         has_personal_data = st.checkbox(
             "Handles Personal Data",
             value=form_data.get("has_personal_data", True),
+            key="agentic_has_personal_data_checkbox",
             help="Does the entity process personal or customer data?"
         )
     
@@ -208,6 +181,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
         is_regulated = st.checkbox(
             "Directly Regulated Entity",
             value=form_data.get("is_regulated", False),
+            key="agentic_is_regulated_checkbox",
             help="Is the entity subject to direct regulatory oversight?"
         )
     with col4:
@@ -266,8 +240,8 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
     
     st.markdown("---")
     
-    # Advanced Options (collapsed by default)
-    with st.expander("⚙️ Advanced Options"):
+    # Advanced Options (expanded to show selection)
+    with st.expander("⚙️ Advanced Options", expanded=True):
         max_iterations = st.slider(
             "Max Reasoning Iterations",
             min_value=3,
@@ -275,6 +249,9 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
             value=10,
             help="Maximum number of plan-execute-reflect cycles"
         )
+    
+    # Display selected value outside expander for visibility
+    st.caption(f"📊 **Configuration**: Max Reasoning Iterations = **{max_iterations}**")
     
     st.markdown("---")
     
@@ -338,7 +315,10 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                 # Call API with 120s timeout for agentic analysis (can take 60-90 seconds)
                 # Agentic analysis makes multiple LLM calls: planning + execution + reflection
                 try:
-                    response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=120)
+                    status_placeholder = st.info("🚀 Running agentic analysis (may take up to 120s)...")
+                    with st.spinner("Agentic engine executing plan/steps..."):
+                        response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=120)
+                    status_placeholder.empty()
                     
                     # Parse standardized agentic response
                     status, results, error, timestamp = parseAgenticResponse(response)
@@ -351,20 +331,42 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                         st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 120 seconds'}")
                         st.info("💡 **Tip**: Try reducing max iterations or simplifying the task description.")
                     elif status == "error":
-                        error_msg = error or 'Unknown error occurred'
-                        
                         # Try to extract more details from response
-                        if isinstance(response.data, dict):
-                            error_details = response.data.get('error', {})
-                            if isinstance(error_details, dict):
-                                error_msg = error_details.get('message', error_msg)
-                                error_type = error_details.get('type', '')
-                                if error_type:
-                                    error_msg = f"{error_type}: {error_msg}"
-                            elif isinstance(error_details, str):
-                                error_msg = error_details
+                        error_msg = 'Unknown error occurred'
+                        
+                        # Check parseAgenticResponse error first
+                        if error:
+                            error_msg = error
+                        # Check response.data for nested error structures
+                        elif hasattr(response, 'data') and response.data:
+                            if isinstance(response.data, dict):
+                                # Check multiple possible error fields
+                                error_msg = (
+                                    response.data.get('error') or
+                                    response.data.get('detail') or
+                                    response.data.get('message') or
+                                    str(response.data.get('errors', ''))
+                                )
+                                # If error is a dict, extract message
+                                if isinstance(error_msg, dict):
+                                    error_msg = error_msg.get('message') or error_msg.get('detail') or str(error_msg)
+                                # If still no message, check nested error structure
+                                if not error_msg or error_msg == 'Unknown error occurred':
+                                    if 'error' in response.data and isinstance(response.data['error'], dict):
+                                        error_msg = response.data['error'].get('message') or response.data['error'].get('detail') or str(response.data['error'])
+                            elif isinstance(response.data, str):
+                                error_msg = response.data
+                        
+                        # Also check response.error if available
+                        if (error_msg == 'Unknown error occurred' and hasattr(response, 'error') and response.error):
+                            error_msg = response.error
                         
                         st.error(f"❌ **Error**: {error_msg}")
+                        
+                        # Show technical details in expander for debugging
+                        if hasattr(response, 'data') and response.data:
+                            with st.expander("🔍 Technical Details"):
+                                st.json(response.data)
                         
                         # Provide specific guidance based on error type
                         error_lower = error_msg.lower()
@@ -396,7 +398,7 @@ if st.session_state.agentic_results:
     # Status badge with better handling
     status = results.get("status", "unknown")
     if status == "placeholder":
-        st.info("⚠️ **PLACEHOLDER RESPONSE**: This is a demo response showing the expected structure. Full implementation coming in PHASE 2.")
+        st.warning("⚠️ **Incomplete Response**: The agentic analysis returned a placeholder response. This may indicate:\n1. The backend agentic engine is not fully implemented\n2. The analysis encountered an error during execution\n3. The API endpoint needs to be updated\n\nPlease check backend logs for more details.")
     elif status == "partial":
         st.warning("⚠️ **Partial Results**: Analysis completed but some steps may have failed. Review step outputs for details.")
     elif status == "error":
@@ -458,7 +460,9 @@ if st.session_state.agentic_results:
                 with st.expander(f"{status_icon} {step_id.replace('_', ' ').title()}", expanded=False):
                     st.markdown(f"**Status:** `{status}`")
                     
-                    st.markdown(f"**Output:**")
+                    st.markdown(f"**Output/Error:**")
+                    if status == "failure" and output.get("error"):
+                        st.error(output.get("error"))
                     st.text(output.get("output", "No output"))
                     
                     # Display findings
@@ -637,7 +641,7 @@ if st.session_state.agentic_results:
             with col4:
                 success_rate = metrics.get("success_rate", 0.0)
                 if success_rate > 0:
-                    st.metric("Success Rate", f"{success_rate:.1f}%",
+                    st.metric("Success Rate", f"{success_rate * 100:.1f}%",
                              help="Percentage of steps that completed successfully")
                 else:
                     st.metric("Success Rate", "N/A", help="Success rate not calculated")
@@ -667,10 +671,31 @@ if st.session_state.agentic_results:
                     st.markdown(f"- {tool}: {count} time{'s' if count > 1 else ''}")
             
             with col2:
-                # Simple bar chart visualization
-                import pandas as pd
-                df = pd.DataFrame(list(tool_counts.items()), columns=["Tool", "Count"])
-                st.bar_chart(df.set_index("Tool"))
+                # Plotly bar chart visualization with plotly_white theme
+                try:
+                    import plotly.express as px
+                    import plotly.io as pio
+                    pio.templates.default = "plotly_white"
+                    
+                    import pandas as pd
+                    df = pd.DataFrame(list(tool_counts.items()), columns=["Tool", "Count"])
+                    fig = px.bar(
+                        df,
+                        x="Tool",
+                        y="Count",
+                        title="Tool Usage Frequency",
+                        color="Tool"
+                    )
+                    fig.update_layout(
+                        showlegend=False,
+                        xaxis_title="Tool",
+                        yaxis_title="Usage Count",
+                        template="plotly_white"
+                    )
+                    st.plotly_chart(fig, width="stretch")
+                except ImportError:
+                    # Fallback to simple text if Plotly not available
+                    st.info("📊 Charts require Plotly. Install with: pip install plotly")
         else:
             st.info("🔧 **No Tools Used**: This analysis didn't require any tools. Tools will appear here when the agent uses entity, calendar, task, or HTTP tools.")
         
@@ -765,7 +790,5 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📚 Development Status")
-    st.success("✅ PHASE 1: Structure Complete")
-    st.info("⏳ PHASE 2: Logic Implementation")
+    st.success("✅ PHASE 2: Plan/Execute/Reflect Implemented")
     st.info("⏳ PHASE 3: Memory & Learning")
-

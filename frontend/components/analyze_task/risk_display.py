@@ -35,7 +35,24 @@ def render_risk_breakdown(analysis: dict) -> None:
     # =========================================================================
     # EXTRACT RISK FACTORS
     # =========================================================================
-    risk_factors = analysis.get('risk_factors')
+    # Unified schema uses "risk_analysis" (list of RiskAnalysisItem)
+    # Legacy format uses "risk_factors" (dict)
+    risk_analysis = analysis.get('risk_analysis', [])
+    risk_factors = analysis.get('risk_factors', {})
+    
+    # Convert unified schema format to legacy format for compatibility
+    if risk_analysis and isinstance(risk_analysis, list) and len(risk_analysis) > 0:
+        # Convert risk_analysis list to risk_factors dict
+        risk_factors = {}
+        for item in risk_analysis:
+            if isinstance(item, dict):
+                factor_name = item.get('factor', '')
+                score = item.get('score', 0.0)
+                if factor_name:
+                    risk_factors[factor_name] = score
+            elif hasattr(item, 'factor') and hasattr(item, 'score'):
+                # Pydantic model
+                risk_factors[item.factor] = item.score
     
     # Graceful exit if no risk factors
     if not risk_factors:

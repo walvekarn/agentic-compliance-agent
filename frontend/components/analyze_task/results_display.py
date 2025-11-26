@@ -18,7 +18,7 @@ Status:
   proactive_suggestions, pattern_analysis, escalation_reason, action_plan,
   stakeholders, confidence_warnings, feedback_form, export_section,
   agent_explainability, counterfactuals, chat_integration
-- ⚠️ Partial: decision_banner, risk_level_display, reasoning_chain, recommendations
+- ⚠️ Partial: decision_banner, risk_level_display, recommendations
 """
 
 import streamlit as st
@@ -32,6 +32,103 @@ from .confidence_display import render_confidence_meter
 from .risk_display import render_risk_breakdown
 from .similar_cases_display import render_similar_cases
 from .suggestions_display import render_proactive_suggestions
+
+
+def _clean_reasoning_text(value: Any) -> str:
+    """
+    Normalize a reasoning string for display: strip whitespace/newlines and collapse multiple lines.
+    """
+    if value is None:
+        return ""
+
+    raw_text = str(value).strip()
+    if not raw_text:
+        return ""
+
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    return " ".join(lines).strip()
+
+
+def _get_reasoning_steps(analysis: Dict[str, Any]) -> List[str]:
+    why = analysis.get("why", {})
+    steps = why.get("reasoning_steps") if isinstance(why, dict) else []
+    if not isinstance(steps, list):
+        return []
+    cleaned = []
+    for step in steps:
+        sanitized = _clean_reasoning_text(step)
+        if sanitized:
+            cleaned.append(sanitized)
+    return cleaned
+
+
+def _render_decision_summary(analysis: Dict[str, Any], reasoning_steps: List[str]) -> None:
+    decision = analysis.get("decision", "UNKNOWN")
+    decision_display = decision.replace("_", " ").title() if isinstance(decision, str) else str(decision)
+    decision_icon = {"AUTONOMOUS": "🟢", "REVIEW_REQUIRED": "🟡", "ESCALATE": "🔴"}.get(decision, "⚪")
+
+    risk_level = analysis.get("risk_level", "UNKNOWN")
+    risk_score = analysis.get("risk_score")
+    risk_text = f"{risk_level.title()} ({risk_score:.2f})" if isinstance(risk_score, (int, float)) else risk_level.title()
+
+    confidence = analysis.get("confidence", 0)
+    confidence_pct = confidence * 100 if isinstance(confidence, (int, float)) else 0
+    confidence_text = f"{confidence_pct:.0f}%"
+    confidence_factors = (analysis.get("why", {}) or {}).get("confidence_factors") or []
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"### {decision_icon} **{decision_display}**")
+        st.caption("Final decision")
+    with col2:
+        st.markdown(f"### ⚖️ Risk Level: **{risk_text}**")
+        if reasoning_steps:
+            st.caption(reasoning_steps[0])
+    with col3:
+        st.markdown(f"### 📍 Confidence: **{confidence_text}**")
+        if confidence_factors:
+            st.caption(" · ".join(confidence_factors[:2]))
+
+
+def _render_why_section(reasoning_steps: List[str], is_simple_view: bool) -> None:
+    st.markdown("### 💬 Why This Decision?")
+    if not reasoning_steps:
+        st.info("Reasoning steps are not available for this analysis.")
+        return
+
+    max_steps = len(reasoning_steps) if is_simple_view else len(reasoning_steps)
+    display_steps = reasoning_steps[:3] if is_simple_view else reasoning_steps
+
+    for idx, step in enumerate(display_steps, 1):
+        st.markdown(f"{idx}. {step}")
+
+    if is_simple_view and len(reasoning_steps) > 3:
+        st.caption(f"...and {len(reasoning_steps) - 3} more steps in Detailed View.")
+
+
+def _render_risk_section(analysis: Dict[str, Any], is_simple_view: bool) -> None:
+    if is_simple_view:
+        with st.expander("📊 Risk Factors (Detailed View)", expanded=False):
+            render_risk_breakdown(analysis)
+    else:
+        render_risk_breakdown(analysis)
+
+
+def _render_confidence_section(analysis: Dict[str, Any], is_simple_view: bool) -> None:
+    if is_simple_view:
+        with st.expander("📈 Confidence Details", expanded=False):
+            render_confidence_meter(analysis)
+    else:
+        render_confidence_meter(analysis)
+
+
+def render_reasoning_chain(analysis: Dict[str, Any]) -> None:
+    """
+    Wrapper for compatibility tests; renders the sanitized reasoning section.
+    """
+    is_simple_view = st.session_state.get("results_view_mode") == "Simple View"
+    reasoning_steps = _get_reasoning_steps(analysis)
+    _render_why_section(reasoning_steps, is_simple_view)
 
 
 def render_results(analysis: Dict[str, Any]) -> None:
@@ -64,139 +161,44 @@ def render_results(analysis: Dict[str, Any]) -> None:
         index=0 if st.session_state.results_view_mode == "Simple View" else 1,
         horizontal=True,
         key="results_view_mode_radio",
-        help="Simple View shows only essential information. Detailed View shows full analysis with all sections."
+        help="Simple View: Shows decision, confidence, and risk level. Additional details (risk breakdown, recommendations, similar cases) are in expandable sections. Detailed View: Shows all sections expanded including full reasoning chain, action plan, pattern analysis, and AI transparency features."
     )
     
     # Update session state
     st.session_state.results_view_mode = view_mode
     is_simple_view = (view_mode == "Simple View")
+    st.caption(
+        "Simple View keeps the essentials top-of-mind; Detailed View expands every analytics section."
+    )
     
     # Render results header with clearer structure
     st.markdown("---")
     st.markdown("## 🎯 Your Results")
     
-    # Add a clear summary section FIRST
-    st.markdown("""
-    <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 10px; margin-bottom: 2rem; border-left: 4px solid #3b82f6;'>
-        <p style='font-size: 1.1rem; color: #1e40af; margin: 0;'>
-            <strong>📋 Summary:</strong> Below is your compliance analysis with decision, confidence level, risk assessment, and actionable recommendations.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Quick summary metrics at the top
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        decision = analysis.get("decision", "UNKNOWN")
-        decision_display = decision.replace("_", " ").title() if isinstance(decision, str) else str(decision)
-        st.metric("Decision", decision_display, help="The AI's recommended action")
-    with col2:
-        # Extract confidence - try multiple possible field names and paths
-        confidence_raw = None
-        
-        # Try direct fields first
-        if "confidence_score" in analysis:
-            confidence_raw = analysis["confidence_score"]
-        elif "confidence" in analysis:
-            confidence_raw = analysis["confidence"]
-        # Try nested in decision object
-        elif isinstance(analysis.get("decision"), dict) and "confidence_score" in analysis["decision"]:
-            confidence_raw = analysis["decision"]["confidence_score"]
-        # Try nested in decision_analysis
-        elif isinstance(analysis.get("decision_analysis"), dict) and "confidence_score" in analysis["decision_analysis"]:
-            confidence_raw = analysis["decision_analysis"]["confidence_score"]
-        
-        if confidence_raw is not None and isinstance(confidence_raw, (int, float)) and confidence_raw > 0:
-            # Normalize to 0-100% for display
-            if confidence_raw <= 1.0:
-                confidence_percent = confidence_raw * 100
-            else:
-                confidence_percent = confidence_raw
-            st.metric("Confidence", f"{confidence_percent:.0f}%", help="How certain the AI is about this decision (0-100%)")
-        else:
-            # If confidence is 0 or None, show a warning
-            if confidence_raw == 0:
-                st.metric("Confidence", "0%", delta="Low confidence", delta_color="off", help="The AI has low confidence in this decision. Please review carefully.")
-            else:
-                st.metric("Confidence", "N/A", help="Confidence data not available")
-    with col3:
-        risk = analysis.get("risk_level", "UNKNOWN")
-        risk_display = risk.replace("_", " ").title() if isinstance(risk, str) else str(risk)
-        st.metric("Risk Level", risk_display, help="Overall risk assessment")
-    
-    st.markdown("---")
-    
-    # =========================================================================
-    # CORE DECISION OUTPUT
-    # =========================================================================
-    # P0 - Critical: User's primary answer
+    reasoning_steps = _get_reasoning_steps(analysis)
     render_decision_banner(analysis)
-    
-    # P0 - Critical: Confidence in the decision
-    render_confidence_meter(analysis)
-    
-    # P0 - Critical: Risk level assessment
-    render_risk_level_display(analysis)
-    
+    _render_decision_summary(analysis, reasoning_steps)
+    st.markdown("---")
+    render_reasoning_chain(analysis)
+    st.markdown("---")
+    render_recommendations(analysis)
+    st.markdown("---")
+    _render_risk_section(analysis, is_simple_view)
+    st.markdown("---")
+    _render_confidence_section(analysis, is_simple_view)
+
     if not is_simple_view:
-        # =========================================================================
-        # AGENTIC AI FEATURES (Entity Memory & Proactive Intelligence)
-        # =========================================================================
-        # P0 - Critical: Proactive AI insights shown BEFORE main results
-        # Note: Should appear early to catch user's attention
         render_proactive_suggestions(analysis)
-        
-        # P0 - Critical: Entity memory - similar past cases
-        # Core agentic feature showing organizational learning
         render_similar_cases(analysis)
-        
-        # P1 - Important: Pattern analysis across historical data
         render_pattern_analysis(analysis)
-        
-        # =========================================================================
-        # DETAILED ANALYSIS
-        # =========================================================================
-        # P1 - Important: Breakdown of all 6 risk factors
-        render_risk_breakdown(analysis)
-        
-        # P0 - Partial: Step-by-step reasoning from AI
-        render_reasoning_chain(analysis)
-        
-        # P0 - Partial: Action recommendations with sources
-        render_recommendations(analysis)
-        
-        # P1 - Important: Action plan specific to decision type
         render_action_plan(analysis)
-        
-        # P1 - Important: Stakeholder involvement guidance
         render_stakeholders(analysis)
-        
-        # P1 - Important: Why escalation is needed (if applicable)
         render_escalation_reason(analysis)
-        
-        # =========================================================================
-        # AI TRANSPARENCY & SELF-AWARENESS
-        # =========================================================================
-        # P0 - Missing: Dynamic warnings based on confidence level
         render_confidence_warnings(analysis)
-        
-        # P2 - Nice-to-have: How AI reached this decision
         render_agent_explainability(analysis)
-        
-        # P2 - Nice-to-have: What would change this decision
         render_counterfactual_explanations(analysis)
     else:
-        # Simple view - only essential information with expandable sections
-        with st.expander("📊 See Risk Breakdown", expanded=False):
-            render_risk_breakdown(analysis)
-        
-        with st.expander("💡 See Recommendations", expanded=False):
-            render_recommendations(analysis)
-        
-        with st.expander("🔍 See Similar Past Cases", expanded=False):
-            render_similar_cases(analysis)
-        
-        st.info("💡 Switch to 'Detailed View' above to see full analysis including reasoning chain, action plan, pattern analysis, and more.")
+        st.info("💡 Switch to 'Detailed View' above to access advanced analytics, similar cases, and the full action plan.")
     
     # =========================================================================
     # USER INTERACTION (Always shown in both views)
@@ -315,27 +317,6 @@ def render_pattern_analysis(analysis: Dict[str, Any]) -> None:
 
 # render_risk_breakdown is now imported from risk_display.py
 # See: frontend/components/analyze_task/risk_display.py
-
-
-def render_reasoning_chain(analysis: Dict[str, Any]) -> None:
-    """
-    Render AI reasoning chain.
-    
-    Status: ⚠️ PARTIAL - Simple list in new UI
-    Priority: P0 - Critical
-    
-    Note: Future enhancements could include:
-    - Parse reasoning into structured sections (Risk Analysis, Decision Logic)
-    - Visual formatting with headers
-    - Overall risk score display
-    - Expandable full details section
-    - Debug viewer for reasoning structure
-    """
-    reasoning = analysis.get('reasoning_chain', [])
-    if reasoning:
-        with st.expander("💭 Why This Decision?", expanded=True):
-            for i, step in enumerate(reasoning, 1):
-                st.markdown(f"{i}. {step}")
 
 
 def render_recommendations(analysis: Dict[str, Any]) -> None:
@@ -649,7 +630,8 @@ def render_confidence_warnings(analysis: Dict[str, Any]) -> None:
     Status: ✅ IMPLEMENTED - Basic version with graceful degradation
     Priority: P0 - Critical (AI self-awareness)
     """
-    confidence_raw = analysis.get("confidence_score") or analysis.get("confidence", 0)
+    # Use unified schema field "confidence" (0-1 range)
+    confidence_raw = analysis.get("confidence")
     if not isinstance(confidence_raw, (int, float)):
         return  # Graceful exit if confidence not available
     
@@ -720,14 +702,24 @@ def render_agent_explainability(analysis: Dict[str, Any]) -> None:
         requirements with your legal or compliance team, especially for high-risk scenarios.
         """)
         
-        # Show reasoning chain if available
-        reasoning = analysis.get('reasoning_chain', [])
-        if reasoning:
+        # Show reasoning chain if available (unified schema format)
+        why = analysis.get('why', {})
+        if isinstance(why, dict):
+            reasoning = why.get('reasoning_steps', [])
+        else:
+            reasoning = []
+        display_reasoning = []
+        for step in reasoning[:5]:
+            safe_step = _clean_reasoning_text(step)
+            if safe_step:
+                display_reasoning.append(safe_step)
+
+        if display_reasoning:
             st.markdown("**Reasoning Steps:**")
-            for i, step in enumerate(reasoning[:5], 1):  # Show first 5 steps
+            for i, step in enumerate(display_reasoning, 1):
                 st.markdown(f"{i}. {step}")
-            if len(reasoning) > 5:
-                st.caption(f"... and {len(reasoning) - 5} more steps")
+            if len(reasoning) > 5 and len(display_reasoning) < len(reasoning):
+                st.caption(f"... and {len(reasoning) - len(display_reasoning)} more steps")
 
 
 def render_counterfactual_explanations(analysis: Dict[str, Any]) -> None:
@@ -737,9 +729,22 @@ def render_counterfactual_explanations(analysis: Dict[str, Any]) -> None:
     Status: ✅ IMPLEMENTED - Basic version with risk factor analysis
     Priority: P2 - Nice-to-have
     """
-    risk_factors = analysis.get("risk_factors", {})
-    if not risk_factors or not isinstance(risk_factors, dict):
+    risk_analysis = analysis.get("risk_analysis", [])
+    if not risk_analysis or not isinstance(risk_analysis, list):
         return  # Graceful exit if no risk factors
+
+    risk_factors = {}
+    for item in risk_analysis:
+        if isinstance(item, dict):
+            factor_name = item.get('factor', '')
+            score = item.get('score', 0.0)
+            if factor_name:
+                risk_factors[factor_name] = score
+        elif hasattr(item, 'factor') and hasattr(item, 'score'):
+            risk_factors[item.factor] = item.score
+    
+    if not risk_factors:
+        return  # No high-risk factors to show
     
     # Find high risk factors (> 0.60)
     high_risk_factors = {
@@ -892,7 +897,7 @@ def _format_analysis_as_text(analysis: Dict[str, Any]) -> str:
     lines.append("")
     
     decision = analysis.get("decision", "UNKNOWN")
-    confidence = analysis.get("confidence_score") or analysis.get("confidence", 0)
+    confidence = analysis.get("confidence", 0)
     risk_level = analysis.get("risk_level", "UNKNOWN")
     
     lines.append(f"Decision: {decision.replace('_', ' ').title()}")
@@ -900,7 +905,11 @@ def _format_analysis_as_text(analysis: Dict[str, Any]) -> str:
     lines.append(f"Risk Level: {risk_level}")
     lines.append("")
     
-    reasoning = analysis.get("reasoning_chain", [])
+    why = analysis.get("why", {})
+    if isinstance(why, dict):
+        reasoning = why.get("reasoning_steps", [])
+    else:
+        reasoning = []
     if reasoning:
         lines.append("Reasoning:")
         for i, step in enumerate(reasoning, 1):
@@ -933,14 +942,25 @@ def _format_analysis_as_dataframe(analysis: Dict[str, Any]) -> "pd.DataFrame":
     data["Field"].append("Decision")
     data["Value"].append(analysis.get("decision", "UNKNOWN"))
     
-    confidence = analysis.get("confidence_score") or analysis.get("confidence", 0)
+    confidence = analysis.get("confidence", 0)
     data["Field"].append("Confidence")
     data["Value"].append(f"{confidence:.1%}" if isinstance(confidence, (int, float)) else str(confidence))
     
     data["Field"].append("Risk Level")
     data["Value"].append(analysis.get("risk_level", "UNKNOWN"))
     
-    risk_factors = analysis.get("risk_factors", {})
+    risk_analysis = analysis.get("risk_analysis", [])
+    risk_factors = {}
+    if isinstance(risk_analysis, list):
+        for item in risk_analysis:
+            if isinstance(item, dict):
+                factor_name = item.get('factor', '')
+                score = item.get('score', 0.0)
+                if factor_name:
+                    risk_factors[factor_name] = score
+            elif hasattr(item, 'factor') and hasattr(item, 'score'):
+                risk_factors[item.factor] = item.score
+    
     if risk_factors and isinstance(risk_factors, dict):
         for factor, value in risk_factors.items():
             if isinstance(value, (int, float)):
@@ -996,31 +1016,5 @@ IMPLEMENTATION STATUS:
 - render_pattern_analysis() - Implemented inline
 - render_escalation_reason() - Implemented inline
 
-⚠️ PARTIAL (Basic implementation, needs enhancement):
-- render_decision_banner() - Simplified version
-- render_risk_level_display() - Basic version
-- render_reasoning_chain() - Simple list
-- render_recommendations() - Simple list
-
-❌ REMAINING TODO:
-Phase 1 (P0 - Critical):
-- render_confidence_warnings() - Dynamic warnings based on confidence
-- render_feedback_form() - Learning loop component
-
-Phase 2 (P1 - Important):
-- render_action_plan() - Step-by-step action plan
-- render_stakeholders() - Who to talk to section
-- render_export_section() - Export to TXT/Excel/JSON
-
-Phase 3 (P2 - Nice-to-have):
-- render_agent_explainability() - How AI decided
-- render_counterfactual_explanations() - What would change decision
-- render_chat_integration() - Sidebar chat context
-
-REFACTORING SAFETY:
-- DO NOT remove function calls from render_results()
-- Always check FEATURE_INVENTORY.md before modifying
-- Add new features as new functions, don't modify existing
-- Keep TODO comments until fully implemented
+All core renderers are implemented. Future enhancements (export, richer explainability, chat context) can be added as new helper functions without changing existing call sites. Update this note when new components are shipped.
 """
-

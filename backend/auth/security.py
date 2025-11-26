@@ -70,13 +70,25 @@ def decode_token(token: str) -> Dict[str, Any]:
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+class DemoUser:
+    """Lightweight user object for local/demo/testing contexts."""
+    def __init__(self):
+        self.id = 0
+        self.username = "demo"
+        self.email = "demo@example.com"
+        self.is_active = True
+
+
 def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> User:
     if not credentials or credentials.scheme.lower() != "bearer":
-        logger.warning(f"Authentication failed: No credentials or invalid scheme", extra={
+        # Optional and explicit demo-user bypass for local dev only
+        if settings.ALLOW_DEMO_USER:
+            return DemoUser()
+        logger.warning("Authentication failed: No credentials or invalid scheme", extra={
             "path": request.url.path,
             "method": request.method
         })
@@ -123,5 +135,3 @@ def get_current_user(
         "user_id": user.id
     })
     return user
-
-

@@ -5,7 +5,9 @@ Provides HTTP request capabilities for external API interactions.
 Safe GET/POST wrapper with timeouts, retries, and error handling.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+import os
+from urllib.parse import urlparse
 import httpx
 
 
@@ -23,7 +25,8 @@ class HTTPTool:
         self,
         timeout: float = 30.0,
         max_retries: int = 3,
-        verify_ssl: bool = True
+        verify_ssl: bool = True,
+        allowed_hosts: Optional[List[str]] = None
     ):
         """
         Initialize HTTP tool.
@@ -37,6 +40,10 @@ class HTTPTool:
         self.max_retries = max_retries
         self.verify_ssl = verify_ssl
         self._client = None
+        # Allowlist from env or constructor; empty list disables outbound calls by default
+        env_hosts = os.getenv("AGENTIC_HTTP_ALLOWLIST", "")
+        env_allowlist = [h.strip().lower() for h in env_hosts.split(",") if h.strip()]
+        self.allowed_hosts = [h.lower() for h in (allowed_hosts or env_allowlist)]
     
     @property
     def name(self) -> str:
@@ -82,6 +89,21 @@ class HTTPTool:
             },
             "required": ["method", "url"]
         }
+
+    def _is_url_allowed(self, url: str) -> bool:
+        """
+        Validate URL against scheme and allowlist. Deny by default when allowlist empty.
+        """
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"}:
+                return False
+            if not self.allowed_hosts:
+                return False
+            host = (parsed.hostname or "").lower()
+            return host in self.allowed_hosts
+        except Exception:
+            return False
     
     def run(self, input: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -113,6 +135,16 @@ class HTTPTool:
                 "error": "URL is required",
                 "status_code": None,
                 "data": None
+            }
+
+        if not self._is_url_allowed(url):
+            return {
+                "success": False,
+                "error": "HTTP tool disabled or host not allowed",
+                "status_code": None,
+                "data": None,
+                "url": url,
+                "method": method
             }
         
         try:

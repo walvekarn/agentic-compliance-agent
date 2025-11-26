@@ -11,10 +11,13 @@ Unified API client for Streamlit dashboard with:
 
 from typing import Dict, Any, Optional, Tuple, Union, List
 import time
+import logging
 import requests
 import streamlit as st
 from .constants import API_BASE_URL, API_TIMEOUT
 from .auth_utils import get_auth_headers, refresh_tokens_if_needed, logout, is_authenticated
+
+logger = logging.getLogger(__name__)
 
 
 class APIResponse:
@@ -168,9 +171,9 @@ class APIClient:
                     # If JSON parsing fails, use default error message
                     pass
                 
-                print(f"❌ API Request Failed: {method} {endpoint} - {error_msg} (Status: {resp.status_code})", flush=True)
+                logger.error(f"API Request Failed: {method} {endpoint} - {error_msg} (Status: {resp.status_code})")
                 if resp.status_code >= 500:
-                    print(f"   Server error details: {resp.text[:200]}", flush=True)
+                    logger.debug(f"Server error details: {resp.text[:200]}")
                 
                 # Return structured error
                 return APIResponse(
@@ -181,27 +184,27 @@ class APIClient:
 
             except requests.exceptions.Timeout as e:
                 last_exception = e
-                print(f"⏱️ API Request Timeout: {method} {endpoint} (attempt {attempt + 1}/{self.max_retries + 1})", flush=True)
+                logger.warning(f"API Request Timeout: {method} {endpoint} (attempt {attempt + 1}/{self.max_retries + 1})")
                 if attempt < self.max_retries:
                     self._sleep_backoff(attempt)
                     continue
-                print(f"❌ API Request Failed: {method} {endpoint} - Timeout after {self.max_retries + 1} attempts", flush=True)
+                logger.error(f"API Request Failed: {method} {endpoint} - Timeout after {self.max_retries + 1} attempts")
                 return APIResponse(success=False, error="⏱️ Timeout", status_code=504)
             except requests.exceptions.ConnectionError as e:
                 last_exception = e
-                print(f"🔌 API Connection Error: {method} {endpoint} (attempt {attempt + 1}/{self.max_retries + 1}) - {str(e)[:100]}", flush=True)
+                logger.warning(f"API Connection Error: {method} {endpoint} (attempt {attempt + 1}/{self.max_retries + 1}) - {str(e)[:100]}")
                 if attempt < self.max_retries:
                     self._sleep_backoff(attempt)
                     continue
-                print(f"❌ API Request Failed: {method} {endpoint} - Backend offline after {self.max_retries + 1} attempts", flush=True)
+                logger.error(f"API Request Failed: {method} {endpoint} - Backend offline after {self.max_retries + 1} attempts")
                 return APIResponse(success=False, error="Backend offline", status_code=None)
             except Exception as e:
                 last_exception = e
-                print(f"❌ API Request Exception: {method} {endpoint} - {type(e).__name__}: {str(e)[:200]}", flush=True)
+                logger.error(f"API Request Exception: {method} {endpoint} - {type(e).__name__}: {str(e)[:200]}")
                 break
 
         error_msg = f"❌ Unexpected Error: {str(last_exception) if last_exception else 'Unknown'}"
-        print(f"❌ API Request Failed: {method} {endpoint} - {error_msg}", flush=True)
+        logger.error(f"API Request Failed: {method} {endpoint} - {error_msg}")
         return APIResponse(success=False, error=error_msg, status_code=None)
 
     # Convenience HTTP verbs
@@ -452,4 +455,3 @@ def display_api_error(response: APIResponse):
             if details:
                 with st.expander("🔍 Error Details"):
                     st.json(details)
-

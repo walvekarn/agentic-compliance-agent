@@ -1,0 +1,23 @@
+{
+  "title": "High-Risk Entity Analysis",
+  "description": "Test analysis for high-risk entity with violations",
+  "input": {
+    "entity": {
+      "name": "RiskCorp",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["US_FEDERAL", "EU"],
+      "industry": "FINANCIAL_SERVICES",
+      "has_personal_data": true,
+      "is_regulated": true,
+      "previous_violations": 3
+    },
+    "task": {
+      "description": "Comprehensive risk assessment for entity with previous violations",
+      "category": "RISK_ASSESSMENT"
+    }
+  },
+  "expected_decision": "ESCALATE",
+  "expected_risk_level": "HIGH",
+  "expected_min_confidence": 0.75
+}
+

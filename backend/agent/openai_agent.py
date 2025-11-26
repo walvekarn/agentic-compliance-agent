@@ -1,9 +1,9 @@
-"""OpenAI-based compliance agent using LangChain"""
+"""OpenAI-based compliance agent using unified LLM client"""
 
 from typing import Dict, Any, List, Optional
-import os
 import logging
-from backend.agentic_engine.openai_helper import call_openai_async, call_openai_sync, STANDARD_MODEL
+from backend.utils.llm_client import LLMClient, call_llm_async, call_llm_sync
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,9 @@ class ComplianceAgent:
             api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
             model: OpenAI model to use (defaults to gpt-4o-mini)
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model or os.getenv("OPENAI_MODEL", STANDARD_MODEL)
+        self.api_key = api_key or settings.OPENAI_API_KEY
+        self.model = model or settings.OPENAI_MODEL if hasattr(settings, 'OPENAI_MODEL') else None
+        self.llm_client = LLMClient(api_key=self.api_key, model=self.model)
     
     async def process_query(
         self,
@@ -48,34 +49,40 @@ class ComplianceAgent:
                 history_text = "\n".join([f"User: {h.get('user', '')}\nAssistant: {h.get('assistant', '')}" for h in chat_history[-5:]])
                 prompt = f"Previous conversation:\n{history_text}\n\nCurrent query: {query}"
             
-            # Use standardized OpenAI helper (secondary task - 30s timeout)
-            openai_response = await call_openai_async(
+            # Use unified LLM client
+            openai_response = await self.llm_client.call_async(
                 prompt=prompt,
-                is_main_task=False,  # Query is secondary task
-                model=self.model
+                is_main_task=False  # Query is secondary task
             )
             
-            # Extract response content
             if openai_response["status"] == "completed":
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
+                # LLMClient returns: {"status": "completed", "raw_text": "...", "parsed_json": {...}}
+                response_text = openai_response.get("raw_text", "")
+                # If raw_text is empty but we have parsed_json, extract from it
+                if not response_text and openai_response.get("parsed_json"):
+                    parsed = openai_response["parsed_json"]
+                    if isinstance(parsed, dict):
+                        # Try common response fields
+                        response_text = parsed.get("content") or parsed.get("response") or parsed.get("answer") or str(parsed)
+                    else:
+                        response_text = str(parsed)
+                # Fallback if still empty
+                if not response_text:
+                    response_text = openai_response.get("error", "No response generated")
             else:
                 # Handle error or timeout
                 error_msg = openai_response.get("error", "Unknown error")
-                logger.error(f"OpenAI query failed: {error_msg}")
+                logger.error(f"LLM query failed: {error_msg}")
                 return {
                     "status": "error",
                     "error": error_msg,
-                    "model": self.model,
+                    "model": self.model or "gpt-4o-mini",
                 }
             
             result = {
                 "status": "success",
                 "response": response_text,
-                "model": self.model,
+                "model": self.model or "gpt-4o-mini",
             }
             
             # Log to audit trail if requested and db_session provided
@@ -93,7 +100,7 @@ class ComplianceAgent:
                         confidence_score=confidence,
                         reasoning_chain=[
                             "Query processed by OpenAI agent",
-                            f"Model: {self.model}",
+                            f"Model: {self.model or 'gpt-4o-mini'}",
                             f"Response length: {len(response_text)} characters"
                         ],
                         agent_type="openai_agent",
@@ -117,7 +124,7 @@ class ComplianceAgent:
             return {
                 "status": "error",
                 "error": str(e),
-                "model": self.model,
+                "model": self.model or "gpt-4o-mini",
             }
     
     def _estimate_confidence(self, response: str) -> float:
@@ -160,34 +167,40 @@ class ComplianceAgent:
             Dictionary containing the response and metadata
         """
         try:
-            # Use standardized OpenAI helper (secondary task - 30s timeout)
-            openai_response = call_openai_sync(
+            # Use unified LLM client
+            openai_response = self.llm_client.call_sync(
                 prompt=query,
-                is_main_task=False,  # Query is secondary task
-                model=self.model
+                is_main_task=False  # Query is secondary task
             )
             
-            # Extract response content
             if openai_response["status"] == "completed":
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
+                # LLMClient returns: {"status": "completed", "raw_text": "...", "parsed_json": {...}}
+                response_text = openai_response.get("raw_text", "")
+                # If raw_text is empty but we have parsed_json, extract from it
+                if not response_text and openai_response.get("parsed_json"):
+                    parsed = openai_response["parsed_json"]
+                    if isinstance(parsed, dict):
+                        # Try common response fields
+                        response_text = parsed.get("content") or parsed.get("response") or parsed.get("answer") or str(parsed)
+                    else:
+                        response_text = str(parsed)
+                # Fallback if still empty
+                if not response_text:
+                    response_text = openai_response.get("error", "No response generated")
             else:
                 # Handle error or timeout
                 error_msg = openai_response.get("error", "Unknown error")
-                logger.error(f"OpenAI query failed: {error_msg}")
+                logger.error(f"LLM query failed: {error_msg}")
                 return {
                     "status": "error",
                     "error": error_msg,
-                    "model": self.model,
+                    "model": self.model or "gpt-4o-mini",
                 }
             
             result = {
                 "status": "success",
                 "response": response_text,
-                "model": self.model,
+                "model": self.model or "gpt-4o-mini",
             }
             
             # Log to audit trail if requested and db_session provided
@@ -205,7 +218,7 @@ class ComplianceAgent:
                         confidence_score=confidence,
                         reasoning_chain=[
                             "Query processed by OpenAI agent (sync)",
-                            f"Model: {self.model}",
+                            f"Model: {self.model or 'gpt-4o-mini'}",
                             f"Response length: {len(response_text)} characters"
                         ],
                         agent_type="openai_agent",
@@ -229,6 +242,5 @@ class ComplianceAgent:
             return {
                 "status": "error",
                 "error": str(e),
-                "model": self.model,
+                "model": self.model or "gpt-4o-mini",
             }
-

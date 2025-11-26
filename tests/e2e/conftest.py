@@ -59,7 +59,13 @@ def wait_for_health_check(url: str, max_wait_seconds: int = 15, check_interval: 
 
 @pytest.fixture(scope="session")
 def backend_server():
-    """Start backend server for tests"""
+    """Start backend server for tests (skipped if SKIP_LIVE_BACKEND=1)."""
+    # Skip if environment variable is set
+    if os.getenv("SKIP_LIVE_BACKEND") == "1":
+        print("⏭️  Skipping live backend server (SKIP_LIVE_BACKEND=1)")
+        yield None
+        return
+    
     # Check if backend is already running
     if wait_for_health_check(f"{BASE_URL_BACKEND}/health", max_wait_seconds=2):
         print("✅ Backend already running")
@@ -254,11 +260,17 @@ def check_and_reset_database():
 def ensure_test_user(backend_server):
     """
     Ensure admin user exists before running tests.
+    Skips if backend_server was skipped (for in-process tests using TestClient).
+    
     Tries to login first via POST /auth/login, and if user doesn't exist,
     creates it via backend import (ensure_admin_user).
     
     Note: backend_server fixture already ensures /health returns 200 before this runs.
     """
+    # Skip if backend_server was skipped (for in-process tests)
+    if os.getenv("SKIP_LIVE_BACKEND") == "1":
+        print("⏭️  Skipping test user creation (using in-process TestClient)")
+        return
     
     # Try to login to check if user exists
     user_exists = False
@@ -317,4 +329,3 @@ def ensure_test_user(backend_server):
             # If we can't create user via import, that's OK - login endpoint will create it
             print(f"⚠️  Could not create user via import: {e}")
             print("   User will be created on first login attempt via ensure_admin_user()")
-

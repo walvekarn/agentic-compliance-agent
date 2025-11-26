@@ -8,7 +8,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-33%25-yellow.svg)]()
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](docs/) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
 
@@ -16,16 +16,21 @@
 
 </div>
 
+**One-liner:** Agentic FastAPI + Streamlit stack that analyzes compliance tasks, decides when to escalate, and logs every decision with transparent plan/execute/reflect traces.
+
 ## 📋 Executive Summary
 
 The **AI Agentic Compliance Assistant** is an intelligent system that autonomously handles routine compliance tasks while intelligently escalating high-risk scenarios to human experts. Built with cutting-edge agentic AI capabilities, it combines a **6-factor risk assessment engine**, **persistent entity memory**, **human feedback learning**, **proactive recommendations**, and **counterfactual reasoning** to deliver transparent, auditable compliance decisions.
 
 **Key Metrics:**
-- 🤖 **60% autonomy rate** on routine compliance queries
-- 🎯 **90%+ test coverage** with 84 automated tests
+- 🤖 **Target autonomy rate: ~60%** on routine compliance queries (estimated based on risk thresholds)
+- 🎯 **84 automated tests** with measured coverage ~33%
 - 🧠 **Zero false negatives** on high-risk scenarios (conservative escalation)
 - 📊 **Complete audit trail** for regulatory compliance
 - 🔄 **Continuous learning** from human feedback
+- ⚙️ **Dynamic confidence scoring** (70-90% range based on risk assessment)
+- 📈 **Health checks** with dynamic pass/fail rates (not fixed counts)
+- ⚠️ **Note**: Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned for PHASE 3
 
 **Perfect for:** Portfolio demonstrations, compliance automation research, agentic AI architecture showcases, and production deployment with additional security hardening.
 
@@ -358,7 +363,7 @@ make start
 Terminal 1 - Backend:
 ```bash
 cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Terminal 2 - Dashboard:
@@ -377,7 +382,7 @@ streamlit run frontend/Home.py --server.port 8501
    ```json
    {
      "status": "healthy",
-     "version": "1.0.0",
+     "version": "1.3.0-agentic-hardened",
      "timestamp": "2025-01-XX...",
      "components": {
        "database": {"status": "healthy", "type": "sqlite"},
@@ -424,30 +429,7 @@ streamlit run frontend/Home.py --server.port 8501
 
 ## 📸 Screenshots
 
-### Dashboard Home
-> *Main interface with system status, activity metrics, and quick actions*
-
-![Dashboard Home](docs/screenshots/dashboard_home.png)
-
-### Task Analysis Interface
-> *Form-based compliance task analysis with instant AI risk assessment*
-
-![Task Analysis](docs/screenshots/analyze_task.png)
-
-### Audit Trail Viewer
-> *Complete decision history with filtering and export capabilities*
-
-![Audit Trail](docs/screenshots/audit_trail.png)
-
-### Agent Insights Dashboard
-> *Analytics and performance metrics with interactive charts*
-
-![Agent Insights](docs/screenshots/agent_insights.png)
-
-### Agentic Analysis
-> *Advanced agentic AI analysis with plan-execute-reflect workflow*
-
-![Agentic Analysis](docs/screenshots/agentic_analysis.png)
+Screenshots/GIF demo will be added for the 1.3.0 release. Until then, run the app locally (`make start`) to explore the UI. If you prefer placeholders, point your own screenshots to `docs/screenshots/` and update this section.
 
 ---
 
@@ -659,7 +641,7 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - Streamlit dashboard (9 pages)
 - FastAPI backend with JWT auth
 - SQLite database (PostgreSQL-ready)
-- Comprehensive test suite (90%+ coverage)
+- Comprehensive test suite (measured coverage ~33%)
 - Mock mode for testing without API key
 
 **❌ Not Included (Future Roadmap):**
@@ -754,7 +736,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 | Tool | Purpose |
 |------|---------|
-| **Pytest** | Test framework (84+ tests, 90%+ coverage) |
+| **Pytest** | Test framework (84+ tests, ~33% coverage) |
 | **Black** | Code formatting (PEP 8) |
 | **MyPy** | Static type checking |
 | **Make** | Build automation |
@@ -831,6 +813,6 @@ Building intelligent systems that augment human expertise.
 
 *This is a portfolio/demonstration project. Not intended for production use without additional security hardening.*
 
-**Version 1.0.0** | **Released:** November 2025 | **Status:** Production Ready (MVP)
+**Version 1.3.0-agentic-hardened** | **Released:** November 2025 | **Status:** Production Ready (MVP)
 
 </div>

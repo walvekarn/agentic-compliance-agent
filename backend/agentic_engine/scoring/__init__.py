@@ -4,9 +4,5 @@ Scoring Module
 Provides scoring and evaluation capabilities for agent outputs and decisions.
 """
 
-from .score_assistant import ScoreAssistant
-
-__all__ = [
-    "ScoreAssistant",
-]
-
+# PHASE 3 placeholder: scoring assistant is not yet implemented.
+__all__ = []

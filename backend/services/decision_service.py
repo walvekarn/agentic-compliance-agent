@@ -15,7 +15,7 @@ from backend.repositories.compliance_query_repository import ComplianceQueryRepo
 from backend.repositories.audit_trail_repository import AuditTrailRepository
 from backend.db.models import EntityHistory, ComplianceQuery
 from .pattern_service import PatternService
-from .audit_service import AuditService
+from backend.agent.audit_service import AuditService
 
 
 class DecisionService:
@@ -67,7 +67,7 @@ class DecisionService:
         pattern_result = self.pattern_service.analyze_decision_patterns(
             entity.name,
             task.category.value,
-            limit=5
+            limit=25  # use a larger window to avoid tiny sample sizes
         )
         similar_cases = pattern_result["similar_cases"]
         pattern_analysis = pattern_result["pattern_analysis"]
@@ -172,4 +172,3 @@ class DecisionService:
             },
             "action_required": analysis.escalation_reason if analysis.escalation_reason else "Proceed as recommended"
         }
-

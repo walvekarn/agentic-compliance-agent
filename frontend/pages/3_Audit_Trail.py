@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import json
 import sys
+import os
 from pathlib import Path
 
 # Add frontend directory to path for imports
@@ -24,7 +25,7 @@ from components.constants import API_BASE_URL
 st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 
 # Apply light theme CSS
-from components.ui_helpers import apply_light_theme_css
+from components.ui_helpers import apply_light_theme_css, render_page_header, render_section_header, render_divider, render_plotly_chart
 apply_light_theme_css()
 
 # Additional light theme overrides for this page
@@ -64,8 +65,18 @@ require_auth()
 # Note: All component styling is now handled by apply_light_theme_css() in ui_helpers.py
 # No duplicate CSS needed here - base theme covers all components
 
-st.title("📊 Audit Trail")
-st.markdown("View all past decisions with complete reasoning and context.")
+api_key_present = bool(os.getenv("OPENAI_API_KEY"))
+db_url_present = bool(os.getenv("DATABASE_URL"))
+if not api_key_present:
+    st.info("Running in mock mode: LLM connectivity is not configured. Audit trail entries may be limited.")
+if not db_url_present:
+    st.warning("DATABASE_URL is not set or not writable. Audit trail persistence may be empty.")
+
+render_page_header(
+    title="Audit Trail",
+    icon="📊",
+    description="View all past decisions with complete reasoning and context"
+)
 
 # Helper functions
 DECISION_NAMES = {
@@ -112,8 +123,7 @@ def get_audit_id(entry):
         audit_id = entry.get("audit_id", None)
     return audit_id
 
-# Search and Filters
-st.markdown("### 🔍 Search & Filters")
+render_section_header("Search & Filters", icon="🔍", level=3)
 
 # Keyword search
 search_query = st.text_input(
@@ -219,6 +229,16 @@ try:
         st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try refreshing the page")
         st.stop()
     
+    # Warn if no entries found (common when running in mock mode or empty DB)
+    if not entries:
+        env_msg = []
+        if not os.getenv("DATABASE_URL"):
+            env_msg.append("DATABASE_URL not set (using default SQLite)")
+        if not os.getenv("OPENAI_API_KEY"):
+            env_msg.append("OPENAI_API_KEY not set (mock mode)")
+        tip = "; ".join(env_msg) if env_msg else "Backend may be running with an empty database."
+        st.info(f"ℹ️ No audit entries found yet. {tip}\nSubmit a task or decision to generate audit logs.")
+    
     # Filter by decision and risk (with safe access)
     filtered_entries = []
     for e in entries:
@@ -252,23 +272,32 @@ try:
             if search_lower not in searchable_text:
                 continue
         
-            filtered_entries.append(e)
+        # Add entry if it passed all filters
+        filtered_entries.append(e)
     
     # Display summary
     st.markdown("---")
-    total_count = data.get('total_count', data.get('count', len(entries)))
+    # Use actual entries count, not API total_count which may be incorrect
+    total_count = len(entries)  # Actual entries returned from API
     
     # Show search results summary
     if search_query and search_query.strip():
         if len(filtered_entries) == 0:
             st.info(f"🔍 No results found for **'{search_query}'**. Try different keywords or clear the search.")
         else:
-            st.markdown(f"### 📈 Found {len(filtered_entries)} matching record(s) out of {total_count} total")
+            st.markdown(f"**Found {len(filtered_entries)} matching record(s) out of {total_count} total**")
     else:
-    st.markdown(f"### 📈 Showing {len(filtered_entries)} of {total_count} records")
+        st.markdown(f"**Showing {len(filtered_entries)} of {total_count} records**")
     
     if not filtered_entries:
         # Better empty state
+        if entries:
+            st.caption("Filters returned no results. Showing all available entries instead.")
+            filtered_entries = entries
+            if st.button("🔄 Reset filters", help="Clear filters and show all records"):
+                st.session_state["decision_multiselect_audit"] = list(decision_labels.keys())
+                st.session_state["risk_multiselect_audit"] = list(risk_labels.keys())
+                st.rerun()
         if search_query and search_query.strip():
             st.warning(f"🔍 No results found matching **'{search_query}'** with your current filters.")
             st.markdown("""
@@ -311,8 +340,8 @@ try:
                 st.metric("High risk (🔴)", high_risk)
         
         # Display entries
-        st.markdown("---")
-        st.markdown("### 📋 Audit Records")
+        render_divider()
+        render_section_header("Audit Records", icon="📋", level=3)
         
         for entry in filtered_entries:
             # Support both old/new backend fields
@@ -350,8 +379,12 @@ try:
                             st.markdown(f"**Risk Score (0–100):** {risk_score*100:.0f}")
                         else:
                             st.markdown(f"**Risk Score (0–100):** N/A")
-                    confidence_score = entry['decision'].get('confidence_score', 0)
-                    if confidence_score is not None:
+                    # Unified schema uses "confidence" at top level, legacy uses "decision.confidence_score"
+                    confidence_score = entry.get('confidence_score') or entry['decision'].get('confidence_score')
+                    if confidence_score is not None and isinstance(confidence_score, (int, float)):
+                        # Normalize to 0-1 range if needed
+                        if confidence_score > 1.0:
+                            confidence_score = confidence_score / 100.0
                         st.markdown(f"**Confidence Level:** {confidence_score*100:.1f}%")
                     else:
                         st.markdown(f"**Confidence Level:** N/A")
@@ -360,28 +393,55 @@ try:
                 st.markdown("---")
                 tab1, tab2, tab3 = st.tabs(["🤔 Reasoning", "📊 Risk Factors", "💡 Recommendations"])
                 
-                # Reasoning chain
+                # Reasoning chain (unified schema uses why.reasoning_steps)
                 with tab1:
-                    if entry.get("reasoning_chain"):
-                        for reason in entry["reasoning_chain"]:
-                            st.markdown(f"- {reason}")
+                    reasoning_steps = []
+                    # Try unified schema format first
+                    if entry.get("why") and isinstance(entry["why"], dict):
+                        reasoning_steps = entry["why"].get("reasoning_steps", [])
+                    # Fallback to legacy format
+                    if not reasoning_steps:
+                        reasoning_steps = entry.get("reasoning_chain", [])
+                    
+                    if reasoning_steps and isinstance(reasoning_steps, list) and len(reasoning_steps) > 0:
+                        for reason in reasoning_steps:
+                            if reason and str(reason).strip():
+                                st.markdown(f"- {reason}")
                     else:
                         st.info("No reasoning chain available for this entry.")
                 
-                # Risk factors
+                # Risk factors (unified schema uses risk_analysis list)
                 with tab2:
-                    if entry.get("risk_factors"):
-                        rf = entry["risk_factors"]
+                    risk_analysis = entry.get("risk_analysis", [])
+                    risk_factors = entry.get("risk_factors", {})
+                    
+                    # Convert unified schema format if needed
+                    if risk_analysis and isinstance(risk_analysis, list) and len(risk_analysis) > 0:
+                        risk_factors = {}
+                        for item in risk_analysis:
+                            if isinstance(item, dict):
+                                factor_name = item.get('factor', '')
+                                score = item.get('score', 0.0)
+                                if factor_name:
+                                    risk_factors[factor_name] = score
+                    
+                    if risk_factors and isinstance(risk_factors, dict) and len(risk_factors) > 0:
                         col1, col2, col3 = st.columns(3)
                         with col1:
-                            st.metric("Jurisdiction", f"{rf.get('jurisdiction_risk', 0)*100:.0f}%")
-                            st.metric("Entity", f"{rf.get('entity_risk', 0)*100:.0f}%")
+                            j_risk = risk_factors.get('jurisdiction_risk', 0) or 0
+                            e_risk = risk_factors.get('entity_risk', 0) or 0
+                            st.metric("Jurisdiction", f"{j_risk*100:.0f}%")
+                            st.metric("Entity", f"{e_risk*100:.0f}%")
                         with col2:
-                            st.metric("Task", f"{rf.get('task_risk', 0)*100:.0f}%")
-                            st.metric("Data Sensitivity", f"{rf.get('data_sensitivity_risk', 0)*100:.0f}%")
+                            t_risk = risk_factors.get('task_risk', 0) or 0
+                            d_risk = risk_factors.get('data_sensitivity_risk', 0) or 0
+                            st.metric("Task", f"{t_risk*100:.0f}%")
+                            st.metric("Data Sensitivity", f"{d_risk*100:.0f}%")
                         with col3:
-                            st.metric("Regulatory", f"{rf.get('regulatory_risk', 0)*100:.0f}%")
-                            st.metric("Impact", f"{rf.get('impact_risk', 0)*100:.0f}%")
+                            r_risk = risk_factors.get('regulatory_risk', 0) or 0
+                            i_risk = risk_factors.get('impact_risk', 0) or 0
+                            st.metric("Regulatory", f"{r_risk*100:.0f}%")
+                            st.metric("Impact", f"{i_risk*100:.0f}%")
                     else:
                         st.info("No risk factors available for this entry.")
                 
@@ -394,8 +454,8 @@ try:
                         st.info("No recommendations available for this entry.")
         
         # Export options
-        st.markdown("---")
-        st.markdown("### 💾 Export Audit Trail")
+        render_divider()
+        render_section_header("Export Audit Trail", icon="💾", level=3)
         
         # Prepare export data
         export_data = []
@@ -541,8 +601,8 @@ except Exception as e:
         st.code(traceback.format_exc())
 
 # Statistics
-st.markdown("---")
-st.markdown("### 📈 Overall Statistics")
+render_divider()
+render_section_header("Overall Statistics", icon="📈", level=3)
 
 try:
     with st.spinner("Loading statistics..."):
@@ -572,22 +632,53 @@ if stats:
             high_risk = stats.get("by_risk_level", {}).get("HIGH", 0)
             st.metric("High Risk Items", high_risk)
         
-        # Charts
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Decisions by Outcome")
-            by_outcome = stats.get("by_outcome", {})
-            if by_outcome:
-                df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
-                st.bar_chart(df_outcome.set_index("Decision"))
-        
-        with col2:
-            st.markdown("#### Decisions by Risk Level")
-            by_risk = stats.get("by_risk_level", {})
-            if by_risk:
-                df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
-                st.bar_chart(df_risk.set_index("Risk Level"))
+        # Charts - Using Plotly with plotly_white theme
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            pio.templates.default = "plotly_white"
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                by_outcome = stats.get("by_outcome", {})
+                if by_outcome:
+                    df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
+                    fig = px.bar(
+                        df_outcome,
+                        x="Decision",
+                        y="Count",
+                        color="Decision",
+                        color_discrete_map={
+                            "AUTONOMOUS": "#10b981",
+                            "REVIEW_REQUIRED": "#f59e0b",
+                            "ESCALATE": "#ef4444"
+                        }
+                    )
+                    fig.update_layout(showlegend=False, xaxis_title="Decision Type", yaxis_title="Count")
+                    render_plotly_chart(fig, title="Decisions by Outcome", height=400, show_title=True)
+            
+            with col2:
+                by_risk = stats.get("by_risk_level", {})
+                if by_risk:
+                    df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
+                    fig = px.bar(
+                        df_risk,
+                        x="Risk Level",
+                        y="Count",
+                        color="Risk Level",
+                        color_discrete_map={
+                            "LOW": "#10b981",
+                            "MEDIUM": "#f59e0b",
+                            "HIGH": "#ef4444"
+                        }
+                    )
+                    fig.update_layout(showlegend=False, xaxis_title="Risk Level", yaxis_title="Count")
+                    render_plotly_chart(fig, title="Decisions by Risk Level", height=400, show_title=True)
+        except ImportError:
+            # Fallback to simple text if Plotly not available
+            st.info("📊 Charts require Plotly. Install with: pip install plotly")
 else:
     st.info("Statistics not available at this time.")
 
@@ -641,4 +732,3 @@ with st.expander("❓ Understanding the Audit Trail"):
     - **JSON**: Integrate with other systems or APIs
     - **Full Export**: Download complete audit trail via API
     """)
-

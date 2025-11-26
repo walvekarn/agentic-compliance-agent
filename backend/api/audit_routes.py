@@ -11,6 +11,7 @@ from backend.db.base import get_db
 from backend.auth.security import get_current_user
 from pydantic import BaseModel, Field
 from backend.api.rate_limit import limiter, AUTH_RATE
+from backend.utils.audit_converter import convert_audit_trail_to_audit_entry
 
 router = APIRouter(prefix="/audit", tags=["Audit Trail", "Protected"], dependencies=[Depends(get_current_user)])
 
@@ -99,13 +100,13 @@ async def get_audit_entries(
             end_date=end_date
         )
         
-        # Convert to JSON-serializable format
+        # Convert to unified schema format
         result = {
             "total_count": total_count,
             "total_returned": len(entries),
             "limit": limit,
             "offset": offset,
-            "entries": [entry.to_dict() for entry in entries]
+            "entries": [convert_audit_trail_to_audit_entry(entry) for entry in entries]
         }
         
         return result
@@ -135,7 +136,8 @@ async def get_audit_entry(
         if not entry:
             raise HTTPException(status_code=404, detail=f"Audit entry {audit_id} not found")
         
-        return entry.to_dict()
+        # Convert to unified schema format
+        return convert_audit_trail_to_audit_entry(entry)
         
     except HTTPException:
         raise

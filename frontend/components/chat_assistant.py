@@ -6,10 +6,6 @@ Reusable chat interface for asking questions about compliance decisions.
 
 import streamlit as st
 from datetime import datetime
-import os
-
-# API Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 from .api_client import APIClient, display_api_error
 
 
@@ -453,4 +449,3 @@ def render_chat_sidebar():
     with st.sidebar:
         st.markdown("---")
         render_chat_panel()
-

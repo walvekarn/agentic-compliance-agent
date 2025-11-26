@@ -52,20 +52,33 @@ def _clear_tokens():
 
 def is_authenticated() -> bool:
     """
-    Check if user is authenticated by verifying token exists.
+    Check if user is authenticated by verifying tokens/flags are in sync.
     
     Returns:
-        True if authenticated (token exists), False otherwise
+        True if authenticated, False otherwise
     """
-    # Check token first (most reliable indicator)
     has_token = bool(st.session_state.get("token"))
-    # Also check authenticated flag for consistency
+    has_refresh = bool(st.session_state.get("refresh"))
     has_flag = bool(st.session_state.get("authenticated", False))
-    # If token exists but flag is False, sync the flag (recovery from session state)
-    if has_token and not has_flag:
-        st.session_state["authenticated"] = True
-        st.session_state["auth"] = True
-    return has_token  # Token is the source of truth
+    has_auth = bool(st.session_state.get("auth", False))
+    username = st.session_state.get("username")
+    
+    # If we have tokens but flags are out of sync, repair them
+    if has_token and has_refresh:
+        if not has_flag:
+            st.session_state["authenticated"] = True
+        if not has_auth:
+            st.session_state["auth"] = True
+        if not username:
+            st.session_state["username"] = "demo"  # safe default for demo mode
+        return True
+    
+    # If flags set but no token (stale state), clear
+    if (has_flag or has_auth) and not has_token:
+        _clear_tokens()
+        return False
+    
+    return False
 
 
 def check_auth():

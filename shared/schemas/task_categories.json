@@ -1,0 +1,68 @@
+{
+  "task_categories": [
+    {
+      "code": "DATA_PRIVACY",
+      "name": "Data Privacy",
+      "description": "Data privacy and protection compliance tasks",
+      "complexity": "MEDIUM",
+      "typical_risk": 0.6
+    },
+    {
+      "code": "FINANCIAL_REPORTING",
+      "name": "Financial Reporting",
+      "description": "Financial reporting and SOX compliance tasks",
+      "complexity": "HIGH",
+      "typical_risk": 0.7
+    },
+    {
+      "code": "SECURITY_AUDIT",
+      "name": "Security Audit",
+      "description": "Security audit and assessment tasks",
+      "complexity": "HIGH",
+      "typical_risk": 0.75
+    },
+    {
+      "code": "POLICY_REVIEW",
+      "name": "Policy Review",
+      "description": "Policy review and update tasks",
+      "complexity": "MEDIUM",
+      "typical_risk": 0.5
+    },
+    {
+      "code": "REGULATORY_FILING",
+      "name": "Regulatory Filing",
+      "description": "Regulatory filing and submission tasks",
+      "complexity": "HIGH",
+      "typical_risk": 0.8
+    },
+    {
+      "code": "CONTRACT_REVIEW",
+      "name": "Contract Review",
+      "description": "Contract review and compliance tasks",
+      "complexity": "MEDIUM",
+      "typical_risk": 0.55
+    },
+    {
+      "code": "INCIDENT_RESPONSE",
+      "name": "Incident Response",
+      "description": "Security incident response and breach notification",
+      "complexity": "HIGH",
+      "typical_risk": 0.9
+    },
+    {
+      "code": "RISK_ASSESSMENT",
+      "name": "Risk Assessment",
+      "description": "Risk assessment and evaluation tasks",
+      "complexity": "MEDIUM",
+      "typical_risk": 0.6
+    },
+    {
+      "code": "GENERAL_INQUIRY",
+      "name": "General Inquiry",
+      "description": "General compliance inquiries and questions",
+      "complexity": "LOW",
+      "typical_risk": 0.3
+    }
+  ]
+}
+

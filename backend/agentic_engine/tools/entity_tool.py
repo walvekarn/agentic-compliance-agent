@@ -6,6 +6,7 @@ Connects to the production engine for entity data and audit logs.
 """
 
 from typing import Dict, List, Any, Optional
+import logging
 from sqlalchemy.orm import Session
 
 
@@ -27,6 +28,7 @@ class EntityTool:
         """
         self.db_session = db_session
         self._entity_analyzer = None
+        self._logger = logging.getLogger(__name__)
     
     @property
     def name(self) -> str:
@@ -196,7 +198,7 @@ class EntityTool:
                 from backend.agent.entity_analyzer import EntityAnalyzer
                 self._entity_analyzer = EntityAnalyzer()
             except ImportError as e:
-                print(f"Warning: Could not import EntityAnalyzer: {e}")
+                self._logger.warning(f"Could not import EntityAnalyzer: {e}")
                 self._entity_analyzer = None
         return self._entity_analyzer
     

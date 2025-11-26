@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Dict, List, Any, Optional
 from pathlib import Path
-from backend.agentic_engine.openai_helper import call_openai_sync, STANDARD_MODEL
+from backend.utils.llm_client import LLMClient, STANDARD_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ class ReasoningEngine:
         self.max_tokens = max_tokens
         self.enable_multi_pass = enable_multi_pass
         self.max_reasoning_passes = max_reasoning_passes
+        self.llm_client = LLMClient(api_key=api_key, model=self.model)
         self.mock_mode = not self.api_key or self.api_key == "mock" or (isinstance(self.api_key, str) and self.api_key.startswith("sk-mock"))
         
         if self.mock_mode:
@@ -66,6 +67,15 @@ class ReasoningEngine:
             "pass_history": [],
             "confidence_evolution": []
         }
+    
+    def _llm_call(self, prompt: str, is_main: bool = True) -> Dict[str, Any]:
+        """Call unified LLM client with standard timeout."""
+        timeout = 120.0 if is_main else 30.0
+        return self.llm_client.run_compliance_analysis(
+            prompt=prompt,
+            use_json_schema=False,
+            timeout=timeout
+        ).to_dict()
     
     def _load_prompts(self) -> Dict[str, str]:
         """
@@ -103,7 +113,7 @@ class ReasoningEngine:
                 prompts['reflection'] = "You are an AI critic. Evaluate the step."
         
         except Exception as e:
-            print(f"Warning: Could not load prompts: {e}")
+            logger.warning(f"Could not load prompts: {e}")
         
         return prompts
     
@@ -132,8 +142,8 @@ class ReasoningEngine:
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            print(f"Attempted to parse: {text[:200]}...")
+            logger.error(f"JSON parsing error: {e}")
+            logger.debug(f"Attempted to parse: {text[:200]}...")
             return None
     
     def generate_plan(
@@ -197,20 +207,12 @@ Respond ONLY with a valid JSON array of steps. Example format:
 Respond with JSON only, no other text."""
         
         try:
-            # Use standardized OpenAI helper (main task - 120s timeout)
-            openai_response = call_openai_sync(
-                prompt=full_prompt,
-                is_main_task=True,  # Planning is a main task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-            
+            llm_response = self._llm_call(full_prompt, is_main=True)
             # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
+            if self.mock_mode or llm_response.get("status") != "completed":
                 # Return mock plan for testing/demo or on error
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI planning failed: {openai_response.get('error')}")
+                if llm_response.get("status") == "error":
+                    logger.error(f"LLM planning failed: {llm_response.get('error')}")
                 return [
                     {
                         "step_id": "step_1",
@@ -236,11 +238,9 @@ Respond with JSON only, no other text."""
                 ]
             
             # Extract response content
-            result_content = openai_response.get("result", {})
-            if isinstance(result_content, dict):
-                response_text = result_content.get("content", str(result_content))
-            else:
-                response_text = str(result_content)
+            response_text = llm_response.get("raw_text") or ""
+            if not response_text and llm_response.get("parsed_json"):
+                response_text = json.dumps(llm_response["parsed_json"])
             
             # Safely parse JSON
             plan = self._safe_json_parse(response_text)
@@ -283,7 +283,7 @@ Respond with JSON only, no other text."""
             return validated_plan
             
         except Exception as e:
-            print(f"Error in generate_plan: {e}")
+            logger.error(f"Error in generate_plan: {e}")
             return self._create_default_plan(entity, task)
     
     def _create_default_plan(self, entity: str, task: str) -> List[Dict[str, Any]]:
@@ -417,19 +417,11 @@ Respond ONLY with valid JSON in this format:
 Respond with JSON only, no other text."""
         
         try:
-            # Use standardized OpenAI helper (main task - 120s timeout)
-            openai_response = call_openai_sync(
-                prompt=full_prompt,
-                is_main_task=True,  # Step execution is a main task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-            
+            llm_response = self._llm_call(full_prompt, is_main=True)
             # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI step execution failed: {openai_response.get('error')}")
+            if self.mock_mode or llm_response.get("status") != "completed":
+                if llm_response.get("status") == "error":
+                    logger.error(f"LLM step execution failed: {llm_response.get('error')}")
                 execution_data = {
                     "output": f"Mock execution of step {step_id}: {step.get('description', 'Unknown step')}",
                     "findings": [f"Finding from {step_id}", "Analysis completed"],
@@ -437,13 +429,9 @@ Respond with JSON only, no other text."""
                     "confidence": 0.75
                 }
             else:
-                # Extract response content
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
-                
+                response_text = llm_response.get("raw_text") or ""
+                if not response_text and llm_response.get("parsed_json"):
+                    response_text = json.dumps(llm_response["parsed_json"])
                 # Safely parse JSON
                 execution_data = self._safe_json_parse(response_text)
                 
@@ -478,7 +466,7 @@ Respond with JSON only, no other text."""
             return result
             
         except Exception as e:
-            print(f"Error in run_step: {e}")
+            logger.error(f"Error in run_step: {e}")
             # Return error result
             return {
                 "step_id": step_id,
@@ -553,19 +541,11 @@ Provide your evaluation in JSON format with these exact fields:
 Respond with JSON only, no other text."""
         
         try:
-            # Use standardized OpenAI helper (secondary task - 30s timeout)
-            openai_response = call_openai_sync(
-                prompt=full_prompt,
-                is_main_task=False,  # Reflection is a secondary task
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-            
+            llm_response = self._llm_call(full_prompt, is_main=False)
             # Handle mock mode or extract response
-            if self.mock_mode or openai_response["status"] != "completed":
-                if openai_response["status"] == "error":
-                    logger.error(f"OpenAI reflection failed: {openai_response.get('error')}")
+            if self.mock_mode or llm_response.get("status") != "completed":
+                if llm_response.get("status") == "error":
+                    logger.error(f"LLM reflection failed: {llm_response.get('error')}")
                 reflection_data = {
                     "correctness_score": 0.8,
                     "completeness_score": 0.75,
@@ -577,13 +557,9 @@ Respond with JSON only, no other text."""
                     "missing_data": []
                 }
             else:
-                # Extract response content
-                result_content = openai_response.get("result", {})
-                if isinstance(result_content, dict):
-                    response_text = result_content.get("content", str(result_content))
-                else:
-                    response_text = str(result_content)
-                
+                response_text = llm_response.get("raw_text") or ""
+                if not response_text and llm_response.get("parsed_json"):
+                    response_text = json.dumps(llm_response["parsed_json"])
                 # Safely parse JSON
                 reflection_data = self._safe_json_parse(response_text)
                 
@@ -624,7 +600,7 @@ Respond with JSON only, no other text."""
             return result
             
         except Exception as e:
-            print(f"Error in reflect: {e}")
+            logger.error(f"Error in reflect: {e}")
             # Return default reflection with error noted
             return {
                 "correctness_score": 0.5,
@@ -735,19 +711,12 @@ Please {'refine and improve' if pass_num > 1 else 'execute'} this step and provi
 Respond ONLY with valid JSON: {{"output": "...", "findings": [...], "risks": [...], "confidence": 0.85}}"""
             
             try:
-                # Use standardized OpenAI helper (main task - 120s timeout)
-                openai_response = call_openai_sync(
-                    prompt=full_prompt,
-                    is_main_task=True,  # Multi-pass reasoning is a main task
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens
-                )
+                llm_response = self._llm_call(full_prompt, is_main=True)
                 
                 # Handle mock mode or extract response
-                if self.mock_mode or openai_response["status"] != "completed":
-                    if openai_response["status"] == "error":
-                        logger.error(f"OpenAI multi-pass reasoning failed: {openai_response.get('error')}")
+                if self.mock_mode or llm_response.get("status") != "completed":
+                    if llm_response.get("status") == "error":
+                        logger.error(f"LLM multi-pass reasoning failed: {llm_response.get('error')}")
                     execution_data = {
                         "output": f"Mock multi-pass execution result for step {step_id} (pass {pass_num})",
                         "findings": [f"Multi-pass analysis completed (pass {pass_num})"],
@@ -755,13 +724,9 @@ Respond ONLY with valid JSON: {{"output": "...", "findings": [...], "risks": [..
                         "confidence": 0.8
                     }
                 else:
-                    # Extract response content
-                    result_content = openai_response.get("result", {})
-                    if isinstance(result_content, dict):
-                        response_text = result_content.get("content", str(result_content))
-                    else:
-                        response_text = str(result_content)
-                    
+                    response_text = llm_response.get("raw_text") or ""
+                    if not response_text and llm_response.get("parsed_json"):
+                        response_text = json.dumps(llm_response["parsed_json"])
                     execution_data = self._safe_json_parse(response_text)
                     
                     if execution_data is None or not isinstance(execution_data, dict):
@@ -801,7 +766,7 @@ Respond ONLY with valid JSON: {{"output": "...", "findings": [...], "risks": [..
                         break
                 
             except Exception as e:
-                print(f"Error in multi-pass reasoning pass {pass_num}: {e}")
+                logger.error(f"Error in multi-pass reasoning pass {pass_num}: {e}")
                 if pass_num == 1:
                     # Fallback to single-pass on first pass error
                     return self._run_step_single_pass(step, context)
@@ -823,4 +788,3 @@ Respond ONLY with valid JSON: {{"output": "...", "findings": [...], "risks": [..
             "reasoning_passes": len(pass_results),
             "pass_results": pass_results  # Include all pass results for transparency
         }
-

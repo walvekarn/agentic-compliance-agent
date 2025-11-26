@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 
 from backend.db.models import FeedbackLog, MemoryRecord
-from backend.agentic_engine.memory.memory_store import MemoryStore
 
 
 class FeedbackProcessor:
@@ -23,7 +22,6 @@ class FeedbackProcessor:
             db_session: Database session
         """
         self.db = db_session
-        self.memory_store = MemoryStore()
     
     def process_feedback(
         self,
@@ -225,4 +223,3 @@ class FeedbackProcessor:
             "timeframe_days": days,
             "entity_name": entity_name
         }
-
