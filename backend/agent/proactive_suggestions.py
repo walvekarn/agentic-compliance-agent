@@ -136,7 +136,8 @@ class ProactiveSuggestionService:
                             critical_count += 1
                         elif 8 <= days_until <= 30:
                             upcoming_count += 1
-                    except:
+                    except Exception:
+                        # Skip invalid deadline entries
                         continue
             
             if critical_count > 0:

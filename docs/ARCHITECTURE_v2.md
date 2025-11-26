@@ -27,7 +27,7 @@ The Agentic Compliance Assistant follows a **unified schema architecture** with 
 graph TB
     subgraph "Frontend Layer"
         STREAMLIT[Streamlit Dashboard]
-        PAGES[Pages: Home, Analyze, Calendar, Audit, Insights, Agentic, Test Suite]
+        PAGES[Pages: Home, Analyze Task, Audit Trail, Agentic Analysis, Test Suite]
         COMPONENTS[Components: Forms, Charts, Auth, API Client]
     end
     

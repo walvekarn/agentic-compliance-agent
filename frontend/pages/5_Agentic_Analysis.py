@@ -18,17 +18,15 @@ from components.auth_utils import require_auth, show_logout_button
 from components.session_manager import SessionManager
 from components.api_client import APIClient, display_api_error, parseAgenticResponse
 from components.constants import (
-    COMPANY_TYPE_OPTIONS, INDUSTRY_OPTIONS, LOCATION_OPTIONS
+    INDUSTRY_OPTIONS, LOCATION_OPTIONS
 )
-from components.theme import apply_agentic_page_css
+from components.ui_helpers import apply_light_theme_css
 
 # Page config
 st.set_page_config(page_title="Agentic Analysis", page_icon="🤖", layout="wide")
 
-# Apply light theme CSS
-from components.ui_helpers import apply_light_theme_css
+# Apply light theme CSS only
 apply_light_theme_css()
-apply_agentic_page_css()
 
 # Authentication
 require_auth()
@@ -39,34 +37,10 @@ SessionManager.init()
 # Initialize API client
 api_client = APIClient()
 
-
 # Header
-from components.ui_helpers import render_page_header
-render_page_header(
-    title="Agentic Analysis",
-    icon="🤖",
-    description="Advanced AI reasoning with transparent plan-execute-reflect cycles for deep compliance analysis"
-)
+st.title("🤖 Agentic Analysis")
+st.markdown("Advanced AI reasoning with transparent plan-execute-reflect cycles for deep compliance analysis")
 st.caption("ℹ️ **Agentic**: AI systems that can autonomously plan, execute, and reflect on tasks. This experimental feature uses multi-step reasoning to provide deeper analysis.")
-
-# Environment warnings
-import os
-env_warnings = []
-if not os.getenv("OPENAI_API_KEY"):
-    env_warnings.append("⚠️ **Mock Mode Active**: OPENAI_API_KEY not set. Agentic analysis will use simulated responses.")
-if not os.getenv("DATABASE_URL"):
-    env_warnings.append("⚠️ **Database**: DATABASE_URL not set. Results may not be persisted.")
-
-if env_warnings:
-    st.warning("\n\n".join(env_warnings))
-
-# Experimental notice
-st.markdown("""
-<div class="phase-info">
-    <strong>🧪 Experimental Feature - PHASE 2 Complete</strong><br>
-    Agentic plan-execute-reflect loop is implemented with safety/timeouts. PHASE 3 will focus on memory and deeper learning.
-</div>
-""", unsafe_allow_html=True)
 
 # ============================================================================
 # SESSION STATE INITIALIZATION
@@ -77,195 +51,76 @@ if "agentic_form_data" not in st.session_state:
     st.session_state.agentic_form_data = {}
 
 # ============================================================================
-# EXAMPLE DATA
-# ============================================================================
-EXAMPLE_ENTITY = {
-    "entity_name": "InnovateTech Solutions",
-    "entity_type": "Private company (not traded publicly)",
-    "locations": ["United States (Federal)", "European Union"],
-    "industry": "Technology and software",
-    "employee_count": "150",
-    "has_personal_data": True,
-    "is_regulated": False,
-    "previous_violations": "0"
-}
-
-EXAMPLE_TASK = {
-    "task_description": "Implement GDPR Article 30 records of processing activities",
-    "task_category": "DATA_PROTECTION",
-    "priority": "High",
-    "deadline": ""
-}
-
-# ============================================================================
-# QUICK ACTIONS
-# ============================================================================
-col1, col2, col3 = st.columns([1, 1, 3])
-with col1:
-    if st.button("⚡ Load Example", width="stretch"):
-        st.session_state.agentic_form_data = {**EXAMPLE_ENTITY, **EXAMPLE_TASK}
-        st.rerun()
-with col2:
-    if st.button("🔄 Reset Form", width="stretch"):
-        st.session_state.agentic_form_data = {}
-        st.session_state.agentic_results = None
-        st.rerun()
-
-# ============================================================================
 # MAIN FORM
 # ============================================================================
 with st.form("agentic_analysis_form", clear_on_submit=False):
-    form_data = st.session_state.agentic_form_data
-    
-    st.markdown("## 🏢 Entity Information")
+    st.markdown("## 📋 Analysis Request")
     
     col1, col2 = st.columns(2)
     
     with col1:
         entity_name = st.text_input(
             "Entity Name *",
-            value=form_data.get("entity_name", ""),
+            value="",
             placeholder="Enter entity name",
             help="Name of the organization to analyze"
         )
         
-        # Entity type
-        entity_type_options = ["-- Please select --"] + [opt for opt in COMPANY_TYPE_OPTIONS if opt != "-- Please select --"]
-        entity_type_index = entity_type_options.index(form_data.get("entity_type", entity_type_options[0])) if form_data.get("entity_type") in entity_type_options else 0
-        entity_type = st.selectbox(
-            "Type of Organization *",
-            options=entity_type_options,
-            index=entity_type_index
-        )
-        
-        # Industry
-        industry_options = ["-- Please select --"] + [opt for opt in INDUSTRY_OPTIONS if opt != "-- Please select --"]
-        industry_index = industry_options.index(form_data.get("industry", industry_options[0])) if form_data.get("industry") in industry_options else 0
-        industry = st.selectbox(
-            "Industry *",
-            options=industry_options,
-            index=industry_index
-        )
-    
-    with col2:
-        employee_count = st.text_input(
-            "Number of Employees",
-            value=form_data.get("employee_count", ""),
-            placeholder="e.g., 150",
+        employee_count = st.number_input(
+            "Employee Count",
+            min_value=1,
+            value=50,
             help="Approximate number of employees"
         )
         
         # Locations/Jurisdictions
         location_options = [loc for loc in LOCATION_OPTIONS if loc != "-- Please select --"]
-        default_locations = form_data.get("locations", [])
-        from components.ui_helpers import multiselect_with_select_all
-        locations = multiselect_with_select_all(
+        locations = st.multiselect(
             "Operating Locations *",
             options=location_options,
-            default=default_locations,
-            key="agentic_locations_multiselect",
-            help="Select all jurisdictions where the entity operates",
-            inside_form=True
+            default=[],
+            help="Select all jurisdictions where the entity operates"
+        )
+    
+    with col2:
+        # Industry - simple dropdown without "-- Please select --"
+        industry_options = [opt for opt in INDUSTRY_OPTIONS if opt != "-- Please select --"]
+        industry = st.selectbox(
+            "Industry *",
+            options=industry_options,
+            help="Industry category"
         )
         
-        # Additional context
-        has_personal_data = st.checkbox(
-            "Handles Personal Data",
-            value=form_data.get("has_personal_data", True),
-            key="agentic_has_personal_data_checkbox",
-            help="Does the entity process personal or customer data?"
-        )
-    
-    col3, col4 = st.columns(2)
-    with col3:
-        is_regulated = st.checkbox(
-            "Directly Regulated Entity",
-            value=form_data.get("is_regulated", False),
-            key="agentic_is_regulated_checkbox",
-            help="Is the entity subject to direct regulatory oversight?"
-        )
-    with col4:
-        previous_violations = st.text_input(
-            "Previous Violations",
-            value=form_data.get("previous_violations", "0"),
-            placeholder="0",
-            help="Number of previous compliance violations"
+        # Priority dropdown
+        priority = st.selectbox(
+            "Priority *",
+            options=["Low", "Medium", "High"],
+            index=1,  # Default to Medium
+            help="Task priority level"
         )
     
     st.markdown("---")
-    st.markdown("## 📋 Task Information")
     
+    # Task Description
     task_description = st.text_area(
         "Task Description *",
-        value=form_data.get("task_description", ""),
-        placeholder="Describe the compliance task to analyze...",
-        height=100,
+        value="",
+        placeholder="Describe the compliance task to analyze. For example: 'Implement GDPR Article 30 records of processing activities' or 'Review privacy policy updates for a new feature rollout'",
+        height=120,
         help="Detailed description of what needs to be analyzed"
     )
-    
-    col5, col6, col7 = st.columns(3)
-    
-    with col5:
-        task_category_options = [
-            "-- Please select --",
-            "DATA_PROTECTION",
-            "RISK_ASSESSMENT",
-            "POLICY_REVIEW",
-            "REGULATORY_FILING",
-            "SECURITY_AUDIT",
-            "INCIDENT_RESPONSE"
-        ]
-        task_category_index = task_category_options.index(form_data.get("task_category", task_category_options[0])) if form_data.get("task_category") in task_category_options else 0
-        task_category = st.selectbox(
-            "Task Category",
-            options=task_category_options,
-            index=task_category_index
-        )
-    
-    with col6:
-        priority_options = ["-- Please select --", "Low", "Medium", "High", "Critical"]
-        priority_index = priority_options.index(form_data.get("priority", priority_options[0])) if form_data.get("priority") in priority_options else 0
-        priority = st.selectbox(
-            "Priority",
-            options=priority_options,
-            index=priority_index
-        )
-    
-    with col7:
-        deadline = st.date_input(
-            "Deadline (Optional)",
-            value=None,
-            help="Target completion date"
-        )
-    
-    st.markdown("---")
-    
-    # Advanced Options (expanded to show selection)
-    with st.expander("⚙️ Advanced Options", expanded=True):
-        max_iterations = st.slider(
-            "Max Reasoning Iterations",
-            min_value=3,
-            max_value=20,
-            value=10,
-            help="Maximum number of plan-execute-reflect cycles"
-        )
-    
-    # Display selected value outside expander for visibility
-    st.caption(f"📊 **Configuration**: Max Reasoning Iterations = **{max_iterations}**")
     
     st.markdown("---")
     
     # Submit button
-    submitted = st.form_submit_button("🚀 Run Agentic Analysis", width="stretch", type="primary")
+    submitted = st.form_submit_button("🚀 Run Agentic Analysis", type="primary", use_container_width=True)
     
     if submitted:
         # Validation
         errors = []
         if not entity_name.strip():
             errors.append("Entity name is required")
-        if entity_type == "-- Please select --":
-            errors.append("Entity type is required")
-        if industry == "-- Please select --":
+        if not industry:
             errors.append("Industry is required")
         if not locations:
             errors.append("At least one operating location is required")
@@ -275,111 +130,50 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
         if errors:
             st.error("**Please fix the following errors:**\n\n" + "\n".join([f"• {e}" for e in errors]))
         else:
-            # Save form data
-            st.session_state.agentic_form_data = {
-                "entity_name": entity_name,
-                "entity_type": entity_type,
-                "locations": locations,
-                "industry": industry,
-                "employee_count": employee_count,
-                "has_personal_data": has_personal_data,
-                "is_regulated": is_regulated,
-                "previous_violations": previous_violations,
-                "task_description": task_description,
-                "task_category": task_category,
-                "priority": priority
+            # Prepare API request
+            request_payload = {
+                "entity": {
+                    "entity_name": entity_name,
+                    "entity_type": "PRIVATE_COMPANY",  # Default
+                    "locations": locations,
+                    "industry": industry,
+                    "employee_count": employee_count,
+                    "has_personal_data": True,  # Default
+                    "is_regulated": False,  # Default
+                    "previous_violations": 0  # Default
+                },
+                "task": {
+                    "task_description": task_description,
+                    "task_category": "DATA_PROTECTION",  # Default
+                    "priority": priority.upper(),
+                    "deadline": None
+                },
+                "max_iterations": 10  # Default
             }
             
-            # Prepare API request
-            with st.spinner("🤖 Agentic AI is analyzing... This may take 60-90 seconds (planning, execution, and reflection phases)..."):
-                request_payload = {
-                    "entity": {
-                        "entity_name": entity_name,
-                        "entity_type": entity_type.replace("-- Please select --", "PRIVATE_COMPANY"),
-                        "locations": locations,
-                        "industry": industry.replace("-- Please select --", "TECHNOLOGY"),
-                        "employee_count": int(employee_count) if employee_count.strip().isdigit() else None,
-                        "has_personal_data": has_personal_data,
-                        "is_regulated": is_regulated,
-                        "previous_violations": int(previous_violations) if previous_violations.strip().isdigit() else 0
-                    },
-                    "task": {
-                        "task_description": task_description,
-                        "task_category": task_category if task_category != "-- Please select --" else "DATA_PROTECTION",
-                        "priority": priority if priority != "-- Please select --" else "MEDIUM",
-                        "deadline": deadline.isoformat() if deadline else None
-                    },
-                    "max_iterations": max_iterations
-                }
-                
-                # Call API with 120s timeout for agentic analysis (can take 60-90 seconds)
-                # Agentic analysis makes multiple LLM calls: planning + execution + reflection
+            # Call API with spinner
+            with st.spinner("🤖 Agent is analyzing... This may take 60-90 seconds"):
                 try:
-                    status_placeholder = st.info("🚀 Running agentic analysis (may take up to 120s)...")
-                    with st.spinner("Agentic engine executing plan/steps..."):
-                        response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=120)
-                    status_placeholder.empty()
+                    response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=120)
                     
-                    # Parse standardized agentic response
+                    # Parse response
                     status, results, error, timestamp = parseAgenticResponse(response)
                     
                     if status == "completed" and results:
                         st.session_state.agentic_results = results
-                        st.success(f"✅ Analysis complete! (Completed at {timestamp or 'unknown'})")
+                        st.session_state.agentic_form_data = {
+                            "entity_name": entity_name,
+                            "task_description": task_description
+                        }
+                        st.success(f"✅ Analysis complete!")
                         st.rerun()
                     elif status == "timeout":
                         st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 120 seconds'}")
-                        st.info("💡 **Tip**: Try reducing max iterations or simplifying the task description.")
+                        st.info("💡 **Tip**: Try simplifying the task description or try again later.")
                     elif status == "error":
-                        # Try to extract more details from response
-                        error_msg = 'Unknown error occurred'
-                        
-                        # Check parseAgenticResponse error first
-                        if error:
-                            error_msg = error
-                        # Check response.data for nested error structures
-                        elif hasattr(response, 'data') and response.data:
-                            if isinstance(response.data, dict):
-                                # Check multiple possible error fields
-                                error_msg = (
-                                    response.data.get('error') or
-                                    response.data.get('detail') or
-                                    response.data.get('message') or
-                                    str(response.data.get('errors', ''))
-                                )
-                                # If error is a dict, extract message
-                                if isinstance(error_msg, dict):
-                                    error_msg = error_msg.get('message') or error_msg.get('detail') or str(error_msg)
-                                # If still no message, check nested error structure
-                                if not error_msg or error_msg == 'Unknown error occurred':
-                                    if 'error' in response.data and isinstance(response.data['error'], dict):
-                                        error_msg = response.data['error'].get('message') or response.data['error'].get('detail') or str(response.data['error'])
-                            elif isinstance(response.data, str):
-                                error_msg = response.data
-                        
-                        # Also check response.error if available
-                        if (error_msg == 'Unknown error occurred' and hasattr(response, 'error') and response.error):
-                            error_msg = response.error
-                        
+                        error_msg = error or "Unknown error occurred"
                         st.error(f"❌ **Error**: {error_msg}")
-                        
-                        # Show technical details in expander for debugging
-                        if hasattr(response, 'data') and response.data:
-                            with st.expander("🔍 Technical Details"):
-                                st.json(response.data)
-                        
-                        # Provide specific guidance based on error type
-                        error_lower = error_msg.lower()
-                        if "timeout" in error_lower or "timed out" in error_lower:
-                            st.info("💡 **This analysis takes longer than expected.** Try:\n1. Simplifying the task description\n2. Reducing max iterations (try 5-7 instead of 10)\n3. Trying again in a few moments\n4. Check backend logs if the issue persists")
-                        elif "authentication" in error_lower or "401" in error_msg or "403" in error_msg:
-                            st.info("💡 **Authentication issue.** Please:\n1. Log out and log back in\n2. Check that your session is still valid\n3. Verify you have permission to use agentic features")
-                        elif "404" in error_msg or "not found" in error_lower:
-                            st.info("💡 **Endpoint not found.** Please:\n1. Check that the backend is running and up to date\n2. Verify the agentic routes are properly registered\n3. Contact support if this is a new deployment")
-                        elif "500" in error_msg or "server error" in error_lower:
-                            st.info("💡 **Server error.** Please:\n1. Check backend logs for detailed error information\n2. Try again in a few moments\n3. Contact support if the issue persists")
-                        else:
-                            st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task\n4. Check backend logs for detailed error information\n5. Contact support if the issue persists")
+                        st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task")
                     else:
                         display_api_error(response)
                 except Exception as e:
@@ -395,25 +189,20 @@ if st.session_state.agentic_results:
     st.markdown("---")
     st.markdown("## 📊 Analysis Results")
     
-    # Status badge with better handling
+    # Status check
     status = results.get("status", "unknown")
-    if status == "placeholder":
-        st.warning("⚠️ **Incomplete Response**: The agentic analysis returned a placeholder response. This may indicate:\n1. The backend agentic engine is not fully implemented\n2. The analysis encountered an error during execution\n3. The API endpoint needs to be updated\n\nPlease check backend logs for more details.")
-    elif status == "partial":
-        st.warning("⚠️ **Partial Results**: Analysis completed but some steps may have failed. Review step outputs for details.")
-    elif status == "error":
-        st.error("❌ **Analysis Error**: The analysis encountered an error. Please try again or contact support.")
+    if status == "error":
+        st.error("❌ **Analysis Error**: The analysis encountered an error. Please try again.")
         if results.get("error"):
             st.code(results.get("error"), language="text")
         st.stop()
     
     # Tabs for different sections
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📋 Plan",
-        "⚙️ Step Outputs",
+        "⚙️ Outputs",
         "🔍 Reflections",
-        "💡 Recommendation",
-        "🧠 Memory & Metrics"
+        "💡 Final Recommendation"
     ])
     
     # TAB 1: PLAN
@@ -424,24 +213,20 @@ if st.session_state.agentic_results:
         plan = results.get("plan", [])
         if plan and len(plan) > 0:
             for i, step in enumerate(plan, 1):
-                with st.container():
-                    expected_tools = step.get('expected_tools', []) or step.get('tools', [])
-                    dependencies = step.get('dependencies', [])
-                    st.markdown(f"""
-                    <div class="step-card">
-                        <h4>Step {i}: {step.get('description', 'N/A')}</h4>
-                        <p><strong>Rationale:</strong> {step.get('rationale', 'N/A')}</p>
-                        <p><strong>Expected Tools:</strong> {', '.join(expected_tools) if expected_tools else 'None'}</p>
-                        <p><strong>Dependencies:</strong> {', '.join(dependencies) if dependencies else 'None'}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"#### Step {i}: {step.get('description', 'N/A')}")
+                st.markdown(f"**Rationale:** {step.get('rationale', 'N/A')}")
+                
+                expected_tools = step.get('expected_tools', []) or step.get('tools', [])
+                if expected_tools:
+                    st.markdown(f"**Expected Tools:** {', '.join(expected_tools)}")
+                
+                dependencies = step.get('dependencies', [])
+                if dependencies:
+                    st.markdown(f"**Dependencies:** {', '.join(dependencies)}")
+                
+                st.markdown("---")
         else:
-            st.info("""
-            📋 **No Plan Generated**
-            
-            The execution plan will appear here once you run an analysis. 
-            Click "Run Analysis" above to generate a strategic plan for your task.
-            """)
+            st.info("📋 **No Plan Generated**: The execution plan will appear here once you run an analysis.")
     
     # TAB 2: STEP OUTPUTS
     with tab2:
@@ -460,49 +245,37 @@ if st.session_state.agentic_results:
                 with st.expander(f"{status_icon} {step_id.replace('_', ' ').title()}", expanded=False):
                     st.markdown(f"**Status:** `{status}`")
                     
-                    st.markdown(f"**Output/Error:**")
+                    st.markdown("**Output:**")
                     if status == "failure" and output.get("error"):
                         st.error(output.get("error"))
-                    st.text(output.get("output", "No output"))
+                    output_text = output.get("output", "No output")
+                    st.text(output_text)
                     
                     # Display findings
-                    findings = output.get("metrics", {}).get("findings", []) or output.get("findings", [])
+                    metrics = output.get("metrics", {})
+                    findings = metrics.get("findings", []) or output.get("findings", [])
                     if findings:
-                        st.markdown(f"**🔍 Key Findings:**")
+                        st.markdown("**🔍 Key Findings:**")
                         for finding in findings:
                             st.markdown(f"- {finding}")
                     
                     # Display risks
-                    risks = output.get("metrics", {}).get("risks", []) or output.get("risks", [])
+                    risks = metrics.get("risks", []) or output.get("risks", [])
                     if risks:
-                        st.markdown(f"**⚠️ Risks Identified:**")
+                        st.markdown("**⚠️ Risks Identified:**")
                         for risk in risks:
                             st.markdown(f"- {risk}")
                     
                     # Display confidence
-                    confidence = output.get("metrics", {}).get("confidence", 0.0) or output.get("confidence", 0.0)
+                    confidence = metrics.get("confidence", 0.0) or output.get("confidence", 0.0)
                     if confidence and confidence > 0:
-                        st.metric("Confidence", f"{confidence:.2%}", 
-                                help="Confidence score for this step's execution")
+                        st.metric("Confidence", f"{confidence:.2%}")
                     
                     tools_used = output.get("tools_used", [])
                     if tools_used:
                         st.markdown(f"**🔧 Tools Used:** {', '.join(tools_used)}")
-                    
-                    metrics = output.get("metrics", {})
-                    if metrics:
-                        # Filter out findings, risks, confidence from raw metrics display
-                        raw_metrics = {k: v for k, v in metrics.items() if k not in ["findings", "risks", "confidence"]}
-                        if raw_metrics:
-                            st.markdown(f"**📊 Metrics:**")
-                            st.json(raw_metrics)
         else:
-            st.info("""
-            ⚙️ **No Step Outputs Yet**
-            
-            Step execution results will appear here once you run an analysis.
-            Each step's output, findings, risks, and confidence scores will be displayed.
-            """)
+            st.info("⚙️ **No Step Outputs Yet**: Step execution results will appear here once you run an analysis.")
     
     # TAB 3: REFLECTIONS
     with tab3:
@@ -510,68 +283,48 @@ if st.session_state.agentic_results:
         st.markdown("AI critic's evaluation of each step:")
         
         reflections = results.get("reflections", [])
-        for reflection in reflections:
-            step_id = reflection.get("step_id", "unknown")
-            quality_score = reflection.get("quality_score", 0.0)
-            
-            # Quality color
-            if quality_score >= 0.8:
-                quality_color = "#28a745"
-            elif quality_score >= 0.6:
-                quality_color = "#ffc107"
-            else:
-                quality_color = "#dc3545"
-            
-            st.markdown(f"""
-            <div class="reflection-card" style="border-left-color: {quality_color};">
-                <h4>{step_id.replace('_', ' ').title()}</h4>
-                <p><strong>Quality Score:</strong> {quality_score:.2f} / 1.00</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                correctness_score = reflection.get("correctness_score", None)
-                if correctness_score is not None:
-                    st.metric("Correctness", f"{correctness_score:.2%}", 
-                             "✅" if reflection.get("correctness") else "❌")
-                else:
-                    st.metric("Correctness", "✅" if reflection.get("correctness") else "❌")
-            with col2:
-                completeness_score = reflection.get("completeness_score", None)
-                if completeness_score is not None:
-                    st.metric("Completeness", f"{completeness_score:.2%}",
-                             "✅" if reflection.get("completeness") else "❌")
-                else:
-                    st.metric("Completeness", "✅" if reflection.get("completeness") else "❌")
-            with col3:
-                st.metric("Confidence", f"{reflection.get('confidence', 0.0):.2%}")
-            with col4:
-                st.metric("Quality Score", f"{reflection.get('quality_score', 0.0):.2%}")
-            
-            issues = reflection.get("issues", [])
-            if issues:
-                st.markdown("**⚠️ Issues Identified:**")
-                for issue in issues:
-                    st.markdown(f"- {issue}")
-            
-            suggestions = reflection.get("suggestions", [])
-            if suggestions:
-                st.markdown("**💡 Suggestions:**")
-                for suggestion in suggestions:
-                    st.markdown(f"- {suggestion}")
-            
-            st.markdown("---")
-        
-        if not reflections:
-            st.info("""
-            🔍 **No Reflections Yet**
-            
-            Quality reflections will appear here once you run an analysis.
-            The AI critic evaluates each step for correctness, completeness, and quality.
-            """)
+        if reflections and len(reflections) > 0:
+            for reflection in reflections:
+                step_id = reflection.get("step_id", "unknown")
+                quality_score = reflection.get("quality_score", 0.0)
+                
+                st.markdown(f"#### {step_id.replace('_', ' ').title()}")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    correctness_score = reflection.get("correctness_score", None)
+                    if correctness_score is not None:
+                        st.metric("Correctness", f"{correctness_score:.2%}")
+                    else:
+                        st.metric("Correctness", "✅" if reflection.get("correctness") else "❌")
+                with col2:
+                    completeness_score = reflection.get("completeness_score", None)
+                    if completeness_score is not None:
+                        st.metric("Completeness", f"{completeness_score:.2%}")
+                    else:
+                        st.metric("Completeness", "✅" if reflection.get("completeness") else "❌")
+                with col3:
+                    st.metric("Confidence", f"{reflection.get('confidence', 0.0):.2%}")
+                with col4:
+                    st.metric("Quality Score", f"{quality_score:.2%}")
+                
+                issues = reflection.get("issues", [])
+                if issues:
+                    st.markdown("**⚠️ Issues Identified:**")
+                    for issue in issues:
+                        st.markdown(f"- {issue}")
+                
+                suggestions = reflection.get("suggestions", [])
+                if suggestions:
+                    st.markdown("**💡 Suggestions:**")
+                    for suggestion in suggestions:
+                        st.markdown(f"- {suggestion}")
+                
+                st.markdown("---")
+        else:
+            st.info("🔍 **No Reflections Yet**: Quality reflections will appear here once you run an analysis.")
     
-    # TAB 4: RECOMMENDATION
+    # TAB 4: FINAL RECOMMENDATION
     with tab4:
         st.markdown("### Final Recommendation")
         
@@ -579,31 +332,19 @@ if st.session_state.agentic_results:
         confidence_score = results.get("confidence_score", 0.0)
         
         if not final_recommendation or final_recommendation == "No recommendation available":
-            st.info("""
-            💡 **No Recommendation Yet**
+            st.info("💡 **No Recommendation Yet**: The final recommendation will appear here once you run an analysis.")
+        else:
+            st.markdown(f"**🎯 AI Recommendation:**")
+            st.markdown(final_recommendation)
+            st.markdown("---")
+            st.metric("Confidence Score", f"{confidence_score:.2%}")
             
-            The final recommendation will appear here once you run an analysis.
-            This is the AI's comprehensive guidance based on all step analyses.
-            """)
-            st.stop()
-        
-        st.markdown(f"""
-        <div class="recommendation-box">
-            <h3>🎯 AI Recommendation</h3>
-            <p style="font-size: 1.1rem; line-height: 1.6;">{final_recommendation}</p>
-            <br>
-            <p><strong>Confidence Score:</strong> {confidence_score:.2%}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Download option
-        st.markdown("---")
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            # Prepare download data
+            # Download option
+            st.markdown("---")
+            form_data = st.session_state.agentic_form_data
             download_data = {
-                "entity": form_data.get("entity_name", "Unknown"),
-                "task": form_data.get("task_description", ""),
+                "entity_name": form_data.get("entity_name", "Unknown"),
+                "task_description": form_data.get("task_description", ""),
                 "timestamp": datetime.now().isoformat(),
                 "results": results
             }
@@ -612,151 +353,8 @@ if st.session_state.agentic_results:
                 data=json.dumps(download_data, indent=2),
                 file_name=f"agentic_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
-                width="stretch"
+                use_container_width=True
             )
-    
-    # TAB 5: MEMORY & METRICS
-    with tab5:
-        st.markdown("### Execution Metrics")
-        
-        metrics = results.get("execution_metrics", {})
-        
-        if metrics:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                total_steps = metrics.get("total_steps", 0)
-                st.metric("Total Steps", total_steps if total_steps > 0 else "N/A", 
-                         help="Number of steps in the execution plan")
-            with col2:
-                duration = metrics.get("duration_seconds", 0)
-                if duration > 0:
-                    st.metric("Duration", f"{duration:.2f}s", 
-                             help="Total execution time in seconds")
-                else:
-                    st.metric("Duration", "N/A", help="Execution time not available")
-            with col3:
-                status = metrics.get("status", "unknown")
-                st.metric("Status", status.upper() if status != "unknown" else "N/A",
-                         help="Overall execution status")
-            with col4:
-                success_rate = metrics.get("success_rate", 0.0)
-                if success_rate > 0:
-                    st.metric("Success Rate", f"{success_rate * 100:.1f}%",
-                             help="Percentage of steps that completed successfully")
-                else:
-                    st.metric("Success Rate", "N/A", help="Success rate not calculated")
-        else:
-            st.info("📊 **No Metrics Available**: Execution metrics will appear here after running an analysis.")
-        
-        # Tool Usage Visualization
-        st.markdown("---")
-        st.markdown("### 🔧 Tool Usage")
-        
-        # Collect tool usage from all steps
-        all_tools_used = []
-        step_outputs_list = results.get("step_outputs", [])
-        for output in step_outputs_list:
-            tools = output.get("tools_used", [])
-            if tools:
-                all_tools_used.extend(tools)
-        
-        if all_tools_used:
-            from collections import Counter
-            tool_counts = Counter(all_tools_used)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**Tool Call Frequency:**")
-                for tool, count in tool_counts.most_common():
-                    st.markdown(f"- {tool}: {count} time{'s' if count > 1 else ''}")
-            
-            with col2:
-                # Plotly bar chart visualization with plotly_white theme
-                try:
-                    import plotly.express as px
-                    import plotly.io as pio
-                    pio.templates.default = "plotly_white"
-                    
-                    import pandas as pd
-                    df = pd.DataFrame(list(tool_counts.items()), columns=["Tool", "Count"])
-                    fig = px.bar(
-                        df,
-                        x="Tool",
-                        y="Count",
-                        title="Tool Usage Frequency",
-                        color="Tool"
-                    )
-                    fig.update_layout(
-                        showlegend=False,
-                        xaxis_title="Tool",
-                        yaxis_title="Usage Count",
-                        template="plotly_white"
-                    )
-                    st.plotly_chart(fig, width="stretch")
-                except ImportError:
-                    # Fallback to simple text if Plotly not available
-                    st.info("📊 Charts require Plotly. Install with: pip install plotly")
-        else:
-            st.info("🔧 **No Tools Used**: This analysis didn't require any tools. Tools will appear here when the agent uses entity, calendar, task, or HTTP tools.")
-        
-        # Reasoning Metrics
-        st.markdown("---")
-        st.markdown("### 🧠 Reasoning Metrics")
-        
-        # Check for multi-pass reasoning indicators
-        reasoning_passes_total = 0
-        step_outputs_list = results.get("step_outputs", [])
-        for output in step_outputs_list:
-            metrics_data = output.get("metrics", {})
-            if "reasoning_passes" in metrics_data:
-                reasoning_passes_total += metrics_data["reasoning_passes"]
-        
-        if reasoning_passes_total > 0:
-            st.success(f"✅ Multi-pass reasoning was used ({reasoning_passes_total} total passes)")
-            st.info("Complex steps were analyzed using multiple reasoning passes for improved accuracy.")
-        else:
-            st.info("🧠 **Standard Reasoning**: All steps used single-pass reasoning. Multi-pass reasoning activates automatically for complex steps.")
-        
-        st.markdown("---")
-        st.markdown("### 📊 Detailed Metrics")
-        
-        # Success/Failure breakdown
-        successful_steps = metrics.get("successful_steps")
-        failed_steps = metrics.get("failed_steps")
-        if successful_steps is not None or failed_steps is not None:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Successful Steps", successful_steps if successful_steps is not None else "N/A",
-                         help="Number of steps that completed successfully")
-            with col2:
-                st.metric("Failed Steps", failed_steps if failed_steps is not None else "N/A",
-                         help="Number of steps that failed during execution")
-        
-        # Average step time
-        avg_step_time = metrics.get("average_step_time")
-        if avg_step_time and avg_step_time > 0:
-            st.metric("Average Step Time", f"{avg_step_time:.3f}s",
-                     help="Average time taken per step in seconds")
-        elif metrics:
-            st.info("⏱️ Step timing metrics will appear here after analysis completes.")
-        
-        st.markdown("---")
-        st.markdown("### 🧠 Memory Updates (PHASE 3)")
-        
-        st.info("""
-        **Coming in PHASE 3:**
-        - Episodic memory of this analysis session
-        - Semantic knowledge learned from the analysis
-        - Historical pattern recognition
-        - Cross-session insights
-        
-        The agentic engine will remember insights from this analysis and apply
-        them to future tasks.
-        """)
-        
-        # Raw metrics
-        with st.expander("🔍 View Raw Metrics"):
-            st.json(metrics)
 
 # ============================================================================
 # SIDEBAR INFO
@@ -781,14 +379,9 @@ with st.sidebar:
     - Quality assessment
     - Correctness validation
     - Iterative improvement
-    
-    **🧠 Memory Phase (PHASE 3)**
-    - Episodic memory
-    - Semantic learning
-    - Pattern recognition
     """)
     
-    st.markdown("---")
-    st.markdown("### 📚 Development Status")
-    st.success("✅ PHASE 2: Plan/Execute/Reflect Implemented")
-    st.info("⏳ PHASE 3: Memory & Learning")
+    if st.button("🔄 Reset Form", use_container_width=True):
+        st.session_state.agentic_results = None
+        st.session_state.agentic_form_data = {}
+        st.rerun()

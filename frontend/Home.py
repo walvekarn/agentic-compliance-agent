@@ -47,6 +47,7 @@ apply_home_theme_css()
 
 # Header with Clear Value Proposition
 st.title("🛡️ AI Compliance Assistant")
+st.info("🎯 **Demo Focus**: This project demonstrates agentic AI architecture with autonomous task planning and execution. Navigate to 'Agentic Analysis' to see the agent in action.")
 st.markdown("""
 <div style='background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem; border-left: 6px solid #3b82f6;'>
     <h2 style='color: #1e40af; margin-top: 0; font-size: 2rem;'>Get Instant Answers to Your Compliance Questions</h2>
@@ -92,39 +93,11 @@ if not st.session_state.has_seen_onboarding:
         st.session_state.has_seen_onboarding = True
         st.rerun()
 
-with st.container():
-    st.markdown("### 🚀 Get Started")
-    ob_col1, ob_col2 = st.columns([2, 1])
-    with ob_col1:
-        st.markdown("""
-        <div style='background-color: #f0f9ff; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #3b82f6;'>
-            <p style='font-size: 1.2rem; color: #1e40af; margin: 0 0 1rem 0; font-weight: 600;'>
-                🎯 Quick Start
-            </p>
-            <ol style='padding-left: 1.4rem; line-height: 1.9; font-size: 1.05rem; margin: 0;'>
-                <li>Click <strong>Check One Task</strong> to describe the compliance question.</li>
-                <li>Fill out the form (or load the example) with your context.</li>
-                <li>Review the AI decision, risk level, confidence, and next steps.</li>
-            </ol>
-            <p style='font-size: 0.95rem; color: #475569; margin-top: 1rem;'>Every decision is saved in the audit trail—you can review it later.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("🎯 Start with a sample task", key="demo_task_btn", width="stretch", type="primary"):
-            st.session_state["demo_task_text"] = "Review privacy policy updates for a new feature rollout across US/EU."
-            st.switch_page("pages/1_Analyze_Task.py")
-    with ob_col2:
-        st.markdown("""
-        <div style='background-color: #fef3c7; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #f59e0b;'>
-            <p style='font-size: 1.1rem; color: #92400e; margin: 0; font-weight: 600;'>
-                📋 Plan All Tasks
-            </p>
-            <p style='font-size: 1rem; color: #1e293b; margin-top: 0.5rem; margin-bottom: 0;'>
-                Generate a compliance calendar that lists every required task, deadlines, frequencies, and priorities.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("📋 Generate Calendar", key="option2_calendar_btn", width="stretch", type="secondary"):
-            st.switch_page("pages/2_Compliance_Calendar.py")
+# Project description
+st.markdown("""
+This project demonstrates **agentic AI architecture** with autonomous task planning and execution. 
+The system uses multi-step reasoning to analyze compliance tasks and provide transparent recommendations.
+""")
 
 # Check API connection (health endpoint is unprotected)
 api = APIClient()
@@ -144,7 +117,7 @@ st.markdown("---")
 # Main action buttons
 st.markdown("<h2>Choose What You Need Help With</h2>", unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3, gap="large")
+col1, col2 = st.columns(2, gap="large")
 with col1:
     st.markdown("""
     <div class="feature-card">
@@ -163,21 +136,6 @@ with col1:
 with col2:
     st.markdown("""
     <div class="feature-card">
-        <h3>📋 Plan All Tasks</h3>
-        <p>Get a complete task list for your company</p>
-        <ul>
-            <li>See all required tasks</li>
-            <li>Know when things are due</li>
-            <li>Understand priority levels</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("📋 CREATE TASK LIST →", key="compliance_calendar_btn", width="stretch", type="primary"):
-        st.switch_page("pages/2_Compliance_Calendar.py")
-
-with col3:
-    st.markdown("""
-    <div class="feature-card">
         <h3>📊 Review History</h3>
         <p>Look up past decisions and guidance</p>
         <ul>
@@ -192,13 +150,13 @@ with col3:
 
 # Advanced Features (Collapsible)
 st.markdown("### 🔧 Advanced Tools")
-col_adv1, col_adv2 = st.columns(2)
-with col_adv1:
-    if st.button("📊 View Insights Dashboard", key="agent_insights_btn", width="stretch"):
-        st.switch_page("pages/4_Agent_Insights.py")
-with col_adv2:
-    if st.button("🤖 Advanced Agentic Analysis", key="agentic_analysis_btn", width="stretch"):
-        st.switch_page("pages/5_Agentic_Analysis.py")
+# col_adv1, col_adv2 = st.columns(2)
+# with col_adv1:
+#     if st.button("📊 View Insights Dashboard", key="agent_insights_btn", width="stretch"):
+#         st.switch_page("pages/4_Agent_Insights.py")
+# with col_adv2:
+if st.button("🤖 Advanced Agentic Analysis", key="agentic_analysis_btn", width="stretch"):
+    st.switch_page("pages/5_Agentic_Analysis.py")
 st.caption("💡 These advanced features are optional—only dive in once you want deeper analytics.")
 
 # Agent Activity Metrics

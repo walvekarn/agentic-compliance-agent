@@ -255,11 +255,13 @@ def _render_suggestion_action(action_label: str, action_type: str) -> None:
         action_type: Action type (view_calendar, view_history, etc.)
     """
     if action_type == 'view_calendar':
-        if st.button(
-            f"📅 {action_label}",
-            key=f"action_calendar_{hash(action_label)}"
-        ):
-            st.switch_page("pages/2_Compliance_Calendar.py")
+        # Calendar page is hidden - show info instead
+        st.info(f"📅 {action_label} - Calendar feature is currently unavailable.")
+        # if st.button(
+        #     f"📅 {action_label}",
+        #     key=f"action_calendar_{hash(action_label)}"
+        # ):
+        #     st.switch_page("pages/2_Compliance_Calendar.py")
     
     elif action_type == 'view_history':
         # Display inline note instead of navigation

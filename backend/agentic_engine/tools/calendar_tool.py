@@ -163,8 +163,8 @@ class CalendarTool:
                     try:
                         deadline = datetime.fromisoformat(deadline_text)
                         method = f"Direct date: {deadline_text}"
-                    except:
-                        # Default to 30 days
+                    except Exception:
+                        # Default to 30 days if parsing fails
                         deadline = start + timedelta(days=30)
                         method = f"Could not parse '{deadline_text}', defaulted to 30 days"
             
@@ -213,8 +213,8 @@ class CalendarTool:
             # Parse deadline
             try:
                 deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
-            except:
-                # Try to calculate from text
+            except Exception:
+                # Try to calculate from text if ISO format parsing fails
                 calc_result = self.calculate_deadline(deadline_text=deadline)
                 if calc_result.get('deadline'):
                     deadline_dt = datetime.fromisoformat(calc_result['deadline'])

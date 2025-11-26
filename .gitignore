@@ -60,31 +60,38 @@ venv.bak/
 .env.local
 .env.*.local
 
-# Database
-*.db
+# Database files
+test_decision_outcomes.db
 *.sqlite
 *.sqlite3
+*.db
 compliance.db
 test.db
 
-# Testing
+# Coverage reports
+coverage.xml
+htmlcov/
 .pytest_cache/
 .coverage
 .coverage.*
-htmlcov/
-coverage.xml
 *.cover
 .hypothesis/
 .tox/
 nosetests.xml
 test-results/
 
-# IDEs
-.vscode/
-.idea/
+# Temporary files
+*.pid
+.backend.pid
+.frontend.pid
+*.tmp
 *.swp
 *.swo
 *~
+
+# IDEs
+.vscode/
+.idea/
 .project
 .pydevproject
 .settings/
@@ -106,11 +113,12 @@ CRITICAL_FIXES_APPLIED.md
 CLEANUP_COMPLETE.md
 DOCUMENTATION_UPDATE_SUMMARY.md
 
-# Logs
+# Log files
+backend.log
+frontend.log
+*.log.*
 *.log
 logs/
-*.log.*
-backend.log
 dashboard.log
 backend_test*.log
 
@@ -151,6 +159,8 @@ ipython_config.py
 
 # FastAPI / uvicorn
 *.pid
+.backend.pid
+.frontend.pid
 
 # Backup files
 *.bak

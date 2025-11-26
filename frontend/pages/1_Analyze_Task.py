@@ -129,7 +129,8 @@ if SessionManager.has_draft("analyze_task"):
             if isinstance(draft_timestamp, str) and "T" in draft_timestamp:
                 dt = datetime.fromisoformat(draft_timestamp.replace("Z", "+00:00"))
                 draft_timestamp = dt.strftime("%Y-%m-%d %H:%M")
-        except:
+        except Exception:
+            # Date parsing failed, use original timestamp
             pass
         
         st.info(f"💾 **Draft found!** Your previous form data has been restored. Last saved: {draft_timestamp}")

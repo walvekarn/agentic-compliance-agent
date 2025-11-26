@@ -62,8 +62,46 @@ async def lifespan(app: FastAPI):
     Application lifespan manager.
     Handles startup and shutdown events.
     """
-    # Startup: Initialize database
+    # Startup: Validate environment
     logger.info("Starting up application...")
+    errors = []
+    warnings = []
+    
+    # Check OpenAI API key
+    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "":
+        errors.append("OPENAI_API_KEY is not set")
+    elif not settings.OPENAI_API_KEY.startswith("sk-"):
+        errors.append("OPENAI_API_KEY format looks invalid (should start with 'sk-')")
+    else:
+        logger.info("✓ OpenAI API key found")
+    
+    # Check secrets
+    if settings.SECRET_KEY == "dev_secret_key_change_me":
+        warnings.append("Using default SECRET_KEY - change in production!")
+    
+    if settings.JWT_SECRET == "dev_jwt_secret_change_me":
+        warnings.append("Using default JWT_SECRET - change in production!")
+    
+    if warnings:
+        logger.warning("⚠️  Environment warnings:")
+        for warning in warnings:
+            logger.warning(f"  • {warning}")
+    
+    if errors:
+        logger.error("=" * 70)
+        logger.error("CRITICAL: Environment validation failed!")
+        logger.error("=" * 70)
+        for error in errors:
+            logger.error(f"  ✗ {error}")
+        logger.error("=" * 70)
+        logger.error("Fix: Create .env file with required variables")
+        logger.error("See .env.example for template")
+        logger.error("=" * 70)
+        # Don't crash, but warn loudly
+    else:
+        logger.info("✓ Environment validation passed")
+    
+    # Initialize database
     try:
         # Create all database tables
         Base.metadata.create_all(bind=engine)

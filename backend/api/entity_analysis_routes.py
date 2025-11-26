@@ -468,12 +468,24 @@ async def analyze_entity(
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Log full stack trace
+        logger.error(f"Entity analysis failed: {str(e)}", exc_info=True)
+        
         from backend.api.error_utils import raise_standardized_error
+        from backend.config import settings
         raise_standardized_error(
             status_code=500,
             error_type="EntityAnalysisError",
             message=f"Entity analysis failed: {str(e)}",
-            details={"error_type": type(e).__name__}
+            details={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "traceback": traceback.format_exc() if settings.DEBUG else None
+            }
         )
 
 

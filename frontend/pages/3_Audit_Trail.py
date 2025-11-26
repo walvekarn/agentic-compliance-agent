@@ -147,8 +147,7 @@ with col1:
 decision_labels = {
     "✅ Go ahead": "AUTONOMOUS",
     "⚠️ Needs review": "REVIEW_REQUIRED",
-    "🚨 Escalate": "ESCALATE",
-    "💬 Response provided": "RESPONSE_PROVIDED"
+    "🚨 Escalate": "ESCALATE"
 }
 decision_code_to_label = {code: label for label, code in decision_labels.items()}
 

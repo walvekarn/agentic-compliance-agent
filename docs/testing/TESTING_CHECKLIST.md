@@ -209,18 +209,7 @@ Use this checklist to verify the system is working correctly after setup or upda
   - Can export data
   - Clicking entry shows details
 
-### 11. Agent Insights
-- [ ] **Agent Insights renders charts**
-  - Navigate to "Agent Insights" page
-  - See dashboard with metrics:
-    - Total decisions
-    - Decision distribution pie chart
-    - Risk score histogram
-    - Timeline chart
-  - Charts render without errors
-  - Data matches audit trail
-
-### 12. Chat Assistant
+### 11. Chat Assistant
 - [ ] **Chat assistant responds**
   - Open chat panel (sidebar or main area)
   - Type message: "What is GDPR?"
@@ -233,17 +222,6 @@ Use this checklist to verify the system is working correctly after setup or upda
   - Try context-aware question after analysis:
     - "Why was this decision autonomous?"
     - Should reference recent analysis
-
-### 13. Compliance Calendar
-- [ ] **Compliance calendar generates**
-  - Navigate to "Compliance Calendar" page
-  - Fill out entity information
-  - Click "Generate Calendar"
-  - Expected:
-    - Calendar displays
-    - Shows upcoming obligations
-    - Deadlines highlighted
-    - Can download as CSV/PDF
 
 ---
 
@@ -291,8 +269,7 @@ Use this checklist to verify the system is working correctly after setup or upda
   3. View result
   4. Check audit trail (result appears)
   5. Ask chat question about result
-  6. Navigate to Agent Insights (metrics updated)
-  7. Generate compliance calendar
+  6. Navigate to Agentic Analysis page
   - All steps complete without errors
 
 ### 18. Data Persistence

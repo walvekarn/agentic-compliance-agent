@@ -177,7 +177,8 @@ class HTTPTool:
                 # Parse response
                 try:
                     response_data = response.json()
-                except:
+                except Exception:
+                    # If JSON parsing fails, use text response
                     response_data = response.text
                 
                 return {

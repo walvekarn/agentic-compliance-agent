@@ -44,16 +44,12 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 graph TB
     subgraph "User Interface Layer"
         USER[👤 User]
-        DASH[Streamlit Dashboard<br/>9 Pages + Chat]
+        DASH[Streamlit Dashboard<br/>5 Core Pages + Chat]
         HOME[Home Dashboard]
         ANALYZE[Analyze Task]
-        CALENDAR[Compliance Calendar]
         AUDIT[Audit Trail]
-        INSIGHTS[Agent Insights]
         AGENTIC[Agentic Analysis]
         TEST[Test Suite]
-        RECOVERY[Error Recovery]
-        BENCHMARKS[Benchmarks]
     end
     
     subgraph "API Gateway Layer"
@@ -105,7 +101,7 @@ graph TB
     end
     
     USER --> DASH
-    DASH --> HOME & ANALYZE & CALENDAR & AUDIT & INSIGHTS & AGENTIC & TEST & RECOVERY & BENCHMARKS
+    DASH --> HOME & ANALYZE & AUDIT & AGENTIC & TEST
     DASH --> API
     API --> AUTH & RATE & CORS
     
@@ -362,13 +358,13 @@ make start
 
 Terminal 1 - Backend:
 ```bash
-cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
+cd /path/to/agentic-compliance-agent
 uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Terminal 2 - Dashboard:
 ```bash
-cd "/Users/nikita/Library/Mobile Documents/com~apple~CloudDocs/Generative AI/Portfolio_Dashboard/Pojects/agentic-compliance-agent"
+cd /path/to/agentic-compliance-agent
 streamlit run frontend/Home.py --server.port 8501
 ```
 
@@ -429,7 +425,14 @@ streamlit run frontend/Home.py --server.port 8501
 
 ## 📸 Screenshots
 
-Screenshots/GIF demo will be added for the 1.3.0 release. Until then, run the app locally (`make start`) to explore the UI. If you prefer placeholders, point your own screenshots to `docs/screenshots/` and update this section.
+Screenshots are not included in this release. Run the app locally (`make start`) to explore the UI. The dashboard focuses on 5 core pages:
+- **Home** - Project overview and quick start
+- **Analyze Task** - Single task analysis with 6-factor risk model
+- **Audit Trail** - Complete decision history and statistics
+- **Agentic Analysis** - Advanced plan-execute-reflect workflow
+- **Agentic Test Suite** - Comprehensive test scenarios
+
+For screenshots, see `docs/screenshots/` directory (if available).
 
 ---
 
@@ -566,10 +569,7 @@ GET    /redoc                              # ReDoc (alternative API docs)
    - Go to "Audit Trail" page
    - **Show:** Complete decision history
    - Filter by entity or decision type
-
-5. **Check Agent Insights**
-   - Go to "Agent Insights" page
-   - **Show:** Analytics, charts, metrics
+   - Show statistics and charts
 
 ### Advanced Demo (10 minutes)
 
@@ -591,12 +591,7 @@ GET    /redoc                              # ReDoc (alternative API docs)
    - Change employee count from 50 to 10,000
    - **Show:** How decision changes
 
-3. **Proactive Suggestions**
-   - Go to "Compliance Calendar" page
-   - Analyze an entity with multiple jurisdictions
-   - **Show:** Proactive deadline alerts
-
-4. **Feedback Loop**
+3. **Feedback Loop**
    - Go to "Analyze Task" page
    - After analysis, provide feedback
    - **Show:** How feedback updates memory
@@ -638,7 +633,7 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - Proactive suggestions
 - What-if analysis
 - Complete audit trail
-- Streamlit dashboard (9 pages)
+- Streamlit dashboard (5 core pages focused on agentic AI)
 - FastAPI backend with JWT auth
 - SQLite database (PostgreSQL-ready)
 - Comprehensive test suite (measured coverage ~33%)
