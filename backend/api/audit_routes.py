@@ -162,6 +162,9 @@ async def get_audit_statistics(
     Returns:
         Statistics about audit trail entries
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         stats = AuditService.get_audit_statistics(
             db=db,
@@ -169,9 +172,21 @@ async def get_audit_statistics(
             end_date=end_date
         )
         
+        # Log the statistics structure for debugging
+        logger.info(f"Statistics returned: total_decisions={stats.get('total_decisions', 0)}, "
+                   f"by_outcome keys={list(stats.get('by_outcome', {}).keys())}, "
+                   f"by_risk_level keys={list(stats.get('by_risk_level', {}).keys())}")
+        
+        # Ensure by_outcome and by_risk_level are always dicts (not None)
+        if stats.get("by_outcome") is None:
+            stats["by_outcome"] = {}
+        if stats.get("by_risk_level") is None:
+            stats["by_risk_level"] = {}
+        
         return stats
         
     except Exception as e:
+        logger.error(f"Failed to retrieve statistics: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve statistics: {str(e)}")
 
 

@@ -886,159 +886,199 @@ except Exception as e:
 render_divider()
 render_section_header("Overall Statistics", icon="📈", level=3)
 
-@st.cache_data(ttl=60)  # Cache for 60 seconds to improve performance
+@st.cache_data(ttl=60, show_spinner=False)  # Cache for 60 seconds to improve performance
 def get_cached_statistics():
     """Cached statistics to improve performance"""
     try:
-        stats_response = APIClient().get("/api/v1/audit/statistics")
+        stats_response = APIClient().get("/api/v1/audit/statistics", timeout=5)
         if stats_response.success and isinstance(stats_response.data, dict):
             return stats_response.data
     except Exception:
         pass
     return None
 
-# Use cached statistics instead of blocking call
-stats = get_cached_statistics()
+# Use cached statistics with non-blocking loading
+stats = None
+try:
+    stats = get_cached_statistics()
+except Exception:
+    pass
+
+# Show loading message if stats not available yet (non-blocking)
+if stats is None:
+    st.info("📊 Loading statistics...")
 
 if stats:
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Decisions", stats.get("total_decisions", 0))
-        with col2:
-            avg_conf = stats.get("average_confidence", 0) * 100
-            st.metric("Avg Confidence", f"{avg_conf:.1f}%")
-        with col3:
-            avg_risk = stats.get("average_risk_score", 0)
-            st.metric("Avg Risk Score", f"{avg_risk*100:.0f}%")
-        with col4:
-            high_risk = stats.get("by_risk_level", {}).get("HIGH", 0)
-            st.metric("High Risk Items", high_risk)
-        
-        # Charts - COMPLETELY REWRITTEN: Direct Plotly rendering with explicit styling
-        st.markdown("### 📊 Decision Statistics")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Decisions by Outcome**")
-            by_outcome = stats.get("by_outcome", {})
-            if by_outcome and isinstance(by_outcome, dict) and len(by_outcome) > 0:
-                try:
-                    import plotly.express as px
-                    df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
-                    fig = px.bar(
-                        df_outcome,
-                        x="Decision",
-                        y="Count",
-                        color="Decision",
-                        color_discrete_map={
-                            "AUTONOMOUS": "#059669",  # Much darker green for visibility
-                            "REVIEW_REQUIRED": "#d97706",  # Much darker orange for visibility
-                            "ESCALATE": "#dc2626"  # Much darker red for visibility
-                        },
-                        labels={"Decision": "Decision Type", "Count": "Number of Decisions"}
-                    )
-                    # FIXED: Much darker colors, thicker borders, better contrast
-                    fig.update_layout(
-                        title={"text": "Decisions by Outcome", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
-                        height=400,
-                        paper_bgcolor='#ffffff',
-                        plot_bgcolor='#ffffff',
-                        font={"color": "#0f172a", "size": 14},
-                        margin=dict(l=60, r=20, t=50, b=60),
-                        xaxis={
-                            "title": {"text": "Decision Type", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                            "tickfont": {"color": "#0f172a", "size": 12},
-                            "gridcolor": "#64748b",
-                            "showline": True,
-                            "linecolor": "#475569",
-                            "linewidth": 3
-                        },
-                        yaxis={
-                            "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                            "tickfont": {"color": "#0f172a", "size": 12},
-                            "gridcolor": "#64748b",
-                            "showline": True,
-                            "linecolor": "#475569",
-                            "linewidth": 3
-                        },
-                        showlegend=False
-                    )
-                    # FIXED: Add thick borders to bars and dark text
-                    fig.update_traces(
-                        marker_line_width=3,
-                        marker_line_color="#0f172a",
-                        textfont_color="#0f172a",
-                        textfont_size=14
-                    )
-                    st.plotly_chart(fig, use_container_width=True, key="audit_outcome_chart")
-                except Exception as e:
-                    st.error(f"Chart rendering error: {str(e)}")
-                    st.info("📊 Chart data: " + str(by_outcome))
-            else:
-                st.info("📊 No outcome data available for chart.")
-        
-        with col2:
-            st.markdown("**Decisions by Risk Level**")
-            by_risk = stats.get("by_risk_level", {})
-            if by_risk and isinstance(by_risk, dict) and len(by_risk) > 0:
-                try:
-                    import plotly.express as px
-                    df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
-                    fig = px.bar(
-                        df_risk,
-                        x="Risk Level",
-                        y="Count",
-                        color="Risk Level",
-                        color_discrete_map={
-                            "LOW": "#059669",  # Much darker green for visibility
-                            "MEDIUM": "#d97706",  # Much darker orange for visibility
-                            "HIGH": "#dc2626"  # Much darker red for visibility
-                        },
-                        labels={"Risk Level": "Risk Level", "Count": "Number of Decisions"}
-                    )
-                    # FIXED: Much darker colors, thicker borders, better contrast
-                    fig.update_layout(
-                        title={"text": "Decisions by Risk Level", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
-                        height=400,
-                        paper_bgcolor='#ffffff',
-                        plot_bgcolor='#ffffff',
-                        font={"color": "#0f172a", "size": 14},
-                        margin=dict(l=60, r=20, t=50, b=60),
-                        xaxis={
-                            "title": {"text": "Risk Level", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                            "tickfont": {"color": "#0f172a", "size": 12},
-                            "gridcolor": "#64748b",
-                            "showline": True,
-                            "linecolor": "#475569",
-                            "linewidth": 3
-                        },
-                        yaxis={
-                            "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                            "tickfont": {"color": "#0f172a", "size": 12},
-                            "gridcolor": "#64748b",
-                            "showline": True,
-                            "linecolor": "#475569",
-                            "linewidth": 3
-                        },
-                        showlegend=False
-                    )
-                    # FIXED: Add thick borders to bars and dark text
-                    fig.update_traces(
-                        marker_line_width=3,
-                        marker_line_color="#0f172a",
-                        textfont_color="#0f172a",
-                        textfont_size=14
-                    )
-                    st.plotly_chart(fig, use_container_width=True, key="audit_risk_chart")
-                except Exception as e:
-                    st.error(f"Chart rendering error: {str(e)}")
-                    st.info("📊 Chart data: " + str(by_risk))
-            else:
-                st.info("📊 No risk level data available for chart.")
+    # Verify stats is a dictionary
+    if not isinstance(stats, dict):
+        st.warning(f"⚠️ Unexpected statistics format: {type(stats)}")
+        stats = None
+
+if stats and isinstance(stats, dict):
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Decisions", stats.get("total_decisions", 0))
+    with col2:
+        avg_conf = stats.get("average_confidence", 0) or 0
+        st.metric("Avg Confidence", f"{avg_conf * 100:.1f}%")
+    with col3:
+        avg_risk = stats.get("average_risk_score", 0) or 0
+        st.metric("Avg Risk Score", f"{avg_risk * 100:.0f}%")
+    with col4:
+        by_risk_level = stats.get("by_risk_level", {})
+        high_risk = by_risk_level.get("HIGH", 0) if isinstance(by_risk_level, dict) else 0
+        st.metric("High Risk Items", high_risk)
+    
+    # Charts - COMPLETELY REWRITTEN: Direct Plotly rendering with explicit styling
+    st.markdown("### 📊 Decision Statistics")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Decisions by Outcome**")
+        by_outcome = stats.get("by_outcome", {})
+        # Explicit null checks
+        if by_outcome is None:
+            st.info("📊 No outcome data available. Statistics may still be loading or there are no audit entries yet.")
+        elif not isinstance(by_outcome, dict):
+            st.warning(f"⚠️ Unexpected by_outcome format: {type(by_outcome)}. Expected dict, got {type(by_outcome)}")
+            st.info(f"📊 Raw data: {str(by_outcome)[:200]}")
+        elif len(by_outcome) == 0:
+            st.info("📊 No outcome data available for chart. This means there are no audit entries in the database yet. Submit a task analysis to generate audit data.")
+        else:
+            try:
+                import plotly.express as px
+                df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
+                # Verify DataFrame is not empty
+                if df_outcome.empty:
+                    st.info("📊 No outcome data available for chart.")
+                else:
+                        fig = px.bar(
+                            df_outcome,
+                            x="Decision",
+                            y="Count",
+                            color="Decision",
+                            color_discrete_map={
+                                "AUTONOMOUS": "#059669",  # Much darker green for visibility
+                                "REVIEW_REQUIRED": "#d97706",  # Much darker orange for visibility
+                                "ESCALATE": "#dc2626"  # Much darker red for visibility
+                            },
+                            labels={"Decision": "Decision Type", "Count": "Number of Decisions"}
+                        )
+                        # FIXED: Much darker colors, thicker borders, better contrast
+                        fig.update_layout(
+                            title={"text": "Decisions by Outcome", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
+                            height=400,
+                            paper_bgcolor='#ffffff',
+                            plot_bgcolor='#ffffff',
+                            font={"color": "#0f172a", "size": 14},
+                            margin=dict(l=60, r=20, t=50, b=60),
+                            xaxis={
+                                "title": {"text": "Decision Type", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                                "tickfont": {"color": "#0f172a", "size": 12},
+                                "gridcolor": "#64748b",
+                                "showline": True,
+                                "linecolor": "#475569",
+                                "linewidth": 3
+                            },
+                            yaxis={
+                                "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                                "tickfont": {"color": "#0f172a", "size": 12},
+                                "gridcolor": "#64748b",
+                                "showline": True,
+                                "linecolor": "#475569",
+                                "linewidth": 3
+                            },
+                            showlegend=False
+                        )
+                        # FIXED: Add thick borders to bars and dark text
+                        fig.update_traces(
+                            marker_line_width=3,
+                            marker_line_color="#0f172a",
+                            textfont_color="#0f172a",
+                            textfont_size=14
+                        )
+                        st.plotly_chart(fig, use_container_width=True, key="audit_outcome_chart")
+            except Exception as e:
+                st.error(f"Chart rendering error: {str(e)}")
+                import traceback
+                with st.expander("🔍 Error Details"):
+                    st.code(traceback.format_exc())
+                st.info(f"📊 Chart data: {str(by_outcome)}")
+    
+    with col2:
+        st.markdown("**Decisions by Risk Level**")
+        by_risk = stats.get("by_risk_level", {})
+        # Explicit null checks
+        if by_risk is None:
+            st.info("📊 No risk level data available. Statistics may still be loading or there are no audit entries yet.")
+        elif not isinstance(by_risk, dict):
+            st.warning(f"⚠️ Unexpected by_risk_level format: {type(by_risk)}. Expected dict, got {type(by_risk)}")
+            st.info(f"📊 Raw data: {str(by_risk)[:200]}")
+        elif len(by_risk) == 0:
+            st.info("📊 No risk level data available for chart. This means there are no audit entries with risk levels in the database yet. Submit a task analysis to generate audit data.")
+        else:
+            try:
+                import plotly.express as px
+                df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
+                # Verify DataFrame is not empty
+                if df_risk.empty:
+                    st.info("📊 No risk level data available for chart.")
+                else:
+                        fig = px.bar(
+                            df_risk,
+                            x="Risk Level",
+                            y="Count",
+                            color="Risk Level",
+                            color_discrete_map={
+                                "LOW": "#059669",  # Much darker green for visibility
+                                "MEDIUM": "#d97706",  # Much darker orange for visibility
+                                "HIGH": "#dc2626"  # Much darker red for visibility
+                            },
+                            labels={"Risk Level": "Risk Level", "Count": "Number of Decisions"}
+                        )
+                        # FIXED: Much darker colors, thicker borders, better contrast
+                        fig.update_layout(
+                            title={"text": "Decisions by Risk Level", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
+                            height=400,
+                            paper_bgcolor='#ffffff',
+                            plot_bgcolor='#ffffff',
+                            font={"color": "#0f172a", "size": 14},
+                            margin=dict(l=60, r=20, t=50, b=60),
+                            xaxis={
+                                "title": {"text": "Risk Level", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                                "tickfont": {"color": "#0f172a", "size": 12},
+                                "gridcolor": "#64748b",
+                                "showline": True,
+                                "linecolor": "#475569",
+                                "linewidth": 3
+                            },
+                            yaxis={
+                                "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                                "tickfont": {"color": "#0f172a", "size": 12},
+                                "gridcolor": "#64748b",
+                                "showline": True,
+                                "linecolor": "#475569",
+                                "linewidth": 3
+                            },
+                            showlegend=False
+                        )
+                        # FIXED: Add thick borders to bars and dark text
+                        fig.update_traces(
+                            marker_line_width=3,
+                            marker_line_color="#0f172a",
+                            textfont_color="#0f172a",
+                            textfont_size=14
+                        )
+                        st.plotly_chart(fig, use_container_width=True, key="audit_risk_chart")
+            except Exception as e:
+                st.error(f"Chart rendering error: {str(e)}")
+                import traceback
+                with st.expander("🔍 Error Details"):
+                    st.code(traceback.format_exc())
+                st.info(f"📊 Chart data: {str(by_risk)}")
 else:
-    st.info("Statistics not available at this time.")
+    st.info("📊 Statistics not available at this time. This could mean:\n- The backend is still loading\n- There are no audit entries in the database yet\n- The API endpoint is not responding\n\nTry submitting a task analysis first to generate audit data.")
 
 # Sidebar: Export History and Chat Assistant
 with st.sidebar:

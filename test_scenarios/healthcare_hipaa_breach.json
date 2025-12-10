@@ -1,4 +1,5 @@
 {
+  "_comment": "Data breaches are INCIDENT_RESPONSE scenarios, not DATA_PRIVACY. INCIDENT_RESPONSE always escalates (see decision_engine.py line 430-435). Risk score 0.706 correctly classified as HIGH.",
   "title": "Healthcare HIPAA Data Breach Report",
   "description": "Healthcare company reporting a data breach requiring HIPAA notification",
   "input": {
@@ -14,7 +15,7 @@
     },
     "task": {
       "description": "Report a data breach involving patient PHI to HHS and affected individuals under HIPAA breach notification requirements",
-      "category": "DATA_PRIVACY"
+      "category": "INCIDENT_RESPONSE"
     }
   },
   "expected_decision": "ESCALATE",

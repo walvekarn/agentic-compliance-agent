@@ -13,6 +13,9 @@ from typing import Dict, Any, Optional, Tuple, Union, List
 import time
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from urllib3.poolmanager import PoolManager
 import streamlit as st
 from .constants import API_BASE_URL, API_TIMEOUT
 from .auth_utils import get_auth_headers, refresh_tokens_if_needed, logout, is_authenticated
@@ -41,11 +44,25 @@ class APIResponse:
 class APIClient:
     """Centralized API client with consistent auth, retries, and error handling."""
 
-    def __init__(self, base_url: str = API_BASE_URL, timeout: int = API_TIMEOUT, max_retries: int = 3, backoff_base: float = 0.4):
+    def __init__(self, base_url: str = API_BASE_URL, timeout: int = 10, max_retries: int = 3, backoff_base: float = 0.2):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
         self.backoff_base = backoff_base
+        # Create session with connection pooling
+        self._session = requests.Session()
+        # Configure connection pooling
+        adapter = HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=20,
+            max_retries=Retry(
+                total=0,  # We handle retries manually
+                backoff_factor=0,
+                status_forcelist=[]
+            )
+        )
+        self._session.mount('http://', adapter)
+        self._session.mount('https://', adapter)
 
     def _build_url(self, endpoint: str) -> str:
         if endpoint.startswith("http://") or endpoint.startswith("https://"):
@@ -121,7 +138,8 @@ class APIClient:
         headers = kwargs.pop("headers", {}) or {}
         if inject_auth:
             headers = {**headers, **get_auth_headers()}
-        return requests.request(method, url, headers=headers, timeout=timeout, **kwargs)
+        # Use session for connection pooling
+        return self._session.request(method, url, headers=headers, timeout=timeout, **kwargs)
 
     def _make_request(self, method: str, endpoint: str, inject_auth: bool = True, **kwargs) -> APIResponse:
         url = self._build_url(endpoint)
@@ -436,11 +454,21 @@ def parseAgenticResponse(response: APIResponse) -> Tuple[str, Optional[Dict[str,
         return status, results, error, timestamp
     
     # Handle direct agentic response format (has status but no results wrapper)
+    # Agentic analyze endpoint returns: {status, plan, step_outputs, reflections, final_recommendation, ...}
     status = data.get("status", "unknown")
-    if status in ["completed", "timeout", "error", "partial"]:
+    
+    # Check if this looks like an agentic response (has plan, step_outputs, etc.)
+    has_agentic_fields = any(key in data for key in ["plan", "step_outputs", "reflections", "final_recommendation"])
+    
+    if status in ["completed", "timeout", "error", "partial"] or has_agentic_fields:
         # For agentic endpoints, the entire data is the results
         timestamp = data.get("timestamp") or data.get("execution_metrics", {}).get("timestamp")
         error = data.get("error") if status == "error" else None
+        
+        # If status is "unknown" but we have agentic fields, assume completed
+        if status == "unknown" and has_agentic_fields:
+            status = "completed"
+        
         return status, data, error, timestamp
     
     # Fallback: treat as completed if we have data

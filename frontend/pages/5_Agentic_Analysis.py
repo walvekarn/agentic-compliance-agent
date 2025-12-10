@@ -262,29 +262,75 @@ if st.session_state.get("agentic_analysis_in_progress") and st.session_state.get
         try:
             response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=130)
             
+            # DEBUG: Show raw response for troubleshooting
+            with st.expander("🔍 Debug: API Response", expanded=False):
+                st.json({
+                    "success": response.success,
+                    "error": response.error,
+                    "status_code": response.status_code,
+                    "data_keys": list(response.data.keys()) if response.data and isinstance(response.data, dict) else None,
+                    "data_sample": {k: str(v)[:200] for k, v in (response.data.items() if response.data and isinstance(response.data, dict) else {})} if response.data else None
+                })
+            
             if response.success and response.data:
                 status, results, error, timestamp = parseAgenticResponse(response)
+                
+                # DEBUG: Show parsed response
+                with st.expander("🔍 Debug: Parsed Response", expanded=False):
+                    st.json({
+                        "status": status,
+                        "error": error,
+                        "timestamp": timestamp,
+                        "results_type": type(results).__name__,
+                        "results_keys": list(results.keys()) if results and isinstance(results, dict) else None,
+                        "has_plan": bool(results.get("plan") if results and isinstance(results, dict) else False),
+                        "has_step_outputs": bool(results.get("step_outputs") if results and isinstance(results, dict) else False),
+                        "has_reflections": bool(results.get("reflections") if results and isinstance(results, dict) else False),
+                        "has_final_recommendation": bool(results.get("final_recommendation") if results and isinstance(results, dict) else False)
+                    })
                 
                 # FIXED: Show results even if status is not "completed" or if some fields are missing
                 if results and isinstance(results, dict):
                     # Check if we have any meaningful data to show
-                    has_plan = results.get("plan") and len(results.get("plan", [])) > 0
-                    has_outputs = results.get("step_outputs") and len(results.get("step_outputs", [])) > 0
-                    has_reflections = results.get("reflections") and len(results.get("reflections", [])) > 0
-                    has_recommendation = results.get("final_recommendation") and results.get("final_recommendation") != "No recommendation available"
+                    # More lenient checks - accept results if status is completed or if we have any data at all
+                    has_plan = bool(results.get("plan")) and (isinstance(results.get("plan"), list) and len(results.get("plan", [])) > 0)
+                    has_outputs = bool(results.get("step_outputs")) and (isinstance(results.get("step_outputs"), list) and len(results.get("step_outputs", [])) > 0)
+                    has_reflections = bool(results.get("reflections")) and (isinstance(results.get("reflections"), list) and len(results.get("reflections", [])) > 0)
+                    has_recommendation = bool(results.get("final_recommendation")) and str(results.get("final_recommendation", "")).strip() and results.get("final_recommendation") != "No recommendation available"
                     
-                    if has_plan or has_outputs or has_reflections or has_recommendation or status == "completed":
+                    # Accept results if status is completed, or if we have any meaningful data
+                    # Also accept if status is "partial" (partial results are still useful)
+                    should_display = (
+                        status == "completed" or 
+                        status == "partial" or
+                        has_plan or 
+                        has_outputs or 
+                        has_reflections or 
+                        has_recommendation
+                    )
+                    
+                    if should_display:
                         st.session_state.agentic_results = results
                         del st.session_state["agentic_request_payload"]
                         st.session_state["agentic_analysis_in_progress"] = False
                         if status != "completed":
                             st.warning(f"⚠️ **Partial Results**: Analysis status is '{status}'. Some data may be incomplete.")
+                        # Force rerun to display results
                         st.rerun()
                     else:
                         # No meaningful data
                         del st.session_state["agentic_request_payload"]
                         st.session_state["agentic_analysis_in_progress"] = False
                         st.error(f"❌ **No Results**: {error or 'Analysis completed but returned no data'}")
+                        # Show debug info
+                        st.json({
+                            "status": status,
+                            "has_plan": has_plan,
+                            "has_outputs": has_outputs,
+                            "has_reflections": has_reflections,
+                            "has_recommendation": has_recommendation,
+                            "results_keys": list(results.keys()) if results else None
+                        })
                 elif status == "timeout":
                     del st.session_state["agentic_request_payload"]
                     st.session_state["agentic_analysis_in_progress"] = False
@@ -323,8 +369,20 @@ if st.session_state.get("agentic_analysis_in_progress") and st.session_state.get
 # ============================================================================
 # DISPLAY RESULTS
 # ============================================================================
-if st.session_state.get("agentic_results"):
-    results = st.session_state.agentic_results
+agentic_results = st.session_state.get("agentic_results")
+if agentic_results:
+    results = agentic_results
+    
+    # DEBUG: Show what we're displaying
+    with st.expander("🔍 Debug: Displaying Results", expanded=False):
+        st.json({
+            "results_type": type(results).__name__,
+            "results_keys": list(results.keys()) if isinstance(results, dict) else None,
+            "plan_count": len(results.get("plan", [])) if isinstance(results, dict) else 0,
+            "step_outputs_count": len(results.get("step_outputs", [])) if isinstance(results, dict) else 0,
+            "reflections_count": len(results.get("reflections", [])) if isinstance(results, dict) else 0,
+            "has_final_recommendation": bool(results.get("final_recommendation")) if isinstance(results, dict) else False
+        })
     
     st.markdown("---")
     st.markdown("## 📊 Analysis Results")

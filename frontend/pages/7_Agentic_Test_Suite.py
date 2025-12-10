@@ -11,6 +11,33 @@ from datetime import datetime
 import json
 import pandas as pd
 import altair as alt
+
+# Configure Altair for light theme
+alt.themes.enable('default')  # Use default light theme
+
+# Or configure explicitly:
+def light_theme():
+    return {
+        'config': {
+            'view': {'continuousWidth': 400, 'continuousHeight': 300},
+            'background': '#ffffff',
+            'title': {'color': '#1e293b'},
+            'axis': {
+                'labelColor': '#1e293b',
+                'titleColor': '#1e293b',
+                'gridColor': '#e2e8f0',
+                'domainColor': '#64748b'
+            },
+            'legend': {
+                'labelColor': '#1e293b',
+                'titleColor': '#1e293b'
+            }
+        }
+    }
+
+alt.themes.register('light_compliance', light_theme)
+alt.themes.enable('light_compliance')
+
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
