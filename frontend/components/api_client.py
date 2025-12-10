@@ -164,9 +164,27 @@ class APIClient:
                 error_msg = self._get_error_message(resp.status_code, resp.text)
                 try:
                     error_data = resp.json()
-                    parsed_error = self._parse_error_response(error_data)
-                    if parsed_error:
-                        error_msg = parsed_error
+                    # Check if error_data is a dict with "detail" key (FastAPI error format)
+                    if isinstance(error_data, dict) and "detail" in error_data:
+                        detail = error_data["detail"]
+                        # Handle nested dict details (e.g., timeout responses)
+                        if isinstance(detail, dict):
+                            if "message" in detail:
+                                error_msg = detail["message"]
+                            elif "status" in detail and detail.get("status") == "timeout":
+                                error_msg = f"⏱️ Timeout: {detail.get('message', 'Operation timed out')}"
+                            else:
+                                # Try to parse as nested error
+                                parsed_error = self._parse_error_response(detail)
+                                if parsed_error:
+                                    error_msg = parsed_error
+                        else:
+                            error_msg = str(detail)
+                    else:
+                        # Try standard error parsing
+                        parsed_error = self._parse_error_response(error_data)
+                        if parsed_error:
+                            error_msg = parsed_error
                 except (ValueError, AttributeError):
                     # If JSON parsing fails, use default error message
                     pass
@@ -395,12 +413,15 @@ def parseAgenticResponse(response: APIResponse) -> Tuple[str, Optional[Dict[str,
     
     Standardized format: {status, results, error, timestamp}
     Direct format: {status, plan, step_outputs, ...} (agentic endpoints)
+    
+    Returns: (status, results, error, timestamp)
     """
     if not response or not response.success:
-        return None, None, response.error if response else "Unknown error", None
+        error_msg = response.error if response else "Unknown error"
+        return "error", None, error_msg, None
     
     if not response.data:
-        return None, None, "No data in response", None
+        return "error", None, "No data in response", None
     
     data = response.data if isinstance(response.data, dict) else {}
     
@@ -411,7 +432,7 @@ def parseAgenticResponse(response: APIResponse) -> Tuple[str, Optional[Dict[str,
         error = data.get("error")
         timestamp = data.get("timestamp")
         if status not in ["completed", "timeout", "error"]:
-            return None, None, f"Invalid status: {status}", timestamp
+            return "error", None, f"Invalid status: {status}", timestamp
         return status, results, error, timestamp
     
     # Handle direct agentic response format (has status but no results wrapper)
@@ -426,7 +447,7 @@ def parseAgenticResponse(response: APIResponse) -> Tuple[str, Optional[Dict[str,
     if data:
         return "completed", data, None, None
     
-    return None, None, "Invalid response format", None
+    return "error", None, "Invalid response format", None
 
 
 def display_api_error(response: APIResponse):

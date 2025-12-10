@@ -459,7 +459,8 @@ async def analyze_with_agentic_engine(
                 metadata={
                     "api_endpoint": "/agentic/analyze",
                     "max_iterations": request.max_iterations,
-                    "task_category": request.task.task_category
+                    "task_category": request.task.task_category,
+                    "original_task_description": request.task.task_description
                 }
             )
         except Exception as audit_error:

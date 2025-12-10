@@ -7,7 +7,7 @@ Streamlined orchestrator for task analysis.
 import streamlit as st
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 
 # Add frontend directory to path
 frontend_dir = Path(__file__).parent.parent
@@ -32,6 +32,7 @@ from components.ui_helpers import (
     render_page_header,
     render_info_box
 )
+from components.chat_assistant import render_chat_panel
 
 # Page config
 st.set_page_config(page_title="Check a Task", page_icon="✅", layout="wide")
@@ -79,35 +80,117 @@ if SessionManager.has_results():
 action_col1, action_col2, action_col3 = st.columns([1, 1, 3])
 with action_col1:
     if st.button("⚡ Load Example", width="stretch"):
+        # Prepare example values with deadline_date as a date object
+        from datetime import datetime, timedelta
+        example_values = EXAMPLE_FORM_VALUES.copy()
+        # Set deadline_date to 30 days from now as a date object
+        example_values["deadline_date"] = (datetime.now() + timedelta(days=30)).date()
+        
         # Save example values to form data and draft
-        SessionManager.save_form_data(EXAMPLE_FORM_VALUES)
-        SessionManager.save_draft(EXAMPLE_FORM_VALUES, "analyze_task")
-        # Push example values into widget state so they render immediately
-        st.session_state.company_name_input = EXAMPLE_FORM_VALUES["company_name"]
-        st.session_state.company_type_select = EXAMPLE_FORM_VALUES["company_type"]
-        st.session_state.industry_select = EXAMPLE_FORM_VALUES["industry"]
-        st.session_state.locations_multiselect = EXAMPLE_FORM_VALUES["locations"]
-        st.session_state.task_description_textarea = EXAMPLE_FORM_VALUES["task_description"]
-        st.session_state.task_type_select = EXAMPLE_FORM_VALUES["task_type"]
-        st.session_state.deadline_date_input = None
-        st.session_state.impact_level_select = EXAMPLE_FORM_VALUES["impact_level"]
-        st.session_state.people_affected_input = EXAMPLE_FORM_VALUES["people_affected"]
-        st.session_state.employee_count_input = EXAMPLE_FORM_VALUES["employee_count"]
+        SessionManager.save_form_data(example_values)
+        SessionManager.save_draft(example_values, "analyze_task")
+        
+        # Clear widget session state keys BEFORE setting new values to avoid modification errors
+        widget_keys_to_clear = [
+            "company_name_input",
+            "company_type_select",
+            "industry_select",
+            "locations_multiselect",
+            "task_description_textarea",
+            "task_type_select",
+            "deadline_date_input",
+            "impact_level_select",
+            "people_affected_input",
+            "employee_count_input",
+            "handles_data_checkbox",
+            "is_regulated_checkbox",
+            "involves_personal_checkbox",
+            "involves_financial_checkbox",
+            "crosses_borders_checkbox",
+            "has_deadline_checkbox",
+            "multiselect_state_locations_multiselect",
+            "locations_multiselect_select_all_toggle"
+        ]
+        for key in widget_keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Set session state for all widget keys to ensure they're populated
+        st.session_state["company_name_input"] = example_values.get("company_name", "")
+        
+        company_type = example_values.get("company_type", COMPANY_TYPE_OPTIONS[0])
+        if company_type in COMPANY_TYPE_OPTIONS:
+            st.session_state["company_type_select"] = company_type
+        else:
+            st.session_state["company_type_select"] = COMPANY_TYPE_OPTIONS[0]
+        
+        industry = example_values.get("industry", INDUSTRY_OPTIONS[0])
+        if industry in INDUSTRY_OPTIONS:
+            st.session_state["industry_select"] = industry
+        else:
+            st.session_state["industry_select"] = INDUSTRY_OPTIONS[0]
+        
+        st.session_state["employee_count_input"] = example_values.get("employee_count", "")
+        
+        # Initialize multiselect widget state BEFORE widget is created
+        locations_list = example_values.get("locations", [])
+        valid_locations = [loc for loc in locations_list if loc in LOCATION_OPTIONS]
+        st.session_state["locations_multiselect"] = valid_locations
+        st.session_state["multiselect_state_locations_multiselect"] = valid_locations
+        
+        st.session_state["task_description_textarea"] = example_values.get("task_description", "")
+        
+        task_type = example_values.get("task_type", TASK_TYPE_OPTIONS[0])
+        if task_type in TASK_TYPE_OPTIONS:
+            st.session_state["task_type_select"] = task_type
+        else:
+            st.session_state["task_type_select"] = TASK_TYPE_OPTIONS[0]
+        
+        # Handle deadline date - convert to date object if needed
+        has_deadline = example_values.get("has_deadline", False)
+        st.session_state["has_deadline_checkbox"] = has_deadline
+        
+        if has_deadline:
+            deadline_date = example_values.get("deadline_date")
+            if deadline_date:
+                if isinstance(deadline_date, str):
+                    try:
+                        deadline_date = datetime.fromisoformat(deadline_date).date()
+                    except (ValueError, AttributeError):
+                        deadline_date = (datetime.now() + timedelta(days=30)).date()
+                elif not isinstance(deadline_date, date):
+                    deadline_date = (datetime.now() + timedelta(days=30)).date()
+                st.session_state["deadline_date_input"] = deadline_date
+            else:
+                st.session_state["deadline_date_input"] = (datetime.now() + timedelta(days=30)).date()
+        else:
+            st.session_state["deadline_date_input"] = (datetime.now() + timedelta(days=30)).date()
+        
+        # Set other checkbox states
+        st.session_state["handles_data_checkbox"] = example_values.get("handles_data", False)
+        st.session_state["is_regulated_checkbox"] = example_values.get("is_regulated", False)
+        st.session_state["involves_personal_checkbox"] = example_values.get("involves_personal", False)
+        st.session_state["involves_financial_checkbox"] = example_values.get("involves_financial", False)
+        st.session_state["crosses_borders_checkbox"] = example_values.get("crosses_borders", False)
+        
+        # Set impact level
+        impact_level = example_values.get("impact_level", IMPACT_OPTIONS[0])
+        if impact_level in IMPACT_OPTIONS:
+            st.session_state["impact_level_select"] = impact_level
+        else:
+            st.session_state["impact_level_select"] = IMPACT_OPTIONS[0]
+        
+        st.session_state["people_affected_input"] = example_values.get("people_affected", "")
+        
         # Clear any previous form errors
         if "form_errors" in st.session_state:
             del st.session_state.form_errors
         if "form_warnings" in st.session_state:
             del st.session_state.form_warnings
-        # Clear multiselect state to force example defaults to show
-        for key in [
-            "locations_multiselect",
-            "multiselect_state_locations_multiselect"
-        ]:
-            if key in st.session_state:
-                del st.session_state[key]
-        # Force immediate rerun to show the data
+        
+        # Set flag to use example values on next render
         st.session_state["example_loaded"] = True
-        st.success("✅ Example data loaded! Scroll down to see the form.")
+        st.success("✅ Example data loaded! The form fields should now be populated.")
         st.rerun()
 with action_col2:
     if st.button("🔄 Reset Form", width="stretch"):
@@ -148,6 +231,21 @@ else:
 # If user just clicked Load Example, ensure defaults are the example values
 if st.session_state.get("example_loaded"):
     form_defaults = {**EXAMPLE_FORM_VALUES}
+    # Ensure deadline_date is a date object when has_deadline is True
+    if form_defaults.get("has_deadline"):
+        if not form_defaults.get("deadline_date"):
+            from datetime import datetime, timedelta
+            form_defaults["deadline_date"] = (datetime.now() + timedelta(days=30)).date()
+        elif isinstance(form_defaults["deadline_date"], str):
+            # Convert string date to date object
+            try:
+                form_defaults["deadline_date"] = datetime.fromisoformat(form_defaults["deadline_date"]).date()
+            except (ValueError, AttributeError):
+                from datetime import datetime, timedelta
+                form_defaults["deadline_date"] = (datetime.now() + timedelta(days=30)).date()
+    # Ensure locations match valid LOCATION_OPTIONS
+    if form_defaults.get("locations"):
+        form_defaults["locations"] = [loc for loc in form_defaults["locations"] if loc in LOCATION_OPTIONS]
 
 # ============================================================================
 # MAIN FORM
@@ -447,6 +545,55 @@ if SessionManager.has_results():
         st.rerun()
 
 # ============================================================================
+# SIDEBAR: CHAT ASSISTANT
+# ============================================================================
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("## 💬 AI Chat Assistant")
+    st.caption("Ask questions about the form or your compliance task")
+    
+    # Collect current form data for context from session state or current form values
+    form_data_for_context = {}
+    
+    # Try to get from session state first (saved form data)
+    saved_form = SessionManager.get_form_data()
+    if saved_form:
+        form_data_for_context.update({
+            'company_name': saved_form.get('company_name', ''),
+            'company_type': saved_form.get('company_type', ''),
+            'industry': saved_form.get('industry', ''),
+            'locations': saved_form.get('locations', []),
+            'task_description': saved_form.get('task_description', ''),
+            'task_type': saved_form.get('task_type', '')
+        })
+    
+    # Also get current form values from session state (if form has been filled)
+    if st.session_state.get("company_name_input"):
+        form_data_for_context['company_name'] = st.session_state.get("company_name_input", "")
+    if st.session_state.get("company_type_select"):
+        form_data_for_context['company_type'] = st.session_state.get("company_type_select", "")
+    if st.session_state.get("industry_select"):
+        form_data_for_context['industry'] = st.session_state.get("industry_select", "")
+    if st.session_state.get("locations_multiselect"):
+        form_data_for_context['locations'] = st.session_state.get("locations_multiselect", [])
+    if st.session_state.get("task_description_textarea"):
+        form_data_for_context['task_description'] = st.session_state.get("task_description_textarea", "")
+    if st.session_state.get("task_type_select"):
+        form_data_for_context['task_type'] = st.session_state.get("task_type_select", "")
+    
+    # Get entity name for context
+    entity_name = form_data_for_context.get("company_name", "") or "Your Company"
+    task_desc = form_data_for_context.get("task_description", "") or "Compliance task analysis"
+    
+    # Render chat panel with form context
+    render_chat_panel(context_data={
+        "page": "Analyze Task",
+        "entity_name": entity_name,
+        "task_description": task_desc,
+        "form_data": form_data_for_context
+    })
+
+# ============================================================================
 # HELP SECTION
 # ============================================================================
 st.markdown("---")
@@ -464,4 +611,6 @@ with st.expander("❓ Need Help?"):
     - Tell us if there's a deadline
     
     **Get Your Answer**: Click the button and the AI will analyze your situation instantly.
+    
+    **💬 Need Help?** Use the AI Chat Assistant in the sidebar to ask questions about the form fields or get guidance on your specific situation.
     """)

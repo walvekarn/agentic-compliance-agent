@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from io import BytesIO
 from .api_client import APIClient, display_api_error
 
@@ -175,44 +175,74 @@ End of Report
         return pdf_content.encode('utf-8')
 
 
-def create_excel_from_dataframe(df: pd.DataFrame, sheet_name: str = "Data") -> bytes:
+def create_csv_from_dataframe(df: pd.DataFrame) -> bytes:
     """
-    Create Excel file with formatting from DataFrame
+    Create CSV file from DataFrame as fallback when Excel is not available
+    
+    Args:
+        df: Pandas DataFrame
+    
+    Returns:
+        CSV file as bytes
+    """
+    output = BytesIO()
+    df.to_csv(output, index=False, encoding='utf-8')
+    output.seek(0)
+    return output.getvalue()
+
+
+def create_excel_from_dataframe(df: pd.DataFrame, sheet_name: str = "Data") -> Tuple[bytes, str]:
+    """
+    Create Excel file with formatting from DataFrame.
+    Falls back to CSV if xlsxwriter is not available.
     
     Args:
         df: Pandas DataFrame
         sheet_name: Name for Excel sheet
     
     Returns:
-        Excel file as bytes
+        Tuple of (file_data as bytes, mime_type as str)
     """
-    output = BytesIO()
-    
-    # Create Excel writer with xlsxwriter engine for formatting
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name=sheet_name, index=False)
-        
-        # Get workbook and worksheet objects
-        workbook = writer.book
-        worksheet = writer.sheets[sheet_name]
-        
-        # Add formatting
-        header_format = workbook.add_format({
-            'bold': True,
-            'bg_color': '#4B5563',
-            'font_color': '#FFFFFF',
-            'border': 1
-        })
-        
-        # Apply header format
-        for col_num, value in enumerate(df.columns.values):
-            worksheet.write(0, col_num, value, header_format)
-            # Auto-adjust column width
-            column_len = max(df[value].astype(str).map(len).max(), len(value)) + 2
-            worksheet.set_column(col_num, col_num, min(column_len, 50))
-    
-    output.seek(0)
-    return output.getvalue()
+    try:
+        import xlsxwriter
+
+        output = BytesIO()
+
+        # Create Excel writer with xlsxwriter engine for formatting
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            # Get workbook and worksheet objects
+            workbook = writer.book
+            worksheet = writer.sheets[sheet_name]
+
+            # Add formatting
+            header_format = workbook.add_format({
+                'bold': True,
+                'bg_color': '#4B5563',
+                'font_color': '#FFFFFF',
+                'border': 1
+            })
+
+            # Apply header format
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+                # Auto-adjust column width
+                column_len = max(df[value].astype(str).map(len).max(), len(value)) + 2
+                worksheet.set_column(col_num, col_num, min(column_len, 50))
+
+        output.seek(0)
+        return output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    except ImportError:
+        # Fallback to CSV if xlsxwriter is not available
+        csv_data = create_csv_from_dataframe(df)
+        return csv_data, "text/csv"
+    except Exception as e:
+        # If any other error occurs, fall back to CSV
+        st.warning(f"⚠️ Excel export failed: {str(e)}. Falling back to CSV format.")
+        csv_data = create_csv_from_dataframe(df)
+        return csv_data, "text/csv"
 
 
 def render_export_section(
@@ -311,8 +341,11 @@ def render_export_section(
             file_data = export_data.encode('utf-8')
             mime_type = "text/plain"
         elif export_type == "excel":
-            file_data = create_excel_from_dataframe(export_data)
-            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            file_data, mime_type = create_excel_from_dataframe(export_data)
+            # Update filename extension if CSV fallback was used
+            if mime_type == "text/csv" and export_filename.endswith(".xlsx"):
+                export_filename = export_filename.replace(".xlsx", ".csv")
+                st.info("💡 **Note:** Excel format not available. CSV format downloaded instead.")
         elif export_type == "json":
             file_data = json.dumps(export_data, indent=2, default=str).encode('utf-8')
             mime_type = "application/json"

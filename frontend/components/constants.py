@@ -167,7 +167,7 @@ EXAMPLE_FORM_VALUES = {
     "company_type": "Private company (not traded publicly)",
     "industry": "Technology and software",
     "employee_count": "250",
-        "locations": ["United States", "European Union"],  # Use exact schema names
+    "locations": ["United States (Federal)", "European Union"],  # Use exact LOCATION_OPTIONS names
     "handles_data": True,
     "is_regulated": False,
     "task_description": "We need to update our privacy policy to include new features we're launching next month. The features involve collecting user preferences and behavior data to personalize the experience.",
@@ -176,6 +176,7 @@ EXAMPLE_FORM_VALUES = {
     "involves_financial": False,
     "crosses_borders": True,
     "has_deadline": True,
+    "deadline_date": None,  # Will be set to a date object when loading example
     "impact_level": "Serious issues",
     "people_affected": "50000"
 }

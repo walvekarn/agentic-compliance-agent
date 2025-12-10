@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import json
+import requests
 
 # Add frontend directory to path
 frontend_dir = Path(__file__).parent.parent
@@ -49,10 +50,69 @@ if "agentic_results" not in st.session_state:
     st.session_state.agentic_results = None
 if "agentic_form_data" not in st.session_state:
     st.session_state.agentic_form_data = {}
+if "agentic_form_persistent" not in st.session_state:
+    st.session_state.agentic_form_persistent = {}
+if "agentic_analysis_in_progress" not in st.session_state:
+    st.session_state.agentic_analysis_in_progress = False
+
+# ============================================================================
+# LOAD EXAMPLE FUNCTION
+# ============================================================================
+def load_example_data():
+    """Load example data for testing"""
+    return {
+        "entity_name": "TechCorp Inc.",
+        "industry": "Technology and software",
+        "employee_count": 50,
+        "operating_locations": ["United States (Federal)"],
+        "task_description": "We need to update our privacy policy to comply with GDPR requirements for our EU customers. This involves reviewing data collection practices, updating consent mechanisms, and ensuring proper data subject rights are implemented.",
+        "priority": "Medium"
+    }
 
 # ============================================================================
 # MAIN FORM
 # ============================================================================
+# Quick action buttons before form
+action_col1, action_col2 = st.columns([1, 5])
+with action_col1:
+    if st.button("⚡ Load Example", use_container_width=True):
+        example = load_example_data()
+        
+        # Validate and fix locations to match LOCATION_OPTIONS
+        location_options = [loc for loc in LOCATION_OPTIONS if loc != "-- Please select --"]
+        example_locations = example.get("operating_locations", [])
+        # Filter to only valid options that exist in LOCATION_OPTIONS
+        valid_locations = [loc for loc in example_locations if loc in location_options]
+        example["operating_locations"] = valid_locations
+        
+        # Clear widget session state keys BEFORE setting new values to avoid modification errors
+        # This ensures widgets will use the default values from form_defaults
+        widget_keys_to_clear = [
+            "agentic_locations_multiselect",
+        ]
+        for key in widget_keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Store example data in session state for form to use
+        st.session_state["example_loaded_agentic"] = True
+        st.session_state["example_data_agentic"] = example
+        st.success("✅ Example data loaded! Fill the form below.")
+        st.rerun()
+
+# Get form defaults - prioritize persistent form data, then example data, then empty
+form_defaults = {}
+# First, use persistent form data if available (survives form submissions)
+if st.session_state.get("agentic_form_persistent"):
+    form_defaults = st.session_state["agentic_form_persistent"]
+# Then, if example was just loaded, use example data and save to persistent
+elif st.session_state.get("example_loaded_agentic") and st.session_state.get("example_data_agentic"):
+    form_defaults = st.session_state["example_data_agentic"]
+    # Save to persistent storage so it survives form submissions
+    st.session_state["agentic_form_persistent"] = form_defaults.copy()
+    # Clear the flag after using
+    st.session_state["example_loaded_agentic"] = False
+
 with st.form("agentic_analysis_form", clear_on_submit=False):
     st.markdown("## 📋 Analysis Request")
     
@@ -61,7 +121,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
     with col1:
         entity_name = st.text_input(
             "Entity Name *",
-            value="",
+            value=form_defaults.get("entity_name", ""),
             placeholder="Enter entity name",
             help="Name of the organization to analyze"
         )
@@ -69,33 +129,43 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
         employee_count = st.number_input(
             "Employee Count",
             min_value=1,
-            value=50,
+            value=form_defaults.get("employee_count", 50),
             help="Approximate number of employees"
         )
         
         # Locations/Jurisdictions
         location_options = [loc for loc in LOCATION_OPTIONS if loc != "-- Please select --"]
+        default_locations = form_defaults.get("operating_locations", [])
+        # Filter to only valid options that exist in location_options
+        valid_default_locations = [loc for loc in default_locations if loc in location_options]
         locations = st.multiselect(
             "Operating Locations *",
             options=location_options,
-            default=[],
+            default=valid_default_locations,
+            key="agentic_locations_multiselect",
             help="Select all jurisdictions where the entity operates"
         )
     
     with col2:
         # Industry - simple dropdown without "-- Please select --"
         industry_options = [opt for opt in INDUSTRY_OPTIONS if opt != "-- Please select --"]
+        default_industry = form_defaults.get("industry", industry_options[0] if industry_options else "")
+        industry_index = industry_options.index(default_industry) if default_industry in industry_options else 0
         industry = st.selectbox(
             "Industry *",
             options=industry_options,
+            index=industry_index,
             help="Industry category"
         )
         
         # Priority dropdown
+        priority_options = ["Low", "Medium", "High"]
+        default_priority = form_defaults.get("priority", "Medium")
+        priority_index = priority_options.index(default_priority) if default_priority in priority_options else 1
         priority = st.selectbox(
             "Priority *",
-            options=["Low", "Medium", "High"],
-            index=1,  # Default to Medium
+            options=priority_options,
+            index=priority_index,
             help="Task priority level"
         )
     
@@ -104,7 +174,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
     # Task Description
     task_description = st.text_area(
         "Task Description *",
-        value="",
+        value=form_defaults.get("task_description", ""),
         placeholder="Describe the compliance task to analyze. For example: 'Implement GDPR Article 30 records of processing activities' or 'Review privacy policy updates for a new feature rollout'",
         height=120,
         help="Detailed description of what needs to be analyzed"
@@ -112,28 +182,55 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
     
     st.markdown("---")
     
-    # Submit button
-    submitted = st.form_submit_button("🚀 Run Agentic Analysis", type="primary", use_container_width=True)
+    # Show status if analysis is in progress
+    is_analyzing = st.session_state.get("agentic_analysis_in_progress", False)
+    if is_analyzing:
+        st.info("🔄 **Analysis in Progress**: Please wait while the agentic engine processes your request. This may take a few moments...")
+    
+    # Submit button - disable if analysis is already in progress
+    submit_label = "🔄 Analysis in Progress..." if is_analyzing else "🚀 Run Agentic Analysis"
+    submitted = st.form_submit_button(
+        submit_label, 
+        type="primary", 
+        use_container_width=True,
+        disabled=is_analyzing,
+        help="Analysis is currently running. Please wait for it to complete." if is_analyzing else "Start the agentic analysis"
+    )
     
     if submitted:
-        # Validation
+        # Save form data to persistent storage so it survives reruns
+        form_data_current = {
+            "entity_name": entity_name,
+            "industry": industry,
+            "employee_count": employee_count,
+            "operating_locations": locations,
+            "task_description": task_description,
+            "priority": priority
+        }
+        st.session_state["agentic_form_persistent"] = form_data_current
+        
+        # Validation - use current widget values, not form_defaults
         errors = []
-        if not entity_name.strip():
+        if not entity_name or not entity_name.strip():
             errors.append("Entity name is required")
         if not industry:
             errors.append("Industry is required")
-        if not locations:
+        if not locations or len(locations) == 0:
             errors.append("At least one operating location is required")
-        if not task_description.strip():
+        if not task_description or not task_description.strip():
             errors.append("Task description is required")
         
         if errors:
             st.error("**Please fix the following errors:**\n\n" + "\n".join([f"• {e}" for e in errors]))
+            # Don't proceed if validation fails
         else:
+            # Set analysis in progress flag
+            st.session_state["agentic_analysis_in_progress"] = True
+            
             # Prepare API request
             request_payload = {
                 "entity": {
-                    "entity_name": entity_name,
+                    "entity_name": entity_name.strip(),
                     "entity_type": "PRIVATE_COMPANY",  # Default
                     "locations": locations,
                     "industry": industry,
@@ -143,7 +240,7 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                     "previous_violations": 0  # Default
                 },
                 "task": {
-                    "task_description": task_description,
+                    "task_description": task_description.strip(),
                     "task_category": "DATA_PROTECTION",  # Default
                     "priority": priority.upper(),
                     "deadline": None
@@ -151,24 +248,28 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                 "max_iterations": 10  # Default
             }
             
-            # Call API with spinner
-            with st.spinner("🤖 Agent is analyzing... This may take 60-90 seconds"):
+            # Call API with spinner - progress bar won't update during blocking call
+            with st.spinner("🤖 Connecting to agentic analysis engine... This may take a few moments."):
                 try:
-                    response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=120)
+                    # Make API call with a firm timeout; keep UI responsive
+                    response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=60)
                     
                     # Parse response
                     status, results, error, timestamp = parseAgenticResponse(response)
                     
                     if status == "completed" and results:
+                        st.success("✅ Analysis completed successfully!")
+                        
+                        # Save results and form data
                         st.session_state.agentic_results = results
                         st.session_state.agentic_form_data = {
                             "entity_name": entity_name,
                             "task_description": task_description
                         }
-                        st.success(f"✅ Analysis complete!")
+                        st.session_state["agentic_analysis_in_progress"] = False
                         st.rerun()
                     elif status == "timeout":
-                        st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 120 seconds'}")
+                        st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 60 seconds'}")
                         st.info("💡 **Tip**: Try simplifying the task description or try again later.")
                     elif status == "error":
                         error_msg = error or "Unknown error occurred"
@@ -176,9 +277,23 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
                         st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task")
                     else:
                         display_api_error(response)
+                except requests.exceptions.Timeout:
+                    st.error("⏱️ **Analysis timed out**. The request took too long to complete.")
+                    st.info("💡 **Tip**: Try simplifying the task description or check backend logs for issues.")
+                except requests.exceptions.ConnectionError:
+                    st.error("🔌 **Connection Error**: Could not connect to the backend server.")
+                    st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
                 except Exception as e:
-                    st.error(f"❌ **API Error**: {str(e)}")
-                    st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again in a few moments")
+                    error_str = str(e)
+                    st.error(f"❌ **API Error**: {error_str}")
+                    st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Check backend logs for detailed error information")
+                    # Log the full exception for debugging
+                    import traceback
+                    with st.expander("🔍 Technical Details"):
+                        st.code(traceback.format_exc(), language="text")
+                finally:
+                    # Always clear the in-progress flag so the spinner stops
+                    st.session_state["agentic_analysis_in_progress"] = False
 
 # ============================================================================
 # DISPLAY RESULTS
@@ -384,4 +499,11 @@ with st.sidebar:
     if st.button("🔄 Reset Form", use_container_width=True):
         st.session_state.agentic_results = None
         st.session_state.agentic_form_data = {}
+        st.session_state.agentic_form_persistent = {}
+        st.session_state.agentic_analysis_in_progress = False
+        # Clear example data flags
+        if "example_loaded_agentic" in st.session_state:
+            del st.session_state["example_loaded_agentic"]
+        if "example_data_agentic" in st.session_state:
+            del st.session_state["example_data_agentic"]
         st.rerun()

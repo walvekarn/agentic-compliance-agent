@@ -344,6 +344,12 @@ class AuditService:
         Returns:
             AuditTrail object that was created
         """
+        # Prefer original task description from metadata if the provided text looks like a system prompt
+        meta = metadata or {}
+        original_task_description = meta.get("original_task_description")
+        if task_description and "you are helping a user" in task_description.lower() and original_task_description:
+            task_description = original_task_description
+
         # Extract key information from agent loop result
         plan = agent_loop_result.get("plan", [])
         step_outputs = agent_loop_result.get("step_outputs", [])
@@ -402,7 +408,7 @@ class AuditService:
             "success": agent_loop_result.get("success", False),
             "tool_outputs_count": len(agent_loop_result.get("tool_outputs", [])),
             "audit_log": audit_log,
-            **(metadata or {})
+            **meta
         }
         
         # Create audit trail entry

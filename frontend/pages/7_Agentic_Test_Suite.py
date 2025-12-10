@@ -220,6 +220,23 @@ if st.session_state.test_results:
     
     # Confidence deviations
     confidence_deviations = summary.get("confidence_deviations", [])
+    # Fallback: if there are test_results but no deviations, build a flat-zero chart so the UI is not blank
+    if (not confidence_deviations) and test_results:
+        fallback_devs = []
+        for r in test_results:
+            scenario = r.get("scenario", {})
+            title = scenario.get("title", "Scenario")
+            expected_min = r.get("expected", {}).get("min_confidence", 0.0)
+            actual_conf = r.get("actual", {}).get("confidence", expected_min)
+            fallback_devs.append({
+                "scenario": title,
+                "expected_min": expected_min,
+                "actual": actual_conf,
+                "deviation": actual_conf - expected_min if actual_conf is not None else 0.0,
+                "adequate": (actual_conf or 0.0) >= expected_min
+            })
+        confidence_deviations = fallback_devs
+
     if confidence_deviations:
         render_section_header("Confidence Deviations", icon="📈", level=2)
         

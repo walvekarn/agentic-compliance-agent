@@ -10,7 +10,9 @@ from datetime import datetime, timedelta
 import json
 import sys
 import os
+import requests
 from pathlib import Path
+from typing import Dict, Any
 
 # Add frontend directory to path for imports
 frontend_dir = Path(__file__).parent.parent
@@ -24,37 +26,9 @@ from components.constants import API_BASE_URL
 
 st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 
-# Apply light theme CSS
+# Apply light theme CSS (comprehensive styling already includes all necessary overrides)
 from components.ui_helpers import apply_light_theme_css, render_page_header, render_section_header, render_divider, render_plotly_chart
 apply_light_theme_css()
-
-# Additional light theme overrides for this page
-st.markdown("""
-<style>
-    /* Force sidebar to be light */
-    section[data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
-    }
-    
-    section[data-testid="stSidebar"] * {
-        color: #1e293b !important;
-    }
-    
-    /* Force main content area */
-    .main .block-container {
-        background-color: #ffffff !important;
-    }
-    
-    /* Ensure all text is readable */
-    .stDataFrame,
-    .stDataFrame table,
-    .stDataFrame th,
-    .stDataFrame td {
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # ============================================================================
 # AUTHENTICATION CHECK
@@ -123,7 +97,118 @@ def get_audit_id(entry):
         audit_id = entry.get("audit_id", None)
     return audit_id
 
+
+def transform_entry_to_nested_format(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform flat API entry format to nested format expected by frontend display logic.
+    
+    API returns: {decision_outcome, task_description, entity_name, ...}
+    Frontend expects: {decision: {outcome, risk_level}, task: {description, category}, entity: {name, type}, ...}
+    """
+    if not isinstance(entry, dict):
+        return entry
+    
+    # If already in nested format, return as-is
+    if "decision" in entry and isinstance(entry.get("decision"), dict):
+        return entry
+    
+    # Transform flat format to nested format
+    transformed = entry.copy()
+    
+    # Create nested decision structure
+    decision_outcome = entry.get("decision_outcome") or entry.get("decision", {}).get("outcome")
+    risk_level = entry.get("risk_level") or entry.get("decision", {}).get("risk_level")
+    risk_score = entry.get("risk_score") or entry.get("decision", {}).get("risk_score")
+    confidence_score = entry.get("confidence_score") or entry.get("decision", {}).get("confidence_score")
+    
+    transformed["decision"] = {
+        "outcome": decision_outcome,
+        "risk_level": risk_level,
+        "risk_score": risk_score,
+        "confidence_score": confidence_score
+    }
+    
+    # Create nested task structure
+    task_description = entry.get("task_description") or entry.get("task", {}).get("description", "")
+    task_category = entry.get("task_category") or entry.get("task", {}).get("category")
+    
+    transformed["task"] = {
+        "description": task_description,
+        "category": task_category
+    }
+    
+    # Create nested entity structure
+    entity_name = entry.get("entity_name") or entry.get("entity", {}).get("name")
+    entity_type = entry.get("entity_type") or entry.get("entity", {}).get("type")
+    
+    transformed["entity"] = {
+        "name": entity_name,
+        "type": entity_type
+    }
+    
+    # Add other fields that might be needed
+    if "id" not in transformed and "audit_id" in transformed:
+        transformed["id"] = transformed["audit_id"]
+    
+    # Add reasoning chain to "why" structure if needed
+    reasoning_chain = entry.get("reasoning_chain") or entry.get("why", {}).get("reasoning_steps", [])
+    if reasoning_chain:
+        transformed["why"] = {
+            "reasoning_steps": reasoning_chain if isinstance(reasoning_chain, list) else [reasoning_chain]
+        }
+    
+    # Add risk_factors to risk_analysis structure
+    risk_factors = entry.get("risk_factors") or entry.get("risk_analysis", [])
+    if risk_factors:
+        transformed["risk_analysis"] = risk_factors if isinstance(risk_factors, list) else []
+    
+    return transformed
+
 render_section_header("Search & Filters", icon="🔍", level=3)
+
+# Define filter options
+decision_labels = {
+    "✅ Go ahead": "AUTONOMOUS",
+    "⚠️ Needs review": "REVIEW_REQUIRED",
+    "🚨 Escalate": "ESCALATE"
+}
+decision_code_to_label = {code: label for label, code in decision_labels.items()}
+
+risk_labels = {
+    "🟢 Low": "LOW",
+    "🟡 Medium": "MEDIUM",
+    "🔴 High": "HIGH"
+}
+
+# Check if reset filters button was clicked (must check BEFORE initializing widgets)
+if "reset_filters_audit" in st.session_state and st.session_state["reset_filters_audit"]:
+    # Clear all filter-related session state keys (before widgets are created)
+    filter_keys_to_clear = [
+        "decision_multiselect_audit",
+        "risk_multiselect_audit",
+        "multiselect_state_decision_multiselect_audit",
+        "multiselect_state_risk_multiselect_audit",
+        "decision_multiselect_audit_select_all_toggle",
+        "risk_multiselect_audit_select_all_toggle"
+    ]
+    for key in filter_keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    # Clear the reset flag
+    del st.session_state["reset_filters_audit"]
+    st.rerun()
+
+# Initialize session state keys for multiselect widgets BEFORE they are instantiated
+if "decision_multiselect_audit" not in st.session_state:
+    st.session_state["decision_multiselect_audit"] = list(decision_labels.keys())
+if "risk_multiselect_audit" not in st.session_state:
+    st.session_state["risk_multiselect_audit"] = list(risk_labels.keys())
+
+# Also initialize internal state keys used by multiselect_with_select_all
+if "multiselect_state_decision_multiselect_audit" not in st.session_state:
+    st.session_state["multiselect_state_decision_multiselect_audit"] = list(decision_labels.keys())
+if "multiselect_state_risk_multiselect_audit" not in st.session_state:
+    st.session_state["multiselect_state_risk_multiselect_audit"] = list(risk_labels.keys())
 
 # Keyword search
 search_query = st.text_input(
@@ -144,13 +229,6 @@ with col1:
         help="Choose how far back you want to review decisions."
     )
 
-decision_labels = {
-    "✅ Go ahead": "AUTONOMOUS",
-    "⚠️ Needs review": "REVIEW_REQUIRED",
-    "🚨 Escalate": "ESCALATE"
-}
-decision_code_to_label = {code: label for label, code in decision_labels.items()}
-
 with col2:
     from components.ui_helpers import multiselect_with_select_all
     decision_choices = multiselect_with_select_all(
@@ -163,11 +241,6 @@ with col2:
     )
     filter_decision = [decision_labels[label] for label in decision_choices]
 
-risk_labels = {
-    "🟢 Low": "LOW",
-    "🟡 Medium": "MEDIUM",
-    "🔴 High": "HIGH"
-}
 with col3:
     risk_choices = multiselect_with_select_all(
         "Risk Level ℹ️",
@@ -209,24 +282,56 @@ try:
         params["start_date"] = date_filter
     
     api = APIClient()
+    data = {}
+    entries = []
     try:
         with st.spinner("Loading audit trail entries..."):
             response = api.get("/api/v1/audit/entries", params=params)
         
         if not response.success:
             display_api_error(response)
-            st.stop()
-        
-        data = response.data or {}
-        entries = data.get("entries", [])
-        
-        if not isinstance(entries, list):
-            st.warning("⚠️ **Unexpected Response Format**: Expected a list of entries.")
+            # Don't stop, show empty state instead
             entries = []
+            data = {}
+        else:
+            data = response.data or {}
+            entries_raw = data.get("entries", [])
+            
+            if not isinstance(entries_raw, list):
+                st.warning("⚠️ **Unexpected Response Format**: Expected a list of entries.")
+                entries = []
+            else:
+                # Transform entries from flat API format to nested format expected by frontend
+                entries = []
+                for e in entries_raw:
+                    if isinstance(e, dict):
+                        try:
+                            transformed = transform_entry_to_nested_format(e)
+                            entries.append(transformed)
+                        except Exception as transform_error:
+                            # Log transformation error but continue with other entries
+                            st.warning(f"⚠️ Failed to transform entry: {str(transform_error)[:100]}")
+                            continue
+                
+                # Debug: Log if transformation issues occurred
+                if len(entries) != len(entries_raw) and len(entries_raw) > 0:
+                    st.warning(f"⚠️ **Data Transformation**: {len(entries_raw)} entries returned, {len(entries)} transformed successfully.")
+    except requests.exceptions.Timeout:
+        st.error("⏱️ **Timeout**: Request to backend timed out.")
+        st.info("💡 **Troubleshooting**:\n1. The backend may be overloaded\n2. Try again in a few moments\n3. Check backend logs for issues")
+        entries = []
+    except requests.exceptions.ConnectionError:
+        st.error("🔌 **Connection Error**: Could not connect to the backend server.")
+        st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
+        entries = []
     except Exception as e:
         st.error(f"❌ **Error Loading Audit Trail**: {str(e)}")
         st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try refreshing the page")
-        st.stop()
+        # Show technical details for debugging
+        import traceback
+        with st.expander("🔍 Technical Details"):
+            st.code(traceback.format_exc(), language="text")
+        entries = []  # Set to empty list instead of stopping
     
     # Warn if no entries found (common when running in mock mode or empty DB)
     if not entries:
@@ -243,29 +348,43 @@ try:
     for e in entries:
         if not isinstance(e, dict):
             continue
+        
+        # Get decision and risk from nested structure (already transformed)
         decision = e.get("decision", {})
         if not isinstance(decision, dict):
-            continue
-        outcome = decision.get("outcome")
-        risk_level = decision.get("risk_level")
+            # Fallback to flat structure if transformation didn't work
+            outcome = e.get("decision_outcome")
+            risk_level = e.get("risk_level")
+        else:
+            outcome = decision.get("outcome")
+            risk_level = decision.get("risk_level")
         
-        # Apply decision and risk filters
+        # Skip if outcome is missing
+        if not outcome:
+            continue
+        
+        # Apply decision filter - handle both string values and codes
         if outcome not in filter_decision:
             continue
-        if risk_level and risk_level not in filter_risk:
+        
+        # Apply risk filter - only filter if risk_level exists and filter includes it
+        if risk_level and filter_risk and risk_level not in filter_risk:
             continue
         
         # Apply keyword search if provided
         if search_query and search_query.strip():
             search_lower = search_query.lower().strip()
-            # Search across multiple fields
+            
+            # Get searchable text from nested structure
+            task = e.get("task", {})
+            entity = e.get("entity", {})
             searchable_text = " ".join([
-                str(e.get("task", {}).get("description", "")),
-                str(e.get("entity", {}).get("name", "")),
-                str(e.get("task", {}).get("category", "")),
+                str(task.get("description", "")),
+                str(entity.get("name", "")),
+                str(task.get("category", "")),
                 str(e.get("agent_type", "")),
                 str(outcome),
-                str(risk_level),
+                str(risk_level or ""),
             ]).lower()
             
             if search_lower not in searchable_text:
@@ -276,8 +395,11 @@ try:
     
     # Display summary
     st.markdown("---")
-    # Use actual entries count, not API total_count which may be incorrect
-    total_count = len(entries)  # Actual entries returned from API
+    # Get total count from API response if available, otherwise use entries length
+    if 'data' in locals() and isinstance(data, dict):
+        total_count = data.get("total_count", len(entries))
+    else:
+        total_count = len(entries)
     
     # Show search results summary
     if search_query and search_query.strip():
@@ -293,9 +415,9 @@ try:
         if entries:
             st.caption("Filters returned no results. Showing all available entries instead.")
             filtered_entries = entries
-            if st.button("🔄 Reset filters", help="Clear filters and show all records"):
-                st.session_state["decision_multiselect_audit"] = list(decision_labels.keys())
-                st.session_state["risk_multiselect_audit"] = list(risk_labels.keys())
+            if st.button("🔄 Reset filters", help="Clear filters and show all records", key="reset_filters_button_audit"):
+                # Set flag to trigger reset on next rerun (before widgets are created)
+                st.session_state["reset_filters_audit"] = True
                 st.rerun()
         if search_query and search_query.strip():
             st.warning(f"🔍 No results found matching **'{search_query}'** with your current filters.")
@@ -318,11 +440,25 @@ try:
             **Get started:** Go to "Check One Task" to analyze your first compliance question!
             """)
     else:
-        # Summary metrics
+        # Summary metrics - safely extract decision and risk from nested structure
         col1, col2, col3, col4 = st.columns(4)
         
-        decisions = [e["decision"]["outcome"] for e in filtered_entries]
-        risks = [e["decision"].get("risk_level") for e in filtered_entries if e["decision"].get("risk_level")]
+        decisions = []
+        risks = []
+        for e in filtered_entries:
+            decision = e.get("decision", {})
+            if isinstance(decision, dict):
+                outcome = decision.get("outcome")
+                risk = decision.get("risk_level")
+            else:
+                # Fallback to flat format
+                outcome = e.get("decision_outcome")
+                risk = e.get("risk_level")
+            
+            if outcome:
+                decisions.append(outcome)
+            if risk:
+                risks.append(risk)
         
         with col1:
             autonomous = decisions.count("AUTONOMOUS")
@@ -348,38 +484,56 @@ try:
             if audit_id is None:
                 continue  # skip invalid rows
             
+            # Safely get nested values with fallbacks
+            task = entry.get('task', {})
+            entity = entry.get('entity', {})
+            decision = entry.get('decision', {})
+            
+            # Get task description with fallback
+            task_description = task.get('description') if isinstance(task, dict) else entry.get('task_description', 'N/A')
+            task_desc_display = task_description[:60] + '...' if len(str(task_description)) > 60 else task_description
+            
+            # Get decision outcome with fallback
+            outcome = decision.get('outcome') if isinstance(decision, dict) else entry.get('decision_outcome', 'UNKNOWN')
+            risk_level = decision.get('risk_level') if isinstance(decision, dict) else entry.get('risk_level')
+            
             with st.expander(
-                f"{audit_id} | {entry['task']['description'][:60]}... | "
-                f"{show_decision_badge(entry['decision']['outcome'])} "
-                f"{show_risk_badge(entry['decision'].get('risk_level', 'N/A'))}"
+                f"{audit_id} | {task_desc_display} | "
+                f"{show_decision_badge(outcome)} "
+                f"{show_risk_badge(risk_level or 'N/A')}"
             ):
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
-                    st.markdown(f"**Task:** {entry['task']['description']}")
+                    st.markdown(f"**Task:** {task_description}")
                     # Handle None category gracefully
-                    category = entry['task'].get('category')
+                    category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
                     category_label = category.replace('_', ' ').title() if category else 'N/A'
                     st.markdown(f"**Category:** {category_label}")
-                    if entry.get('entity') and entry['entity'].get('name'):
+                    
+                    entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
+                    if entity_name:
                         # Handle None entity type gracefully
-                        entity_type = entry['entity'].get('type')
+                        entity_type = entity.get('type') if isinstance(entity, dict) else entry.get('entity_type')
                         entity_type_label = entity_type.replace('_', ' ').title() if entity_type else 'N/A'
-                        st.markdown(f"**Entity:** {entry['entity']['name']} ({entity_type_label})")
-                    st.markdown(f"**Agent:** {entry['agent_type']}")
-                    st.markdown(f"**Timestamp:** {entry['timestamp']}")
+                        st.markdown(f"**Entity:** {entity_name} ({entity_type_label})")
+                    
+                    agent_type = entry.get('agent_type', 'N/A')
+                    st.markdown(f"**Agent:** {agent_type}")
+                    timestamp = entry.get('timestamp', 'N/A')
+                    st.markdown(f"**Timestamp:** {timestamp}")
                 
                 with col2:
-                    st.markdown(f"**Decision:** {show_decision_badge(entry['decision']['outcome'])}")
-                    if entry['decision'].get('risk_level'):
-                        st.markdown(f"**Risk:** {show_risk_badge(entry['decision']['risk_level'])}")
-                        risk_score = entry['decision'].get('risk_score')
+                    st.markdown(f"**Decision:** {show_decision_badge(outcome)}")
+                    if risk_level:
+                        st.markdown(f"**Risk:** {show_risk_badge(risk_level)}")
+                        risk_score = decision.get('risk_score') if isinstance(decision, dict) else entry.get('risk_score')
                         if risk_score is not None:
                             st.markdown(f"**Risk Score (0–100):** {risk_score*100:.0f}")
                         else:
                             st.markdown(f"**Risk Score (0–100):** N/A")
                     # Unified schema uses "confidence" at top level, legacy uses "decision.confidence_score"
-                    confidence_score = entry.get('confidence_score') or entry['decision'].get('confidence_score')
+                    confidence_score = entry.get('confidence_score') or (decision.get('confidence_score') if isinstance(decision, dict) else None)
                     if confidence_score is not None and isinstance(confidence_score, (int, float)):
                         # Normalize to 0-1 range if needed
                         if confidence_score > 1.0:
@@ -464,30 +618,48 @@ try:
             if audit_id is None:
                 continue  # skip invalid rows
             
-            decision_label = DECISION_NAMES.get(entry["decision"]["outcome"], entry["decision"]["outcome"].title())
-            risk_label = RISK_NAMES.get(entry["decision"].get("risk_level"), "Not set")
+            # Safely get nested values with fallbacks
+            task = entry.get('task', {})
+            entity = entry.get('entity', {})
+            decision = entry.get('decision', {})
+            
+            outcome = decision.get('outcome') if isinstance(decision, dict) else entry.get('decision_outcome', 'UNKNOWN')
+            decision_label = DECISION_NAMES.get(outcome, outcome.title())
+            
+            risk_level = decision.get('risk_level') if isinstance(decision, dict) else entry.get('risk_level')
+            risk_label = RISK_NAMES.get(risk_level, "Not set") if risk_level else "Not set"
+            
             # Handle None values gracefully
-            category = entry["task"].get("category")
+            category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
             category_label = category.replace('_', ' ').title() if category else 'N/A'
             
             # Handle None values in numeric fields before multiplication
-            risk_score = entry['decision'].get('risk_score', 0)
-            risk_score_display = f"{(risk_score or 0) * 100:.0f}"
+            risk_score = decision.get('risk_score') if isinstance(decision, dict) else entry.get('risk_score')
+            risk_score_display = f"{(risk_score or 0) * 100:.0f}" if risk_score is not None else "N/A"
             
-            confidence_score = entry['decision'].get('confidence_score', 0)
-            confidence_display = f"{(confidence_score or 0) * 100:.1f}%"
+            confidence_score = entry.get('confidence_score') or (decision.get('confidence_score') if isinstance(decision, dict) else None)
+            if confidence_score is not None:
+                # Normalize to 0-1 range if needed
+                if confidence_score > 1.0:
+                    confidence_score = confidence_score / 100.0
+                confidence_display = f"{confidence_score * 100:.1f}%"
+            else:
+                confidence_display = "N/A"
+            
+            task_description = task.get('description') if isinstance(task, dict) else entry.get('task_description', 'N/A')
+            entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name', 'N/A')
             
             export_data.append({
                 "Audit ID": audit_id,
-                "Timestamp": entry["timestamp"],
-                "Entity": entry["entity"]["name"] if entry.get("entity") and entry["entity"].get("name") else "N/A",
-                "Task": entry["task"]["description"],
+                "Timestamp": entry.get("timestamp", "N/A"),
+                "Entity": entity_name,
+                "Task": task_description,
                 "Category": category_label,
                 "Decision": decision_label,
                 "Risk Level": risk_label,
                 "Risk Score (0-100)": risk_score_display,
                 "Confidence Level": confidence_display,
-                "Agent": entry["agent_type"]
+                "Agent": entry.get("agent_type", "N/A")
             })
         
         df = pd.DataFrame(export_data)
@@ -518,19 +690,39 @@ ENTRIES
             if audit_id is None:
                 continue  # skip invalid rows
             
-            decision_label = DECISION_NAMES.get(entry["decision"]["outcome"], entry["decision"]["outcome"].title())
-            risk_label = RISK_NAMES.get(entry["decision"].get("risk_level"), "Not set")
+            # Safely get nested values with fallbacks
+            task = entry.get('task', {})
+            entity = entry.get('entity', {})
+            decision = entry.get('decision', {})
+            
+            outcome = decision.get('outcome') if isinstance(decision, dict) else entry.get("decision_outcome", 'UNKNOWN')
+            decision_label = DECISION_NAMES.get(outcome, outcome.title())
+            
+            risk_level = decision.get('risk_level') if isinstance(decision, dict) else entry.get('risk_level')
+            risk_label = RISK_NAMES.get(risk_level, "Not set") if risk_level else "Not set"
+            
+            task_description = task.get('description') if isinstance(task, dict) else entry.get('task_description', 'N/A')
+            entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name', 'N/A')
+            
+            confidence_score = entry.get('confidence_score') or (decision.get('confidence_score') if isinstance(decision, dict) else None)
+            if confidence_score is not None:
+                if confidence_score > 1.0:
+                    confidence_score = confidence_score / 100.0
+                confidence_display = f"{confidence_score*100:.1f}%"
+            else:
+                confidence_display = "N/A"
+            
             text_report += f"""
 Entry #{i}
 ----------
 ID: {audit_id}
-Timestamp: {entry["timestamp"]}
-Entity: {entry["entity"]["name"] if entry.get("entity") and entry["entity"].get("name") else "N/A"}
-Task: {entry["task"]["description"]}
+Timestamp: {entry.get("timestamp", "N/A")}
+Entity: {entity_name}
+Task: {task_description}
 Decision: {decision_label}
 Risk: {risk_label}
-Confidence: {entry['decision'].get('confidence_score', 0)*100:.1f}%
-Agent: {entry["agent_type"]}
+Confidence: {confidence_display}
+Agent: {entry.get("agent_type", "N/A")}
 
 """
         
@@ -548,15 +740,27 @@ Agent: {entry["agent_type"]}
             },
             "summary": {
                 "total_records": len(filtered_entries),
-                "high_risk": len([e for e in filtered_entries if e["decision"].get("risk_level") == "HIGH"]),
-                "medium_risk": len([e for e in filtered_entries if e["decision"].get("risk_level") == "MEDIUM"]),
-                "low_risk": len([e for e in filtered_entries if e["decision"].get("risk_level") == "LOW"])
+                "high_risk": len([
+                    e for e in filtered_entries 
+                    if (e.get("decision", {}).get("risk_level") if isinstance(e.get("decision"), dict) else e.get("risk_level")) == "HIGH"
+                ]),
+                "medium_risk": len([
+                    e for e in filtered_entries 
+                    if (e.get("decision", {}).get("risk_level") if isinstance(e.get("decision"), dict) else e.get("risk_level")) == "MEDIUM"
+                ]),
+                "low_risk": len([
+                    e for e in filtered_entries 
+                    if (e.get("decision", {}).get("risk_level") if isinstance(e.get("decision"), dict) else e.get("risk_level")) == "LOW"
+                ])
             },
             "entries": filtered_entries
         }
         
         # Determine overall risk for filename
-        high_risk_count = len([e for e in filtered_entries if e["decision"].get("risk_level") == "HIGH"])
+        high_risk_count = len([
+            e for e in filtered_entries 
+            if (e.get("decision", {}).get("risk_level") if isinstance(e.get("decision"), dict) else e.get("risk_level")) == "HIGH"
+        ])
         if high_risk_count > len(filtered_entries) * 0.3:
             overall_risk = "HIGH"
         elif high_risk_count > len(filtered_entries) * 0.1:
@@ -655,7 +859,7 @@ if stats:
                             "ESCALATE": "#ef4444"
                         }
                     )
-                    fig.update_layout(showlegend=False, xaxis_title="Decision Type", yaxis_title="Count")
+                    # render_plotly_chart will apply light theme - just set basic layout here
                     render_plotly_chart(fig, title="Decisions by Outcome", height=400, show_title=True)
             
             with col2:
@@ -673,7 +877,7 @@ if stats:
                             "HIGH": "#ef4444"
                         }
                     )
-                    fig.update_layout(showlegend=False, xaxis_title="Risk Level", yaxis_title="Count")
+                    # render_plotly_chart will apply light theme - just set basic layout here
                     render_plotly_chart(fig, title="Decisions by Risk Level", height=400, show_title=True)
         except ImportError:
             # Fallback to simple text if Plotly not available

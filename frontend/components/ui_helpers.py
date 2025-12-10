@@ -70,6 +70,10 @@ def apply_light_theme_css():
             color: #0f172a !important;
         }
         
+        h1, h2, h3, h4, h5, h6 {
+            color: #0f172a !important;
+        }
+        
         /* ====================================================================
            CHAT MESSAGE COMPONENTS - Light Theme
            ==================================================================== */
@@ -181,39 +185,67 @@ def apply_light_theme_css():
            CHECKBOXES - Complete Styling (Enhanced for Light Theme)
            ==================================================================== */
         .stCheckbox {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.35rem;
+            display: inline-flex !important;
+            align-items: flex-start !important;
+            gap: 0.25rem !important;
+            flex-wrap: nowrap !important;
         }
         
         .stCheckbox > label,
         .stCheckbox label:first-of-type {
             color: #1e293b !important;
             font-size: 1rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.25rem !important;
+            line-height: 1.2 !important;
+            white-space: normal !important;
         }
         
         /* Checkbox box styling - Multiple selectors to override Streamlit defaults */
         .stCheckbox [data-baseweb="checkbox"],
         .stCheckbox input[type="checkbox"],
         input[type="checkbox"][data-baseweb="checkbox"],
-        [data-baseweb="checkbox"] {
+        [data-baseweb="checkbox"],
+        div[data-baseweb="checkbox"],
+        .stCheckbox > div > div[data-baseweb="checkbox"] {
             background-color: #ffffff !important;
             border: 2px solid #cbd5e1 !important;
             border-radius: 4px !important;
+            width: 20px !important;
+            height: 20px !important;
+            min-width: 20px !important;
+            min-height: 20px !important;
+            display: inline-block !important;
         }
         
         .stCheckbox [data-baseweb="checkbox"]:checked,
         .stCheckbox input[type="checkbox"]:checked,
         input[type="checkbox"][data-baseweb="checkbox"]:checked,
-        [data-baseweb="checkbox"]:checked {
+        [data-baseweb="checkbox"]:checked,
+        div[data-baseweb="checkbox"]:checked {
             background-color: #3b82f6 !important;
             border-color: #3b82f6 !important;
         }
         
-        /* Fix checkbox checkmark color - ensure it's white on blue */
-        .stCheckbox [data-baseweb="checkbox"]:checked::after,
-        .stCheckbox input[type="checkbox"]:checked::after,
-        [data-baseweb="checkbox"]:checked::after {
-            color: #ffffff !important;
-            border-color: #ffffff !important;
+        /* Force checkbox visibility and proper styling */
+        .stCheckbox [data-baseweb="checkbox"] *,
+        [data-baseweb="checkbox"] * {
+            background-color: transparent !important;
+        }
+        
+        .stCheckbox [data-baseweb="checkbox"]:checked *,
+        [data-baseweb="checkbox"]:checked * {
+            background-color: transparent !important;
+        }
+        
+        /* Ensure checkmark is visible */
+        .stCheckbox [data-baseweb="checkbox"]:checked svg path,
+        [data-baseweb="checkbox"]:checked svg path {
+            stroke: #ffffff !important;
+            fill: #ffffff !important;
+            stroke-width: 2px !important;
         }
         
         /* Override any dark theme checkbox styling */
@@ -784,6 +816,12 @@ def apply_light_theme_css():
         /* ====================================================================
            MOBILE RESPONSIVENESS
            ==================================================================== */
+        /* Ensure columns don't collapse on desktop */
+        [data-testid="column"] {
+            min-width: 280px !important;
+            align-items: flex-start !important;
+        }
+
         @media (max-width: 768px) {
             /* Reduce padding on mobile */
             .stMarkdown h1 {
@@ -819,6 +857,7 @@ def apply_light_theme_css():
             background-color: #ffffff !important;
             padding: 1.5rem !important;
             border-radius: 8px !important;
+            gap: 0.5rem !important;
         }
         
         /* Form elements alignment */
@@ -831,12 +870,6 @@ def apply_light_theme_css():
             margin-bottom: 1rem !important;
         }
         
-        /* Form column alignment */
-        .stForm [data-testid="column"] {
-            display: flex !important;
-            flex-direction: column !important;
-        }
-        
         /* Filter alignment */
         [data-testid="column"] .stSelectbox,
         [data-testid="column"] .stMultiSelect {
@@ -844,22 +877,115 @@ def apply_light_theme_css():
         }
         
         /* ====================================================================
-           TABLES/DATAFRAMES - Theme Override
+           TABLES/DATAFRAMES - Comprehensive Light Theme Override
            ==================================================================== */
-        .stDataFrame {
+        /* Main DataFrame container */
+        .stDataFrame,
+        div[data-testid="stDataFrame"],
+        [data-testid="stDataFrame"] {
             background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
         }
         
-        .stDataFrame table {
+        /* All nested DataFrame divs */
+        .stDataFrame div,
+        div[data-testid="stDataFrame"] > div,
+        div[data-testid="stDataFrame"] div,
+        [data-testid="stDataFrame"] > div,
+        [data-testid="stDataFrame"] div {
             background-color: #ffffff !important;
-        }
-        
-        .stDataFrame th {
-            background-color: #f8fafc !important;
             color: #1e293b !important;
         }
         
-        .stDataFrame td {
+        /* DataFrame tables */
+        .stDataFrame table,
+        div[data-testid="stDataFrame"] table,
+        [data-testid="stDataFrame"] table,
+        table {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border-collapse: collapse !important;
+        }
+        
+        /* Table headers */
+        .stDataFrame th,
+        div[data-testid="stDataFrame"] th,
+        [data-testid="stDataFrame"] th,
+        table th,
+        thead th {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border: 1px solid #e2e8f0 !important;
+            font-weight: 600 !important;
+            padding: 0.75rem !important;
+        }
+        
+        /* Table cells */
+        .stDataFrame td,
+        div[data-testid="stDataFrame"] td,
+        [data-testid="stDataFrame"] td,
+        table td,
+        tbody td {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 0.75rem !important;
+        }
+        
+        /* Table rows */
+        .stDataFrame tr,
+        div[data-testid="stDataFrame"] tr,
+        [data-testid="stDataFrame"] tr,
+        table tr,
+        tbody tr {
+            background-color: #ffffff !important;
+        }
+        
+        /* Alternating row colors for better readability */
+        .stDataFrame tbody tr:nth-child(even),
+        div[data-testid="stDataFrame"] tbody tr:nth-child(even),
+        [data-testid="stDataFrame"] tbody tr:nth-child(even),
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc !important;
+        }
+        
+        /* Hover state for rows */
+        .stDataFrame tbody tr:hover,
+        div[data-testid="stDataFrame"] tbody tr:hover,
+        [data-testid="stDataFrame"] tbody tr:hover,
+        tbody tr:hover {
+            background-color: #f1f5f9 !important;
+        }
+        
+        /* Streamlit table wrapper */
+        .stTable,
+        [data-testid="stTable"] {
+            background-color: #ffffff !important;
+        }
+        
+        .stTable table,
+        [data-testid="stTable"] table {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        /* Force all table-related text to be dark */
+        .stDataFrame *,
+        div[data-testid="stDataFrame"] *,
+        [data-testid="stDataFrame"] *,
+        .stTable *,
+        [data-testid="stTable"] * {
+            color: inherit !important;
+        }
+        
+        /* Override any dark background classes Streamlit might add */
+        [class*="dark"],
+        [class*="black"],
+        [style*="background-color: black"],
+        [style*="background-color: #000"],
+        [style*="background: black"],
+        [style*="background: #000"] {
             background-color: #ffffff !important;
             color: #1e293b !important;
         }
@@ -904,6 +1030,69 @@ def apply_light_theme_css():
         select {
             background-color: #ffffff !important;
             color: #1e293b !important;
+        }
+        
+        /* ====================================================================
+           CHART STYLING - Comprehensive Light Theme for Plotly Charts
+           ==================================================================== */
+        /* Plotly graph containers */
+        .plotly-graph-div,
+        [data-testid="stPlotlyChart"],
+        div[data-testid="stPlotlyChart"] {
+            background-color: #ffffff !important;
+        }
+        
+        /* Plotly SVG containers */
+        .plotly-graph-div .js-plotly-plot,
+        .plotly-graph-div .js-plotly-plot .plot-container,
+        .plotly-graph-div .js-plotly-plot .plot-container .svg-container,
+        .plotly-graph-div .js-plotly-plot .plot-container .svg-container svg,
+        svg.main-svg,
+        svg.main-svg > g {
+            background-color: #ffffff !important;
+        }
+        
+        /* Plotly background elements */
+        .plotly .bg,
+        .plotly .plotbg,
+        .js-plotly-plot .bg {
+            fill: #ffffff !important;
+        }
+        
+        /* Ensure plot background is white */
+        .js-plotly-plot .plotly {
+            background-color: #ffffff !important;
+        }
+        
+        /* Fix for dark theme patches */
+        .element-container div[data-testid="element-container"],
+        [data-testid="stPlotlyChart"] div {
+            background-color: transparent !important;
+        }
+        
+        /* Navigation and page indicators - Light Theme */
+        /* Streamlit sidebar navigation */
+        [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+            background-color: #f8fafc !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stSidebarNav"] a,
+        [data-testid="stSidebar"] [data-testid="stSidebarNav"] span {
+            color: #1e293b !important;
+        }
+        
+        /* Active page indicator */
+        [data-testid="stSidebarNav"] [aria-current="page"],
+        [data-testid="stSidebarNav"] a[aria-current="page"] {
+            background-color: #e0e7ff !important;
+            color: #1e40af !important;
+            border-left: 3px solid #3b82f6 !important;
+        }
+        
+        /* Navigation links hover */
+        [data-testid="stSidebarNav"] a:hover {
+            background-color: #f1f5f9 !important;
+            color: #1e40af !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -1175,21 +1364,47 @@ def render_plotly_chart(fig, title: str = "", height: int = 400, width: str = "s
             fig.update_layout(title=None)
     
     # Standard layout with consistent margins and legend placement
+    # Force light theme with comprehensive color overrides
     fig.update_layout(
         height=height,
-        template="plotly_white",
+        template="plotly_white",  # Use plotly_white template
         font=dict(family="Arial, sans-serif", size=12, color="#1e293b"),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        plot_bgcolor="white",  # Chart background
+        paper_bgcolor="white",  # Paper/container background
         margin=dict(l=60, r=60, t=40, b=60),  # Consistent margins
+        # Ensure light theme colors
+        xaxis=dict(
+            gridcolor="#e2e8f0",
+            linecolor="#cbd5e1",
+            zerolinecolor="#cbd5e1",
+            title_font=dict(color="#1e293b")
+        ),
+        yaxis=dict(
+            gridcolor="#e2e8f0",
+            linecolor="#cbd5e1",
+            zerolinecolor="#cbd5e1",
+            title_font=dict(color="#1e293b")
+        ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="#e2e8f0",
+            borderwidth=1,
+            font=dict(color="#1e293b")
         ) if len(fig.data) > 1 else None  # Horizontal legend if multiple series
     )
+    
+    # Update traces to ensure light theme colors
+    for trace in fig.data:
+        if hasattr(trace, 'marker'):
+            if hasattr(trace.marker, 'line') and trace.marker.line.color == 'black':
+                trace.marker.line.color = "#1e293b"
+        if hasattr(trace, 'line') and trace.line.color == 'black':
+            trace.line.color = "#1e293b"
     
     st.plotly_chart(fig, width=width, key=key)
 
