@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional
 import time
 import logging
 from datetime import datetime, timezone
+from sqlalchemy.orm import Session
 
 from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 from backend.agentic_engine.tools.tool_registry import ToolRegistry
@@ -38,7 +39,8 @@ class AgentLoop:
         enable_memory: bool = True,
         reasoning_engine: Optional[ReasoningEngine] = None,
         tools: Optional[Dict[str, Any]] = None,
-        replan_threshold: float = 0.75
+        replan_threshold: float = 0.75,
+        db_session: Optional[Session] = None
     ):
         """
         Initialize the agent loop.
@@ -50,11 +52,13 @@ class AgentLoop:
             reasoning_engine: Optional ReasoningEngine instance for enhanced reasoning
             tools: Optional dictionary of available tools
             replan_threshold: Quality score threshold below which to replan (default: 0.75)
+            db_session: Optional database session for memory operations
         """
         self.max_steps = max_steps
         self.enable_reflection = enable_reflection
         self.enable_memory = enable_memory
         self.replan_threshold = replan_threshold
+        self.db_session = db_session
         
         # Initialize reasoning engine if not provided
         if reasoning_engine is None:
@@ -556,7 +560,34 @@ class AgentLoop:
             self.reflections = []
             self.reset_metrics()
             
-            # Step 1: Generate initial plan using LLM
+            # Load previous analyses from memory if enabled
+            previous_analyses = []
+            if self.enable_memory and self.db_session:
+                try:
+                    from backend.agentic_engine.memory import MemoryService
+                    memory_service = MemoryService(self.db_session)
+                    memories = memory_service.get_memories_for_entity(entity, limit=3)
+                    previous_analyses = [
+                        {
+                            "task_summary": mem.content.get("task_summary", mem.summary or "")[:200],
+                            "decision_outcome": mem.content.get("decision_outcome", "UNKNOWN"),
+                            "timestamp": mem.content.get("timestamp") or (mem.created_at.isoformat() if mem.created_at else None),
+                            "risk_level": mem.content.get("risk_level", "UNKNOWN")
+                        }
+                        for mem in memories
+                    ]
+                    if previous_analyses:
+                        logger.info(f"Loaded {len(previous_analyses)} previous analyses for {entity}")
+                except Exception as e:
+                    logger.warning(f"Failed to load previous analyses: {e}")
+            
+            # Add previous_analyses to context
+            if context is None:
+                context = {}
+            if previous_analyses:
+                context["previous_analyses"] = previous_analyses
+            
+            # Step 1: Generate initial plan using LLM (includes previous_analyses in context)
             plan = self.generate_plan(entity, task, context)
             self.original_plan = plan.copy()
             current_plan = plan.copy()
@@ -621,7 +652,54 @@ class AgentLoop:
             # Determine overall success
             success = all(r.get("status") == "success" for r in step_outputs) if step_outputs else False
             
-            return {
+            # Save to memory if enabled and task completed successfully
+            memory_saved = False
+            if self.enable_memory and self.db_session and success:
+                try:
+                    from backend.agentic_engine.memory import MemoryService
+                    memory_service = MemoryService(self.db_session)
+                    
+                    # Create memory key from entity and task
+                    memory_key = f"task_{entity}_{hash(task) % 10000}"
+                    
+                    # Extract decision outcome from recommendation or risk assessment
+                    decision_outcome = "UNKNOWN"
+                    if recommendation:
+                        if "ESCALATE" in recommendation.upper() or risk_assessment.get("level") == "HIGH":
+                            decision_outcome = "ESCALATE"
+                        elif "REVIEW" in recommendation.upper() or risk_assessment.get("level") == "MEDIUM":
+                            decision_outcome = "REVIEW_REQUIRED"
+                        elif "AUTONOMOUS" in recommendation.upper() or risk_assessment.get("level") == "LOW":
+                            decision_outcome = "AUTONOMOUS"
+                    
+                    # Task summary (first 200 chars)
+                    task_summary = task[:200] if len(task) > 200 else task
+                    
+                    # Save simplified memory record
+                    memory_content = {
+                        "entity_name": entity,
+                        "task_summary": task_summary,
+                        "decision_outcome": decision_outcome,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "risk_level": risk_assessment.get("level", "UNKNOWN")
+                    }
+                    
+                    summary = f"{entity}: {task_summary[:100]}... → {decision_outcome}"
+                    
+                    memory_service.save_memory(
+                        memory_key=memory_key,
+                        content=memory_content,
+                        memory_type="episodic",
+                        entity_name=entity,
+                        summary=summary,
+                        importance_score=0.7
+                    )
+                    memory_saved = True
+                    logger.info(f"Memory saved: {memory_key} for {entity}")
+                except Exception as e:
+                    logger.warning(f"Failed to save memory: {e}")
+            
+            result = {
                 "plan": self.original_plan,
                 "revised_plan": self.revised_plan if self.revised_plan else None,
                 "tool_outputs": self.tool_outputs,
@@ -633,6 +711,16 @@ class AgentLoop:
                 "success": success,
                 "metrics": final_metrics
             }
+            
+            if memory_saved:
+                result["memory_saved"] = True
+            
+            # Include previous_analyses in result if they were loaded
+            if previous_analyses:
+                result["previous_analyses"] = previous_analyses
+                result["memory_context"] = previous_analyses  # Also include as memory_context for compatibility
+            
+            return result
         
         except Exception as e:
             total_time = time.time() - start_time

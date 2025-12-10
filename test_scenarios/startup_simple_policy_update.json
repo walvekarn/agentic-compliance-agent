@@ -1,0 +1,22 @@
+{
+  "title": "Startup Simple Policy Update",
+  "description": "Small startup updating internal expense policy",
+  "input": {
+    "entity": {
+      "name": "StartupTech",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["US_FEDERAL"],
+      "industry": "TECHNOLOGY",
+      "has_personal_data": false,
+      "is_regulated": false,
+      "employee_count": 25
+    },
+    "task": {
+      "description": "Update internal expense reimbursement policy for employees",
+      "category": "GENERAL_INQUIRY"
+    }
+  },
+  "expected_decision": "AUTONOMOUS",
+  "expected_risk_level": "LOW",
+  "expected_min_confidence": 0.85
+}

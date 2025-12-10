@@ -495,6 +495,67 @@ if st.session_state.get("agentic_results"):
                 mime="application/json",
                 use_container_width=True
             )
+    
+    # MEMORY CONTEXT SECTION
+    memory_context = results.get("memory_context") or results.get("previous_analyses")
+    if memory_context:
+        st.markdown("---")
+        with st.expander("🧠 Agent Memory (Previous Analyses)", expanded=False):
+            st.info("💡 **About Memory**: The agent remembers previous analyses to provide more consistent recommendations.")
+            
+            if isinstance(memory_context, list) and len(memory_context) > 0:
+                for i, analysis in enumerate(memory_context, 1):
+                    st.markdown(f"#### Analysis #{i}")
+                    
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        # Get entity name from analysis or form data
+                        entity_name = analysis.get("entity_name")
+                        if not entity_name:
+                            form_data = st.session_state.get("agentic_form_data", {})
+                            entity_name = form_data.get("entity_name", "Unknown")
+                        
+                        task_summary = analysis.get("task_summary", "N/A")
+                        decision = analysis.get("decision_outcome", "UNKNOWN")
+                        
+                        st.markdown(f"**Entity:** {entity_name}")
+                        st.markdown(f"**Task:** {task_summary}")
+                        st.markdown(f"**Decision:** `{decision}`")
+                    
+                    with col2:
+                        timestamp = analysis.get("timestamp")
+                        if timestamp:
+                            try:
+                                # Try to parse and format the timestamp
+                                if isinstance(timestamp, str):
+                                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                    formatted_date = dt.strftime("%Y-%m-%d %H:%M")
+                                else:
+                                    formatted_date = str(timestamp)
+                                st.markdown(f"**Date:** {formatted_date}")
+                            except:
+                                st.markdown(f"**Date:** {timestamp}")
+                        
+                        risk_level = analysis.get("risk_level", "UNKNOWN")
+                        if risk_level and risk_level != "UNKNOWN":
+                            risk_color = {
+                                "HIGH": "🔴",
+                                "MEDIUM": "🟡",
+                                "LOW": "🟢"
+                            }.get(risk_level, "⚪")
+                            st.markdown(f"**Risk:** {risk_color} {risk_level}")
+                    
+                    if i < len(memory_context):
+                        st.markdown("---")
+            else:
+                st.info("📊 No previous analyses found for this entity.")
+    elif results.get("status") == "completed":
+        # Only show "no memory" message if analysis completed successfully
+        st.markdown("---")
+        with st.expander("🧠 Agent Memory (Previous Analyses)", expanded=False):
+            st.info("💡 **About Memory**: The agent remembers previous analyses to provide more consistent recommendations.")
+            st.info("📊 No previous analyses found for this entity.")
 
 # ============================================================================
 # SIDEBAR INFO

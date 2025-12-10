@@ -1,0 +1,23 @@
+{
+  "title": "Healthcare HIPAA Data Breach Report",
+  "description": "Healthcare company reporting a data breach requiring HIPAA notification",
+  "input": {
+    "entity": {
+      "name": "HealthCareCorp",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["US_FEDERAL"],
+      "industry": "HEALTHCARE",
+      "has_personal_data": true,
+      "is_regulated": true,
+      "employee_count": 500,
+      "previous_violations": 1
+    },
+    "task": {
+      "description": "Report a data breach involving patient PHI to HHS and affected individuals under HIPAA breach notification requirements",
+      "category": "DATA_PRIVACY"
+    }
+  },
+  "expected_decision": "ESCALATE",
+  "expected_risk_level": "HIGH",
+  "expected_min_confidence": 0.80
+}

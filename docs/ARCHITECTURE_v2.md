@@ -21,6 +21,114 @@ The Agentic Compliance Assistant follows a **unified schema architecture** with 
 
 ---
 
+## Quick Reference (Interview Cheat Sheet)
+
+### System Flow
+
+```mermaid
+graph LR
+    A[Streamlit Frontend] -->|HTTP/REST| B[FastAPI :8000]
+    B -->|Routes| C[Orchestrator]
+    C -->|Plan/Execute/Reflect| D[ReasoningEngine]
+    D -->|LLM Calls| E[OpenAI API]
+    C -->|Tools| F[Entity/Calendar/Task/HTTP]
+    B -->|DI| G[Repositories]
+    G -->|SQLAlchemy| H[(Database)]
+    B -->|JWT| I[Auth Service]
+```
+
+**Flow**: User → Frontend → API Routes → Orchestrator → AgentLoop → ReasoningEngine → OpenAI
+
+### Key File Locations
+
+| Component | Path |
+|-----------|------|
+| **API Routes** | `backend/api/*_routes.py` |
+| **Orchestrator** | `backend/agentic_engine/orchestrator.py` |
+| **Agent Loop** | `backend/agentic_engine/agent_loop.py` |
+| **Reasoning Engine** | `backend/agentic_engine/reasoning/reasoning_engine.py` |
+| **Test Suite** | `backend/agentic_engine/testing/test_suite_engine.py` |
+| **Repositories** | `backend/repositories/base_repository.py` |
+| **LLM Gateway** | `backend/utils/llm_client.py` |
+| **Decision Engine** | `backend/agent/decision_engine.py` |
+
+### Code Snippets
+
+#### 1. Repository Pattern (Generic Base)
+
+```python
+# backend/repositories/base_repository.py
+class BaseRepository(ABC, Generic[T]):
+    def __init__(self, db: Session):
+        self.db = db
+    
+    @abstractmethod
+    def create(self, entity: T) -> T: ...
+    
+    @abstractmethod
+    def get_by_id(self, entity_id: int) -> Optional[T]: ...
+
+# Usage: AuditTrailRepository(BaseRepository[AuditTrail])
+```
+**Why**: Type-safe, testable data access layer with consistent CRUD operations.
+
+#### 2. Dependency Injection (FastAPI Depends)
+
+```python
+# backend/api/audit_routes.py
+@router.get("/entries")
+def get_audit_entries(
+    limit: int = Query(10),
+    entity_name: Optional[str] = None,
+    db: Session = Depends(get_db)  # ← DI here
+):
+    repository = AuditTrailRepository(db)
+    return repository.get_all(limit=limit, entity_name=entity_name)
+```
+**Why**: Automatic session management, testable endpoints, clean separation of concerns.
+
+#### 3. Reflection Method (Agentic Loop)
+
+```python
+# backend/agentic_engine/reasoning/reasoning_engine.py
+def reflect(self, step: Dict, output: Dict) -> Dict:
+    """Critically evaluate step execution quality"""
+    prompt = f"Evaluate correctness, completeness, hallucination risk..."
+    llm_response = self._llm_call(prompt)
+    return {
+        "correctness_score": 0.0-1.0,
+        "completeness_score": 0.0-1.0,
+        "overall_quality": 0.0-1.0,
+        "issues": [...],
+        "requires_retry": bool
+    }
+```
+**Why**: Self-correcting agentic loop - AI critiques its own work before proceeding.
+
+### Architectural Choices (One-Liners)
+
+| Choice | Rationale |
+|--------|-----------|
+| **Repository Pattern** | Decouples business logic from SQLAlchemy, enables easy testing/mocking |
+| **FastAPI Depends** | Automatic dependency injection, request-scoped DB sessions, clean API |
+| **Single LLM Gateway** | Centralized OpenAI calls, consistent error handling, mock mode support |
+| **Agentic Loop (Plan→Execute→Reflect)** | Multi-step reasoning with self-correction, handles complex tasks |
+| **Unified Schemas** | Frontend/backend share same data structures, prevents drift |
+| **JWT Auth** | Stateless authentication, scalable, works with FastAPI middleware |
+| **Generic Repositories** | Type-safe CRUD operations, reduces boilerplate, consistent patterns |
+| **Memory System** | Episodic memory for entity context, improves consistency over time |
+| **Test Suite Engine** | Automated scenario testing, validates decision accuracy, CI/CD ready |
+
+### Key Metrics
+
+- **84 automated tests** | **33% code coverage** | **~60% target autonomy rate**
+- **6-factor risk model** | **3-tier decisions** (AUTONOMOUS/REVIEW/ESCALATE)
+- **Complete audit trail** | **Zero false negatives** on high-risk scenarios
+
+**Tech Stack**: Python 3.11+, FastAPI, Streamlit, SQLAlchemy, OpenAI GPT-4o-mini, SQLite/PostgreSQL
+
+---
+
 ## System Architecture
 
 ```mermaid
@@ -783,6 +891,39 @@ streamlit run frontend/Home.py --server.port 8501
 - Set up rate limiting
 - Configure CORS properly
 - Use environment variables for secrets
+
+---
+
+---
+
+## Documentation Structure
+
+### Why Separate Schema Documentation?
+
+**`SCHEMA_v2.md` is kept separate from `ARCHITECTURE_v2.md` for these reasons:**
+
+1. **Different Audiences**: 
+   - Architecture docs are for system designers, architects, and interviewers
+   - Schema docs are for developers implementing features, API consumers, and frontend/backend teams
+
+2. **Different Update Cycles**:
+   - Architecture changes infrequently (major refactors)
+   - Schemas change frequently (new fields, API updates, feature additions)
+
+3. **Different Detail Levels**:
+   - Architecture focuses on system design, patterns, and flow
+   - Schemas focus on data structures, field definitions, and contracts
+
+4. **Practical Usage**:
+   - Developers need quick schema reference without architecture context
+   - API documentation requires standalone schema definitions
+   - Frontend/backend teams reference schemas during development
+
+5. **Size Management**:
+   - Combined would create a 1200+ line document that's hard to navigate
+   - Separation allows focused, scannable documentation
+
+**Recommendation**: Keep schemas separate, but reference them in architecture docs (as done above with "Unified Schemas" principle).
 
 ---
 

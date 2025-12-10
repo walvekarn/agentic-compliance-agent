@@ -187,6 +187,7 @@ class TestSuiteEngine:
                 jurisdictions=jurisdictions,
                 has_personal_data=entity_data.get("has_personal_data", False),
                 is_regulated=entity_data.get("is_regulated", False),
+                employee_count=entity_data.get("employee_count"),
                 previous_violations=entity_data.get("previous_violations", 0)
             )
             

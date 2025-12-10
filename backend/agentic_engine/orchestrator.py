@@ -53,13 +53,14 @@ class AgenticAIOrchestrator:
         # Use config values if provided, otherwise use defaults optimized for speed
         max_steps = self.config.get("max_steps") or self.config.get("max_iterations") or 5
         enable_reflection = self.config.get("enable_reflection", False)  # Default False for speed
-        enable_memory = self.config.get("enable_memory", False)  # Default False (not fully implemented)
+        enable_memory = self.config.get("enable_memory", True)  # Default True - memory demo enabled
         
         self.agent_loop = AgentLoop(
             max_steps=max_steps,
             enable_reflection=enable_reflection,
             enable_memory=enable_memory,
-            tools=tools  # Pass tools to agent_loop so it can use them directly
+            tools=tools,  # Pass tools to agent_loop so it can use them directly
+            db_session=db_session  # Pass db_session for memory operations
         )
         
         self.overall_timeout = settings.AGENTIC_OPERATION_TIMEOUT

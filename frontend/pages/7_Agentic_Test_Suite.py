@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 import pandas as pd
+import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -158,6 +159,7 @@ if run_button or st.session_state.test_running:
     if not st.session_state.test_running:
         st.session_state.test_running = True
         st.session_state.test_results = None
+        st.rerun()  # Rerun to show loading state immediately
     
     # Prepare request (no configuration needed - uses curated scenarios)
     request_data = {}
@@ -167,10 +169,11 @@ if run_button or st.session_state.test_running:
         with st.spinner("Running test suite... This may take a few minutes."):
             response = api_client.post("/api/v1/agentic/testSuite", request_data, timeout=120)
         
-        st.session_state.test_running = False
-        
         # Parse standardized agentic response
         status, results, error, timestamp = parseAgenticResponse(response)
+        
+        # Clear running state before processing results
+        st.session_state.test_running = False
         
         if status == "completed" and results:
             st.session_state.test_results = results
@@ -191,8 +194,13 @@ if run_button or st.session_state.test_running:
         st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again in a few moments")
         st.session_state.test_results = None
 
-# Display results
-if st.session_state.test_results:
+# Show loading state if test is running but no results yet
+if st.session_state.test_running and not st.session_state.test_results:
+    st.info("🔄 **Test suite is running...** Please wait while tests are executed.")
+    st.stop()  # Stop rendering to prevent showing empty sections
+
+# Display results - only when results are ready and test is not running
+if st.session_state.test_results and not st.session_state.test_running:
     results = st.session_state.test_results
     summary = results.get("summary", {}) if isinstance(results, dict) else {}
     
@@ -267,112 +275,138 @@ if st.session_state.test_results:
     
     # Confidence deviations - Build with guaranteed fallback
     confidence_deviations = summary.get("confidence_deviations", [])
-    
-    # If no deviations but we have test results, build them
     test_results = results.get("test_results", [])
-    if not confidence_deviations and test_results:
-        confidence_deviations = []
-        for r in test_results:
-            scenario = r.get("scenario", {})
-            title = scenario.get("title", f"Scenario {len(confidence_deviations) + 1}")
-            expected_min = r.get("expected", {}).get("min_confidence", 0.5)
-            actual_conf = r.get("actual", {}).get("confidence")
-            
-            # Handle None actual confidence
-            if actual_conf is None:
-                actual_conf = expected_min  # Assume adequate if not reported
-            
-            confidence_deviations.append({
-                "scenario": title,
-                "expected_min": expected_min,
-                "actual": actual_conf,
-                "deviation": round(actual_conf - expected_min, 3),
-                "adequate": actual_conf >= expected_min
-            })
+    
+    # Always build deviations from test_results if we have them (even if backend returned empty)
+    # This ensures we show the chart even when all tests pass (100% adequacy)
+    if test_results and len(test_results) > 0:
+        # Check if we need to build deviations (either empty or missing)
+        if not confidence_deviations or len(confidence_deviations) == 0:
+            confidence_deviations = []
+            for r in test_results:
+                scenario = r.get("scenario", {})
+                title = scenario.get("title", f"Scenario {len(confidence_deviations) + 1}")
+                expected_min = r.get("expected", {}).get("min_confidence", 0.5)
+                actual_conf = r.get("actual", {}).get("confidence")
+                
+                # Handle None actual confidence
+                if actual_conf is None:
+                    actual_conf = expected_min  # Assume adequate if not reported
+                
+                confidence_deviations.append({
+                    "scenario": title,
+                    "expected_min": expected_min,
+                    "actual": actual_conf,
+                    "deviation": round(actual_conf - expected_min, 3),
+                    "adequate": actual_conf >= expected_min
+                })
 
-    # Confidence Deviations Chart - Simplified to match working pattern from Audit_Trail.py
+    # Confidence Deviations Chart - Using Altair for simple bar chart
     render_section_header("Confidence Deviations", icon="📈", level=2)
     
-    if confidence_deviations and len(confidence_deviations) > 0:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Confidence Deviations Chart**")
-            try:
-                deviation_df = pd.DataFrame(confidence_deviations)
-                fig = px.bar(
-                    deviation_df,
-                    x="scenario",
-                    y="deviation",
-                    color="adequate",
-                    color_discrete_map={True: "#22c55e", False: "#ef4444"},
-                    labels={"deviation": "Deviation (Actual - Expected Min)", "scenario": "Scenario"}
-                )
-                # Explicit styling with VISIBLE backgrounds and borders
-                fig.update_layout(
-                    title={"text": "Confidence Deviations (Actual - Expected Min)", "font": {"color": "#1e293b", "size": 16}},
-                    height=400,
-                    paper_bgcolor='#f8fafc',  # Light gray background - VISIBLE on white page
-                    plot_bgcolor='#ffffff',  # White plot area inside gray border
-                    font={"color": "#1e293b", "size": 12},
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    xaxis={
-                        "title": {"text": "Scenario", "font": {"color": "#1e293b"}},
-                        "tickfont": {"color": "#1e293b"},
-                        "gridcolor": "#cbd5e1",  # Darker grid for visibility
-                        "showline": True,
-                        "linecolor": "#94a3b8",
-                        "linewidth": 2
-                    },
-                    yaxis={
-                        "title": {"text": "Deviation", "font": {"color": "#1e293b"}},
-                        "tickfont": {"color": "#1e293b"},
-                        "gridcolor": "#cbd5e1",  # Darker grid for visibility
-                        "showline": True,
-                        "linecolor": "#94a3b8",
-                        "linewidth": 2
-                    },
-                    legend={
-                        "font": {"color": "#1e293b"},
-                        "bgcolor": "#ffffff",
-                        "bordercolor": "#94a3b8",
-                        "borderwidth": 2,
-                        "title": {"text": "Adequate", "font": {"color": "#1e293b"}}
-                    },
-                    shapes=[dict(
-                        type="rect",
-                        xref="paper", yref="paper",
-                        x0=0, y0=0, x1=1, y1=1,
-                        line=dict(color="#94a3b8", width=2)
-                    )]
-                )
-                fig.update_traces(textfont_color="#1e293b")
-                st.plotly_chart(fig, use_container_width=True, key="confidence_deviations_chart")
-            except Exception as e:
-                st.error(f"Chart rendering error: {str(e)}")
-                st.info("📊 Chart data: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
-        
-        with col2:
-            st.markdown("**Deviation Data Table**")
-            try:
-                deviation_df = pd.DataFrame(confidence_deviations)
-                display_cols = ["scenario", "expected_min", "actual", "deviation", "adequate"]
-                available_cols = [col for col in display_cols if col in deviation_df.columns]
-                if available_cols:
-                    st.dataframe(deviation_df[available_cols], use_container_width=True)
+    # Validate and process confidence_deviations data
+    # Show chart if we have deviations (including when all tests pass - all deviations >= 0)
+    if confidence_deviations and isinstance(confidence_deviations, list) and len(confidence_deviations) > 0:
+        try:
+            # Convert to DataFrame
+            deviation_df = pd.DataFrame(confidence_deviations)
+            
+            # Validate required columns
+            required_cols = ["scenario", "deviation"]
+            if not all(col in deviation_df.columns for col in required_cols):
+                st.error(f"❌ **Data format error**: Missing required columns. Expected: {required_cols}, Got: {list(deviation_df.columns)}")
+                st.info("📊 Raw data sample: " + str(confidence_deviations[:2]))
+            else:
+                # Ensure deviation is numeric
+                deviation_df["deviation"] = pd.to_numeric(deviation_df["deviation"], errors="coerce")
+                
+                # Check if all deviations are valid (not NaN)
+                valid_deviations = deviation_df["deviation"].notna()
+                if not valid_deviations.all():
+                    st.warning(f"⚠️ Some deviation values are invalid (NaN). Valid: {valid_deviations.sum()}/{len(deviation_df)}")
+                    deviation_df = deviation_df[valid_deviations]
+                
+                # Check if we have any data after cleaning
+                if len(deviation_df) == 0:
+                    st.error("❌ **Data error**: No valid deviation data after processing.")
                 else:
-                    st.info("📊 Column mismatch in data.")
-            except Exception as e:
-                st.error(f"Table rendering error: {str(e)}")
-                st.info("📊 Raw data: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
+                    # Check if all deviations are adequate (>= 0)
+                    all_adequate = (deviation_df["deviation"] >= 0).all()
+                    
+                    # Show success message for 100% adequacy, but still display the chart
+                    if all_adequate:
+                        st.success("✅ **All confidence scores met or exceeded expectations!** All scenarios have confidence >= expected minimum.")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Confidence Deviations Chart**")
+                        
+                        # Create color condition: green if deviation >= 0, red if < 0
+                        chart = alt.Chart(deviation_df).mark_bar().encode(
+                            x=alt.X("scenario:N", title="Scenario", sort=None, axis=alt.Axis(labelAngle=-45 if len(deviation_df) > 5 else 0)),
+                            y=alt.Y("deviation:Q", title="Deviation (Actual - Expected Min)"),
+                            color=alt.condition(
+                                alt.datum.deviation >= 0,
+                                alt.value("#22c55e"),  # Green for adequate
+                                alt.value("#ef4444")   # Red for inadequate
+                            ),
+                            tooltip=["scenario", "deviation"]
+                        ).properties(
+                            width="container",
+                            height=400,
+                            title="Confidence Deviations (Actual - Expected Min)"
+                        )
+                        
+                        st.altair_chart(chart, use_container_width=True)
+                    
+                    with col2:
+                        st.markdown("**Deviation Data Table**")
+                        display_cols = ["scenario", "expected_min", "actual", "deviation", "adequate"]
+                        available_cols = [col for col in display_cols if col in deviation_df.columns]
+                        if available_cols:
+                            st.dataframe(deviation_df[available_cols], use_container_width=True)
+                        else:
+                            # Show available columns if expected ones are missing
+                            st.dataframe(deviation_df, use_container_width=True)
+        
+        except Exception as e:
+            st.error(f"❌ **Data processing error**: {str(e)}")
+            st.info("📊 Raw data sample: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
+            import traceback
+            with st.expander("🔍 Error Details", expanded=False):
+                st.code(traceback.format_exc())
+    
     else:
-        st.info("📊 No confidence deviation data available. This typically means all tests met confidence thresholds.")
+        # No deviations data available - this should be rare since we build from test_results above
+        # But handle edge case where test_results might not have confidence data
+        if test_results and len(test_results) > 0:
+            # Try to check if we can determine adequacy from test_results
+            all_adequate = True
+            has_confidence_data = False
+            for r in test_results:
+                actual_conf = r.get("actual", {}).get("confidence")
+                expected_min = r.get("expected", {}).get("min_confidence", 0.5)
+                if actual_conf is not None and expected_min is not None:
+                    has_confidence_data = True
+                    if actual_conf < expected_min:
+                        all_adequate = False
+                        break
+            
+            if has_confidence_data:
+                if all_adequate:
+                    st.success("✅ **All confidence scores met or exceeded expectations!** All scenarios have confidence >= expected minimum.")
+                else:
+                    st.warning("⚠️ **Some confidence scores below threshold** - but deviation data could not be generated.")
+            else:
+                st.info("📊 **No confidence data available** in test results. Cannot generate deviation chart.")
+        else:
+            st.info("📊 No test results available. Run the test suite to see confidence deviations.")
     
-    # Detailed results table
-    render_section_header("Detailed Test Results", icon="🔍", level=2)
-    
+    # Detailed results table - only show header when results are ready
     test_results = results.get("test_results", [])
     if test_results:
+        render_section_header("Detailed Test Results", icon="🔍", level=2)
         results_data = []
         for r in test_results:
             scenario = r.get("scenario", {})
@@ -423,5 +457,10 @@ if st.session_state.test_results:
                 
                 if result.get("error"):
                     st.error(f"**Error**: {result.get('error')}")
+    else:
+        # No test results in the data
+        st.info("📊 No detailed test results available in the response.")
 else:
-    st.info("No test results available.")
+    # No results available and test is not running
+    if not st.session_state.test_running:
+        st.info("No test results available. Run the test suite to see results.")

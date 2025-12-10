@@ -1,0 +1,22 @@
+{
+  "title": "Multinational GDPR Data Subject Access Request",
+  "description": "Large multinational company handling GDPR Data Subject Access Request",
+  "input": {
+    "entity": {
+      "name": "GlobalFinance",
+      "entity_type": "PRIVATE_COMPANY",
+      "locations": ["EU", "US_FEDERAL", "UK"],
+      "industry": "FINANCIAL_SERVICES",
+      "has_personal_data": true,
+      "is_regulated": true,
+      "employee_count": 5000
+    },
+    "task": {
+      "description": "Process a GDPR Data Subject Access Request (DSAR) from an EU resident requesting access to their personal data",
+      "category": "DATA_PRIVACY"
+    }
+  },
+  "expected_decision": "REVIEW_REQUIRED",
+  "expected_risk_level": "MEDIUM",
+  "expected_min_confidence": 0.75
+}
