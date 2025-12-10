@@ -408,8 +408,8 @@ async def analyze_with_agentic_engine(
                 timeout=settings.AGENTIC_OPERATION_TIMEOUT
             )
         except asyncio.TimeoutError:
-            logger.warning(
-                "Agentic analysis timed out",
+            logger.error(
+                f"TIMEOUT: Agentic analysis for {request.entity.entity_name}",
                 extra={
                     "entity_name": request.entity.entity_name,
                     "task_description": request.task.task_description,
@@ -417,12 +417,19 @@ async def analyze_with_agentic_engine(
                 }
             )
             db.rollback()
-            raise HTTPException(
+            # Return a proper JSON response instead of HTTPException for frontend compatibility
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
                 status_code=504,
-                detail={
+                content={
                     "status": "timeout",
-                    "message": "Agentic analysis exceeded time limit",
-                    "timeout_seconds": settings.AGENTIC_OPERATION_TIMEOUT
+                    "error": f"Analysis timed out after {settings.AGENTIC_OPERATION_TIMEOUT} seconds",
+                    "plan": [],
+                    "step_outputs": [],
+                    "reflections": [],
+                    "final_recommendation": "Analysis timed out. Please try with a simpler task.",
+                    "confidence_score": 0.0,
+                    "execution_metrics": {}
                 }
             )
         except Exception as orchestrator_error:
@@ -606,8 +613,12 @@ class TestSuiteRequest(BaseModel):
     max_iterations: int = Field(default=5, description="Maximum iterations per scenario")
 
 
+# NOTE (December 2025): The following response models are legacy from removed routes.
+# They are kept for potential API documentation purposes but are not used by active endpoints.
+# Active endpoints use standardized format: {status, results, error, timestamp}
+
 class TestResult(BaseModel):
-    """Individual test result"""
+    """Individual test result (legacy - not used by active endpoints)"""
     scenario: Dict[str, Any]
     status: str
     execution_time: float
@@ -624,86 +635,10 @@ class TestResult(BaseModel):
 
 
 class TestSuiteResponse(BaseModel):
-    """Response model for test suite execution"""
+    """Response model for test suite execution (legacy - not used by active endpoints)"""
     test_results: List[TestResult]
     summary: Dict[str, Any]
     timestamp: str
-
-
-@router.post("/tests/run", response_model=TestSuiteResponse)
-async def run_test_suite(
-    request: TestSuiteRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Run a test suite through the agentic engine.
-    
-    Generates and executes test scenarios, collecting comprehensive metrics
-    including execution time, tools used, reasoning passes, success rates,
-    and error distributions.
-    
-    Args:
-        request: Test suite configuration
-        db: Database session
-        
-    Returns:
-        Test suite results with metrics and summary
-    """
-    try:
-        # Initialize test suite engine
-        test_engine = TestSuiteEngine(db_session=db)
-        
-        # Convert custom scenarios if provided
-        scenarios = None
-        if request.custom_scenarios:
-            scenarios = [TestScenario.from_dict(s) for s in request.custom_scenarios]
-        
-        # Convert complexity distribution if provided
-        complexity_dist = None
-        if request.complexity_distribution:
-            complexity_dist = {
-                ComplexityLevel(k): v 
-                for k, v in request.complexity_distribution.items()
-            }
-        
-        # Run test suite
-        results = test_engine.run_test_suite(
-            scenarios=scenarios,
-            num_random=request.num_random,
-            complexity_distribution=complexity_dist,
-            max_iterations=request.max_iterations
-        )
-        
-        # Transform results to response format
-        test_results = []
-        for result in results["test_results"]:
-            test_results.append(TestResult(
-                scenario=result["scenario"],
-                status=result["status"],
-                execution_time=result["execution_time"],
-                tools_used=result["tools_used"],
-                required_tools=result["required_tools"],
-                missing_tools=result["missing_tools"],
-                reasoning_passes=result["reasoning_passes"],
-                success=result["success"],
-                errors=result["errors"],
-                confidence_score=result["confidence_score"],
-                plan_steps=result["plan_steps"],
-                executed_steps=result["executed_steps"],
-                timestamp=result["timestamp"]
-            ))
-        
-        return TestSuiteResponse(
-            test_results=test_results,
-            summary=results["summary"],
-            timestamp=results["timestamp"]
-        )
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Test suite execution failed: {str(e)}"
-        )
 
 
 class FailureSimulationRequest(BaseModel):
@@ -717,7 +652,7 @@ class FailureSimulationRequest(BaseModel):
 
 
 class FailureSimulationResponse(BaseModel):
-    """Response model for failure simulation"""
+    """Response model for failure simulation (legacy - not used by active endpoints)"""
     status: str
     execution_time: float
     failures: List[Dict[str, Any]]
@@ -730,78 +665,6 @@ class FailureSimulationResponse(BaseModel):
     timestamp: str
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-
-
-@router.post("/failures/simulate", response_model=FailureSimulationResponse)
-async def simulate_failure(
-    request: FailureSimulationRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Simulate failures in the agentic engine and test recovery.
-    
-    Injects specified failure types during execution and tracks
-    recovery attempts and outcomes.
-    
-    Args:
-        request: Failure simulation configuration
-        db: Database session
-        
-    Returns:
-        Failure simulation results with recovery timeline
-    """
-    try:
-        # Validate failure type
-        try:
-            failure_type = FailureType(request.failure_type)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid failure type: {request.failure_type}. "
-                       f"Valid types: {[ft.value for ft in FailureType]}"
-            )
-        
-        # Initialize failure simulator
-        simulator = FailureSimulator(db_session=db)
-        
-        # Prepare context
-        context = {}
-        if request.entity_context:
-            context["entity"] = request.entity_context
-        if request.task_context:
-            context["task"] = request.task_context
-        
-        # Run simulation
-        results = simulator.simulate_failure(
-            task=request.task,
-            context=context if context else None,
-            failure_type=failure_type,
-            failure_rate=request.failure_rate,
-            max_iterations=request.max_iterations
-        )
-        
-        return FailureSimulationResponse(
-            status=results["status"],
-            execution_time=results["execution_time"],
-            failures=results["failures"],
-            recovery_attempts=results["recovery_attempts"],
-            recovery_timeline=results["recovery_timeline"],
-            failure_statistics=results["failure_statistics"],
-            taxonomy_statistics=results["taxonomy_statistics"],
-            injected_failure_type=results["injected_failure_type"],
-            failure_rate=results["failure_rate"],
-            timestamp=results["timestamp"],
-            result=results.get("result"),
-            error=results.get("error")
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failure simulation failed: {str(e)}"
-        )
 
 
 class BenchmarkRequest(BaseModel):
@@ -821,7 +684,7 @@ class BenchmarkRequest(BaseModel):
 
 
 class BenchmarkResult(BaseModel):
-    """Individual benchmark result"""
+    """Individual benchmark result (legacy - not used by active endpoints)"""
     case_id: str
     case: Dict[str, Any]
     status: str
@@ -833,83 +696,10 @@ class BenchmarkResult(BaseModel):
 
 
 class BenchmarkResponse(BaseModel):
-    """Response model for benchmark execution"""
+    """Response model for benchmark execution (legacy - not used by active endpoints)"""
     benchmark_results: List[BenchmarkResult]
     summary: Dict[str, Any]
     timestamp: str
-
-
-@router.post("/benchmark/run", response_model=BenchmarkResponse)
-async def run_benchmark(
-    request: BenchmarkRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Run benchmark suite to evaluate agentic engine performance.
-    
-    Executes benchmark cases and calculates metrics including:
-    - Accuracy
-    - Reasoning depth score
-    - Tool precision score
-    - Reflection correction score
-    - Average execution time
-    
-    Args:
-        request: Benchmark configuration
-        db: Database session
-        
-    Returns:
-        Benchmark results with aggregated metrics
-    """
-    try:
-        # Convert level strings to BenchmarkLevel enums
-        levels = None
-        if request.levels:
-            try:
-                levels = [BenchmarkLevel(level) for level in request.levels]
-            except ValueError as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid benchmark level. Valid levels: {[l.value for l in BenchmarkLevel]}"
-                )
-        
-        # Initialize benchmark runner
-        runner = BenchmarkRunner(db_session=db)
-        
-        # Run benchmark suite
-        results = runner.run_benchmark_suite(
-            levels=levels,
-            max_cases_per_level=request.max_cases_per_level,
-            max_iterations=request.max_iterations
-        )
-        
-        # Transform results to response format
-        benchmark_results = []
-        for result in results["benchmark_results"]:
-            benchmark_results.append(BenchmarkResult(
-                case_id=result["case_id"],
-                case=result["case"],
-                status=result["status"],
-                execution_time=result["execution_time"],
-                metrics=result["metrics"],
-                timestamp=result["timestamp"],
-                result=result.get("result"),
-                error=result.get("error")
-            ))
-        
-        return BenchmarkResponse(
-            benchmark_results=benchmark_results,
-            summary=results["summary"],
-            timestamp=results["timestamp"]
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Benchmark execution failed: {str(e)}"
-        )
 
 
 class HealthCheckResponse(BaseModel):
@@ -1563,7 +1353,12 @@ async def run_error_recovery_endpoint(
 
 
 # ============================================================================
-# NOTE: Route aliases removed - frontend uses canonical routes only
-# Canonical routes: /testSuite, /benchmarks, /recovery, /error-recovery, /health/full
-# Frontend calls: /api/v1/agentic/testSuite, /api/v1/agentic/benchmarks, /api/v1/agentic/recovery, /api/v1/agentic/error-recovery
+# NOTE: Legacy routes removed (December 2025)
+# Removed unused routes: /tests/run, /benchmark/run, /failures/simulate
+# Frontend uses canonical routes only:
+# - /api/v1/agentic/testSuite (replaces /tests/run)
+# - /api/v1/agentic/benchmarks (replaces /benchmark/run)
+# - /api/v1/agentic/recovery (replaces /failures/simulate)
+# - /api/v1/agentic/error-recovery
+# - /api/v1/agentic/health/full
 # ============================================================================

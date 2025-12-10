@@ -1,7 +1,7 @@
 # Schema v2 - Unified Data Schemas
 
 **Version:** 2.0  
-**Last Updated:** November 2025
+**Last Updated:** December 2025
 
 ---
 
@@ -419,6 +419,6 @@ from schemas.schema_loader import load_jurisdictions
 
 ---
 
-*Last Updated: November 2025*  
+*Last Updated: December 2025*  
 *Schema Version: 2.0*
 

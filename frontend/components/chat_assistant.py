@@ -97,13 +97,15 @@ def process_chat_query(user_query: str, current_page: str, system_prompt: str, c
     ]
     
     # Call API
+    # Pass original user query separately for audit logging (without system prompts)
     try:
         client = APIClient()
         response = client.post(
             "/api/v1/query",
             {
-                "query": enhanced_query,
-                "chat_history": chat_history if chat_history else None
+                "query": enhanced_query,  # Enhanced query with system prompts for LLM processing
+                "chat_history": chat_history if chat_history else None,
+                "original_user_query": user_query  # Original user query for audit logging
             },
             timeout=30
         )

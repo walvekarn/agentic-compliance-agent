@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 from backend.agentic_engine.tools.tool_registry import ToolRegistry
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class AgentLoop:
         
         # Initialize reasoning engine if not provided
         if reasoning_engine is None:
-            self.reasoning_engine = ReasoningEngine()
+            self.reasoning_engine = ReasoningEngine(api_key=settings.OPENAI_API_KEY)
         else:
             self.reasoning_engine = reasoning_engine
         

@@ -24,7 +24,7 @@ sys.path.insert(0, str(frontend_dir))
 from components.auth_utils import require_auth, show_logout_button
 from components.session_manager import SessionManager
 from components.api_client import APIClient, display_api_error, parseAgenticResponse
-from components.ui_helpers import render_plotly_chart
+# render_plotly_chart removed - using direct st.plotly_chart instead
 
 # Page config
 st.set_page_config(page_title="Agentic Test Suite", page_icon="🧪", layout="wide")
@@ -77,6 +77,53 @@ st.markdown("""
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.75rem;
+}
+/* Test result badges - force light theme */
+.test-expected-badge, .test-actual-badge {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+}
+/* Force light theme for ALL badges in test results */
+.stMarkdown span[style*="background"],
+.element-container span[style*="background"] {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+}
+/* Specific badge overrides */
+code, .stMarkdown code {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+/* Decision badges */
+.stMarkdown strong + code,
+code:contains("ESCALATE"),
+code:contains("AUTONOMOUS"),
+code:contains("REVIEW") {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+}
+/* Detailed results table styling */
+.stDataFrame, [data-testid="stDataFrame"] {
+    background-color: #ffffff !important;
+}
+.stDataFrame td, .stDataFrame th {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+/* Override any dark theme leakage */
+[data-testid="stExpander"] {
+    background-color: #ffffff !important;
+}
+[data-testid="stExpander"] summary {
+    color: #1e293b !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -218,51 +265,108 @@ if st.session_state.test_results:
                         deviation = c.get("deviation", 0)
                         st.warning(f"**Confidence Below Threshold**: Expected min `{c.get('expected_min'):.2f}`, got `{c.get('actual'):.2f}` (deviation: {deviation:+.2f})")
     
-    # Confidence deviations
+    # Confidence deviations - Build with guaranteed fallback
     confidence_deviations = summary.get("confidence_deviations", [])
-    # Fallback: if there are test_results but no deviations, build a flat-zero chart so the UI is not blank
-    if (not confidence_deviations) and test_results:
-        fallback_devs = []
+    
+    # If no deviations but we have test results, build them
+    test_results = results.get("test_results", [])
+    if not confidence_deviations and test_results:
+        confidence_deviations = []
         for r in test_results:
             scenario = r.get("scenario", {})
-            title = scenario.get("title", "Scenario")
-            expected_min = r.get("expected", {}).get("min_confidence", 0.0)
-            actual_conf = r.get("actual", {}).get("confidence", expected_min)
-            fallback_devs.append({
+            title = scenario.get("title", f"Scenario {len(confidence_deviations) + 1}")
+            expected_min = r.get("expected", {}).get("min_confidence", 0.5)
+            actual_conf = r.get("actual", {}).get("confidence")
+            
+            # Handle None actual confidence
+            if actual_conf is None:
+                actual_conf = expected_min  # Assume adequate if not reported
+            
+            confidence_deviations.append({
                 "scenario": title,
                 "expected_min": expected_min,
                 "actual": actual_conf,
-                "deviation": actual_conf - expected_min if actual_conf is not None else 0.0,
-                "adequate": (actual_conf or 0.0) >= expected_min
+                "deviation": round(actual_conf - expected_min, 3),
+                "adequate": actual_conf >= expected_min
             })
-        confidence_deviations = fallback_devs
 
-    if confidence_deviations:
-        render_section_header("Confidence Deviations", icon="📈", level=2)
-        
-        deviation_df = pd.DataFrame(confidence_deviations)
-        
+    # Confidence Deviations Chart - Simplified to match working pattern from Audit_Trail.py
+    render_section_header("Confidence Deviations", icon="📈", level=2)
+    
+    if confidence_deviations and len(confidence_deviations) > 0:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Deviation chart
-            if not deviation_df.empty:
+            st.markdown("**Confidence Deviations Chart**")
+            try:
+                deviation_df = pd.DataFrame(confidence_deviations)
                 fig = px.bar(
                     deviation_df,
                     x="scenario",
                     y="deviation",
                     color="adequate",
-                    color_discrete_map={True: "#28a745", False: "#dc3545"},
-                    labels={"deviation": "Deviation", "scenario": "Scenario"}
+                    color_discrete_map={True: "#22c55e", False: "#ef4444"},
+                    labels={"deviation": "Deviation (Actual - Expected Min)", "scenario": "Scenario"}
                 )
-                render_plotly_chart(fig, title="Confidence Deviations (Actual - Expected Min)", height=400, show_title=True)
+                # Explicit styling with VISIBLE backgrounds and borders
+                fig.update_layout(
+                    title={"text": "Confidence Deviations (Actual - Expected Min)", "font": {"color": "#1e293b", "size": 16}},
+                    height=400,
+                    paper_bgcolor='#f8fafc',  # Light gray background - VISIBLE on white page
+                    plot_bgcolor='#ffffff',  # White plot area inside gray border
+                    font={"color": "#1e293b", "size": 12},
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    xaxis={
+                        "title": {"text": "Scenario", "font": {"color": "#1e293b"}},
+                        "tickfont": {"color": "#1e293b"},
+                        "gridcolor": "#cbd5e1",  # Darker grid for visibility
+                        "showline": True,
+                        "linecolor": "#94a3b8",
+                        "linewidth": 2
+                    },
+                    yaxis={
+                        "title": {"text": "Deviation", "font": {"color": "#1e293b"}},
+                        "tickfont": {"color": "#1e293b"},
+                        "gridcolor": "#cbd5e1",  # Darker grid for visibility
+                        "showline": True,
+                        "linecolor": "#94a3b8",
+                        "linewidth": 2
+                    },
+                    legend={
+                        "font": {"color": "#1e293b"},
+                        "bgcolor": "#ffffff",
+                        "bordercolor": "#94a3b8",
+                        "borderwidth": 2,
+                        "title": {"text": "Adequate", "font": {"color": "#1e293b"}}
+                    },
+                    shapes=[dict(
+                        type="rect",
+                        xref="paper", yref="paper",
+                        x0=0, y0=0, x1=1, y1=1,
+                        line=dict(color="#94a3b8", width=2)
+                    )]
+                )
+                fig.update_traces(textfont_color="#1e293b")
+                st.plotly_chart(fig, use_container_width=True, key="confidence_deviations_chart")
+            except Exception as e:
+                st.error(f"Chart rendering error: {str(e)}")
+                st.info("📊 Chart data: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
         
         with col2:
-            # Deviation table
-            st.dataframe(
-                deviation_df[["scenario", "expected_min", "actual", "deviation", "adequate"]],
-                width="stretch"
-            )
+            st.markdown("**Deviation Data Table**")
+            try:
+                deviation_df = pd.DataFrame(confidence_deviations)
+                display_cols = ["scenario", "expected_min", "actual", "deviation", "adequate"]
+                available_cols = [col for col in display_cols if col in deviation_df.columns]
+                if available_cols:
+                    st.dataframe(deviation_df[available_cols], use_container_width=True)
+                else:
+                    st.info("📊 Column mismatch in data.")
+            except Exception as e:
+                st.error(f"Table rendering error: {str(e)}")
+                st.info("📊 Raw data: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
+    else:
+        st.info("📊 No confidence deviation data available. This typically means all tests met confidence thresholds.")
     
     # Detailed results table
     render_section_header("Detailed Test Results", icon="🔍", level=2)

@@ -11,6 +11,86 @@ from backend.agent.risk_models import DecisionAnalysis
 class AuditService:
     """Service for logging and retrieving agent decisions in audit trail"""
     
+    # System prompt patterns to detect and filter out
+    SYSTEM_PROMPT_PATTERNS = [
+        "you are helping a user",
+        "you are an expert compliance",
+        "you are an expert compliance analyst",
+        "you are a helpful ai assistant",
+        "your role is to",
+        "system:",
+        "assistant:",
+        "current page:",
+        "entity:",
+        "task:",
+        "recent decision:",
+        "form context:",
+        "please provide a clear",
+        "based on the context above",
+    ]
+    
+    @staticmethod
+    def _is_system_prompt(text: str) -> bool:
+        """Check if text looks like a system prompt rather than user input."""
+        if not text:
+            return False
+        text_lower = text.lower().strip()
+        # Check if it starts with system prompt patterns
+        if any(text_lower.startswith(pattern) for pattern in ["you are", "system:", "your role", "current page:"]):
+            return True
+        # Check if it contains multiple system prompt indicators (likely a combined prompt)
+        pattern_count = sum(1 for pattern in AuditService.SYSTEM_PROMPT_PATTERNS if pattern in text_lower)
+        return pattern_count >= 2  # If 2+ patterns found, it's likely a system prompt
+    
+    @staticmethod
+    def _extract_user_task(text: str) -> str:
+        """Extract the user's actual task from a combined system+user prompt."""
+        if not text:
+            return "Unknown task"
+        
+        text_lower = text.lower()
+        
+        # Common patterns for where user content starts
+        markers = [
+            "user question:",
+            "user query:",
+            "current query:",
+            "query:",
+            "task:",
+            "analyze compliance task for",
+        ]
+        
+        # Try to find the user's actual question
+        for marker in markers:
+            if marker in text_lower:
+                idx = text_lower.index(marker) + len(marker)
+                extracted = text[idx:].strip()
+                # Clean up common trailing phrases
+                for trailing in ["please provide", "based on", "explain", "help"]:
+                    if extracted.lower().startswith(trailing):
+                        # Try to find the actual question after these phrases
+                        trailing_idx = extracted.lower().index(trailing) + len(trailing)
+                        extracted = extracted[trailing_idx:].strip()
+                        if extracted.startswith("a "):
+                            extracted = extracted[2:].strip()
+                # If we found meaningful content, return it
+                if len(extracted) > 10:
+                    return extracted[:500] if len(extracted) > 500 else extracted
+        
+        # If text starts with system prompt, try to extract from the end
+        if text_lower.startswith(("you are", "system:", "your role")):
+            # Look for "User Question:" or similar near the end
+            for marker in ["user question:", "user query:", "query:"]:
+                if marker in text_lower:
+                    idx = text_lower.index(marker) + len(marker)
+                    extracted = text[idx:].strip()
+                    if len(extracted) > 10:
+                        return extracted[:500] if len(extracted) > 500 else extracted
+            return "Compliance query"
+        
+        # Otherwise, return the text as-is (but limit length)
+        return text[:500] if len(text) > 500 else text
+    
     @staticmethod
     def log_decision_analysis(
         db: Session,
@@ -113,6 +193,16 @@ class AuditService:
         Returns:
             AuditTrail object that was created
         """
+        # Filter out system prompts - use original task from metadata if available
+        original_task_description = (metadata or {}).get("original_task_description") if metadata else None
+        
+        if AuditService._is_system_prompt(task_description):
+            if original_task_description:
+                task_description = original_task_description
+            else:
+                # Try to extract user task from the prompt
+                task_description = AuditService._extract_user_task(task_description)
+        
         audit_entry = AuditTrail(
             timestamp=datetime.utcnow(),
             agent_type=agent_type,
@@ -410,6 +500,16 @@ class AuditService:
             "audit_log": audit_log,
             **meta
         }
+        
+        # Filter out system prompts - use original task from metadata if available
+        original_task_description = meta.get("original_task_description") if meta else None
+        
+        if AuditService._is_system_prompt(task_description):
+            if original_task_description:
+                task_description = original_task_description
+            else:
+                # Try to extract user task from the prompt
+                task_description = AuditService._extract_user_task(task_description)
         
         # Create audit trail entry
         audit_entry = AuditTrail(

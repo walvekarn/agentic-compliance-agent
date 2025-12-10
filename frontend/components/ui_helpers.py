@@ -183,24 +183,38 @@ def apply_light_theme_css():
         
         /* ====================================================================
            CHECKBOXES - Complete Styling (Enhanced for Light Theme)
+           REWRITTEN: Fixed width constraints to prevent vertical layout collapse
            ==================================================================== */
+        /* Checkbox container - CRITICAL: width constraints prevent collapse */
         .stCheckbox {
-            margin-bottom: 0.35rem;
-            display: inline-flex !important;
+            margin-bottom: 0.35rem !important;
+            display: flex !important;
             align-items: flex-start !important;
-            gap: 0.25rem !important;
+            gap: 0.5rem !important;
             flex-wrap: nowrap !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            flex-shrink: 0 !important;
         }
         
+        /* Checkbox label - Prevent vertical text wrapping */
         .stCheckbox > label,
         .stCheckbox label:first-of-type {
             color: #1e293b !important;
             font-size: 1rem !important;
-            display: inline-flex !important;
+            display: flex !important;
             align-items: center !important;
-            gap: 0.25rem !important;
-            line-height: 1.2 !important;
+            gap: 0.5rem !important;
+            line-height: 1.4 !important;
             white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            width: auto !important;
         }
         
         /* Checkbox box styling - Multiple selectors to override Streamlit defaults */
@@ -296,10 +310,24 @@ def apply_light_theme_css():
             background: #3b82f6 !important;
         }
         
-        /* Force checkbox caret/text to stay horizontal */
-        .stCheckbox [data-baseweb="checkbox"] span {
+        /* Force checkbox caret/text to stay horizontal - CRITICAL */
+        .stCheckbox [data-baseweb="checkbox"] span,
+        .stCheckbox span {
             writing-mode: horizontal-tb !important;
             transform: none !important;
+            text-orientation: mixed !important;
+            text-align: left !important;
+        }
+        
+        /* Checkbox wrapper div - prevent width collapse */
+        .stCheckbox > div {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            flex-wrap: nowrap !important;
         }
         
         /* ====================================================================
@@ -816,10 +844,17 @@ def apply_light_theme_css():
         /* ====================================================================
            MOBILE RESPONSIVENESS
            ==================================================================== */
-        /* Ensure columns don't collapse on desktop */
-        [data-testid="column"] {
-            min-width: 280px !important;
+        /* Ensure columns don't collapse on desktop (non-form columns) */
+        [data-testid="column"]:not(.stForm [data-testid="column"]) {
+            min-width: 300px !important;
+            flex: 1 1 300px !important;
             align-items: flex-start !important;
+        }
+        
+        /* Prevent horizontal overflow from squeezing columns (non-form) */
+        [data-testid="stHorizontalBlock"]:not(.stForm [data-testid="stHorizontalBlock"]) {
+            flex-wrap: wrap !important;
+            gap: 1rem !important;
         }
 
         @media (max-width: 768px) {
@@ -832,8 +867,8 @@ def apply_light_theme_css():
                 font-size: 1.5rem !important;
             }
             
-            /* Stack columns on mobile */
-            [data-testid="column"] {
+            /* Stack columns on mobile (non-form columns) */
+            [data-testid="column"]:not(.stForm [data-testid="column"]) {
                 min-width: 100% !important;
                 width: 100% !important;
             }
@@ -853,7 +888,10 @@ def apply_light_theme_css():
         /* ====================================================================
            FORMS - Layout and Alignment
            ==================================================================== */
-        .stForm {
+        /* Form container max-width to prevent over-expansion */
+        .stForm, [data-testid="stForm"] {
+            max-width: 1200px !important;
+            margin: 0 auto !important;
             background-color: #ffffff !important;
             padding: 1.5rem !important;
             border-radius: 8px !important;
@@ -874,6 +912,73 @@ def apply_light_theme_css():
         [data-testid="column"] .stSelectbox,
         [data-testid="column"] .stMultiSelect {
             width: 100% !important;
+        }
+        
+        /* ====================================================================
+           FORM COLUMNS - CRITICAL: Prevent column collapse in forms
+           ==================================================================== */
+        /* Form columns must maintain minimum width to prevent collapse */
+        .stForm [data-testid="column"],
+        .stForm [data-testid="stHorizontalBlock"] > [data-testid="column"],
+        [data-testid="stForm"] [data-testid="column"] {
+            min-width: 350px !important;
+            width: 50% !important;
+            max-width: 50% !important;
+            flex: 0 0 50% !important;
+            flex-basis: 50% !important;
+            flex-shrink: 0 !important;
+            flex-grow: 0 !important;
+            box-sizing: border-box !important;
+            padding: 0 0.5rem !important;
+            writing-mode: horizontal-tb !important;
+            text-orientation: mixed !important;
+        }
+        
+        /* Prevent ANY text rotation in form columns */
+        .stForm [data-testid="column"] *,
+        [data-testid="stForm"] [data-testid="column"] * {
+            writing-mode: horizontal-tb !important;
+            text-orientation: mixed !important;
+            transform: none !important;
+            text-align: left !important;
+        }
+        
+        /* Form horizontal block - ensure columns don't wrap unexpectedly */
+        .stForm [data-testid="stHorizontalBlock"],
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            gap: 1rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Checkboxes inside form columns - ensure full width */
+        .stForm [data-testid="column"] .stCheckbox,
+        [data-testid="stForm"] [data-testid="column"] .stCheckbox {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+        
+        /* Multiselect inside form columns - ensure full width */
+        .stForm [data-testid="column"] .stMultiSelect,
+        [data-testid="stForm"] [data-testid="column"] .stMultiSelect {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+        
+        /* Media query: Stack columns on smaller screens only */
+        @media (max-width: 900px) {
+            .stForm [data-testid="column"],
+            .stForm [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+                min-width: 100% !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                flex: 0 0 100% !important;
+                flex-basis: 100% !important;
+            }
         }
         
         /* ====================================================================
@@ -1147,21 +1252,59 @@ def multiselect_with_select_all(
     
     current_selection = st.session_state[state_key]
     
-    # Add "Select All" / "Deselect All" toggle
-    select_all_col, multiselect_col = st.columns([1, 4])
-    
-    with select_all_col:
+    # Avoid nested columns when inside_form=True to prevent layout collapse
+    if inside_form:
+        # Stack vertically for forms to avoid nested column issues
         all_selected = len(current_selection) == len(options) and len(options) > 0
-
-        if inside_form:
-            # SAFE toggle for forms (checkbox instead of button)
-            toggle = st.checkbox(
-                "📋 Select All" if not all_selected else "✂️ Clear All",
-                value=all_selected,
-                key=f"{state_key}_select_all_toggle",
-                help="Select all options" if not all_selected else "Clear all selections"
-            )
-        else:
+        
+        # Add container with width constraint for form mode
+        st.markdown('<div style="width: 100%; max-width: 100%; box-sizing: border-box;">', unsafe_allow_html=True)
+        
+        toggle = st.checkbox(
+            "📋 Select All" if not all_selected else "✂️ Clear All",
+            value=all_selected,
+            key=f"{state_key}_select_all_toggle",
+            help="Select all options" if not all_selected else "Clear all selections"
+        )
+        
+        # If user toggles, update state
+        if toggle != all_selected:
+            if toggle:
+                st.session_state[state_key] = options.copy()
+            else:
+                st.session_state[state_key] = []
+        
+        # Multiselect below toggle (no nested columns) - full width
+        current_default = st.session_state[state_key]
+        valid_default = [opt for opt in current_default if opt in options] if current_default else []
+        
+        # If no valid default and default parameter was provided, use it if valid
+        if not valid_default and default:
+            valid_default = [opt for opt in default if opt in options]
+        
+        # Wrap multiselect in container to ensure full width
+        st.markdown('<div style="width: 100%; max-width: 100%;">', unsafe_allow_html=True)
+        selected = st.multiselect(
+            label,
+            options=options,
+            default=valid_default,
+            key=key or f"ms_{label.replace(' ', '_')}",
+            help=help,
+            placeholder=placeholder if placeholder else "Choose options..."
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Update state
+        st.session_state[state_key] = selected
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        # Use columns only when NOT in form (outside forms, nested columns are fine)
+        select_all_col, multiselect_col = st.columns([1, 4])
+        
+        with select_all_col:
+            all_selected = len(current_selection) == len(options) and len(options) > 0
+            
             # Use button when not in form (better UX outside forms)
             if st.button(
                 "📋 Select All" if not all_selected else "✂️ Clear All",
@@ -1173,34 +1316,34 @@ def multiselect_with_select_all(
             else:
                 toggle = all_selected
 
-        # If user toggles, update state
-        if toggle != all_selected:
-            if toggle:
-                st.session_state[state_key] = options.copy()
-            else:
-                st.session_state[state_key] = []
-    
-    with multiselect_col:
-        # Show multiselect - always enabled to fix "No results" bug
-        # Ensure default values are valid (subset of options)
-        current_default = st.session_state[state_key]
-        valid_default = [opt for opt in current_default if opt in options] if current_default else []
+            # If user toggles, update state
+            if toggle != all_selected:
+                if toggle:
+                    st.session_state[state_key] = options.copy()
+                else:
+                    st.session_state[state_key] = []
         
-        # If no valid default and default parameter was provided, use it if valid
-        if not valid_default and default:
-            valid_default = [opt for opt in default if opt in options]
-        
-        selected = st.multiselect(
-            label,
-            options=options,
-            default=valid_default,
-            key=key or f"ms_{label.replace(' ', '_')}",
-            help=help,
-            placeholder=placeholder if placeholder else "Choose options..."
-        )
-        
-        # Update state
-        st.session_state[state_key] = selected
+        with multiselect_col:
+            # Show multiselect - always enabled to fix "No results" bug
+            # Ensure default values are valid (subset of options)
+            current_default = st.session_state[state_key]
+            valid_default = [opt for opt in current_default if opt in options] if current_default else []
+            
+            # If no valid default and default parameter was provided, use it if valid
+            if not valid_default and default:
+                valid_default = [opt for opt in default if opt in options]
+            
+            selected = st.multiselect(
+                label,
+                options=options,
+                default=valid_default,
+                key=key or f"ms_{label.replace(' ', '_')}",
+                help=help,
+                placeholder=placeholder if placeholder else "Choose options..."
+            )
+            
+            # Update state
+            st.session_state[state_key] = selected
     
     return st.session_state[state_key]
 

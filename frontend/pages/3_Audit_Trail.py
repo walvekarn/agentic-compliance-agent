@@ -27,7 +27,7 @@ from components.constants import API_BASE_URL
 st.set_page_config(page_title="Audit Trail", page_icon="📊", layout="wide")
 
 # Apply light theme CSS (comprehensive styling already includes all necessary overrides)
-from components.ui_helpers import apply_light_theme_css, render_page_header, render_section_header, render_divider, render_plotly_chart
+from components.ui_helpers import apply_light_theme_css, render_page_header, render_section_header, render_divider
 apply_light_theme_css()
 
 # ============================================================================
@@ -35,6 +35,14 @@ apply_light_theme_css()
 # ============================================================================
 require_auth()
 # ============================================================================
+
+# ============================================================================
+# SESSION-BASED AUDIT RECORDS (10 items per session)
+# ============================================================================
+# Initialize session audit records - resets on each new login session
+if "session_audit_records" not in st.session_state:
+    st.session_state["session_audit_records"] = []
+SESSION_AUDIT_LIMIT = 10  # Fixed limit - no user selection
 
 # Note: All component styling is now handled by apply_light_theme_css() in ui_helpers.py
 # No duplicate CSS needed here - base theme covers all components
@@ -253,12 +261,8 @@ with col3:
     filter_risk = [risk_labels[label] for label in risk_choices]
 
 with col4:
-    limit = st.selectbox(
-        "Show Records",
-        options=[10, 25, 50, 100],
-        index=1,
-        help="How many recent records would you like to display?"
-    )
+    # Session-based: Always show last 10 records from current session
+    st.caption(f"📋 Showing last {SESSION_AUDIT_LIMIT} session records")
 
 if search_query and search_query.strip():
     st.caption(f"🔎 Searching for: **{search_query}** | 💡 Tip: Combine search with filters to find exactly what you need.")
@@ -276,8 +280,8 @@ try:
     elif date_range == "Last 30 Days":
         date_filter = (datetime.now() - timedelta(days=30)).isoformat()
     
-    # Build query parameters
-    params = {"limit": limit}
+    # Fetch entries from API (we'll filter to session records)
+    params = {"limit": 100}  # Fetch enough to populate session
     if date_filter:
         params["start_date"] = date_filter
     
@@ -285,7 +289,13 @@ try:
     data = {}
     entries = []
     try:
-        with st.spinner("Loading audit trail entries..."):
+        # Show spinner only on first load or when cache expires
+        if "audit_entries_loaded" not in st.session_state:
+            with st.spinner("Loading audit trail entries..."):
+                response = api.get("/api/v1/audit/entries", params=params)
+                st.session_state["audit_entries_loaded"] = True
+        else:
+            # Subsequent loads are faster without spinner
             response = api.get("/api/v1/audit/entries", params=params)
         
         if not response.success:
@@ -316,6 +326,18 @@ try:
                 # Debug: Log if transformation issues occurred
                 if len(entries) != len(entries_raw) and len(entries_raw) > 0:
                     st.warning(f"⚠️ **Data Transformation**: {len(entries_raw)} entries returned, {len(entries)} transformed successfully.")
+                
+                # Track entries in session and maintain only last 10
+                for entry in entries:
+                    entry_id = get_audit_id(entry)
+                    if entry_id:
+                        # Check if entry already exists in session (avoid duplicates)
+                        existing_ids = [get_audit_id(e) for e in st.session_state["session_audit_records"]]
+                        if entry_id not in existing_ids:
+                            st.session_state["session_audit_records"].append(entry)
+                
+                # Show only last 10 from session
+                entries = st.session_state["session_audit_records"][-SESSION_AUDIT_LIMIT:]
     except requests.exceptions.Timeout:
         st.error("⏱️ **Timeout**: Request to backend timed out.")
         st.info("💡 **Troubleshooting**:\n1. The backend may be overloaded\n2. Try again in a few moments\n3. Check backend logs for issues")
@@ -491,21 +513,78 @@ try:
             
             # Get task description with fallback
             task_description = task.get('description') if isinstance(task, dict) else entry.get('task_description', 'N/A')
-            task_desc_display = task_description[:60] + '...' if len(str(task_description)) > 60 else task_description
+            
+            # FIX: Extract better description from system prompts or metadata
+            def extract_better_description(desc, entry):
+                """Extract a more meaningful description from system prompts or metadata"""
+                if not desc or desc == 'N/A':
+                    return desc
+                
+                desc_str = str(desc)
+                # Check if it's a system prompt
+                system_indicators = ["you are helping a user", "you are an expert", "system:", "your role is", "current page:"]
+                is_system_prompt = any(indicator in desc_str.lower() for indicator in system_indicators)
+                
+                if is_system_prompt:
+                    # Try to get original task from metadata
+                    metadata = entry.get('metadata', {}) or entry.get('meta_data', {})
+                    if isinstance(metadata, dict):
+                        original_task = metadata.get('original_task_description')
+                        if original_task and len(str(original_task)) > 10:
+                            return str(original_task)
+                    
+                    # Try to extract from common patterns
+                    markers = ["user question:", "user query:", "current query:", "query:", "task:"]
+                    for marker in markers:
+                        if marker.lower() in desc_str.lower():
+                            idx = desc_str.lower().index(marker.lower()) + len(marker)
+                            extracted = desc_str[idx:].strip()
+                            # Clean up trailing phrases
+                            for trailing in ["please provide", "based on", "explain"]:
+                                if extracted.lower().startswith(trailing):
+                                    extracted = extracted[len(trailing):].strip()
+                            if len(extracted) > 10:
+                                return extracted[:200]  # Limit length
+                    
+                    # If it's clearly a system prompt, use entity name or category as fallback
+                    entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
+                    category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
+                    if entity_name:
+                        return f"Query for {entity_name}"
+                    elif category:
+                        return f"{category.replace('_', ' ').title()} Query"
+                    else:
+                        return "Compliance Query"
+                
+                return desc_str
+            
+            # Get improved task description
+            improved_task_description = extract_better_description(task_description, entry)
+            task_desc_display = improved_task_description[:80] + '...' if len(str(improved_task_description)) > 80 else improved_task_description
+            
+            # Get entity name for display
+            entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
+            
+            # FIX: Include entity name in display if available to make records more distinguishable
+            if entity_name and entity_name != 'N/A' and entity_name:
+                display_label = f"{audit_id} | {entity_name}: {task_desc_display}"
+            else:
+                display_label = f"{audit_id} | {task_desc_display}"
             
             # Get decision outcome with fallback
             outcome = decision.get('outcome') if isinstance(decision, dict) else entry.get('decision_outcome', 'UNKNOWN')
             risk_level = decision.get('risk_level') if isinstance(decision, dict) else entry.get('risk_level')
             
             with st.expander(
-                f"{audit_id} | {task_desc_display} | "
+                f"{display_label} | "
                 f"{show_decision_badge(outcome)} "
                 f"{show_risk_badge(risk_level or 'N/A')}"
             ):
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
-                    st.markdown(f"**Task:** {task_description}")
+                    # Use improved task description for display
+                    st.markdown(f"**Task:** {improved_task_description}")
                     # Handle None category gracefully
                     category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
                     category_label = category.replace('_', ' ').title() if category else 'N/A'
@@ -803,21 +882,23 @@ except Exception as e:
         import traceback
         st.code(traceback.format_exc())
 
-# Statistics
+# Statistics - CACHED for performance
 render_divider()
 render_section_header("Overall Statistics", icon="📈", level=3)
 
-try:
-    with st.spinner("Loading statistics..."):
+@st.cache_data(ttl=60)  # Cache for 60 seconds to improve performance
+def get_cached_statistics():
+    """Cached statistics to improve performance"""
+    try:
         stats_response = APIClient().get("/api/v1/audit/statistics")
-    if stats_response.success and isinstance(stats_response.data, dict):
-        stats = stats_response.data
-    else:
-        st.info("Statistics not available at this time.")
-        stats = None
-except Exception as e:
-    st.info(f"Statistics not available: {str(e)}")
-    stats = None
+        if stats_response.success and isinstance(stats_response.data, dict):
+            return stats_response.data
+    except Exception:
+        pass
+    return None
+
+# Use cached statistics instead of blocking call
+stats = get_cached_statistics()
 
 if stats:
         
@@ -835,18 +916,16 @@ if stats:
             high_risk = stats.get("by_risk_level", {}).get("HIGH", 0)
             st.metric("High Risk Items", high_risk)
         
-        # Charts - Using Plotly with plotly_white theme
-        try:
-            import plotly.express as px
-            import plotly.graph_objects as go
-            import plotly.io as pio
-            pio.templates.default = "plotly_white"
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                by_outcome = stats.get("by_outcome", {})
-                if by_outcome:
+        # Charts - COMPLETELY REWRITTEN: Direct Plotly rendering with explicit styling
+        st.markdown("### 📊 Decision Statistics")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Decisions by Outcome**")
+            by_outcome = stats.get("by_outcome", {})
+            if by_outcome and isinstance(by_outcome, dict) and len(by_outcome) > 0:
+                try:
+                    import plotly.express as px
                     df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
                     fig = px.bar(
                         df_outcome,
@@ -854,17 +933,58 @@ if stats:
                         y="Count",
                         color="Decision",
                         color_discrete_map={
-                            "AUTONOMOUS": "#10b981",
-                            "REVIEW_REQUIRED": "#f59e0b",
-                            "ESCALATE": "#ef4444"
-                        }
+                            "AUTONOMOUS": "#059669",  # Much darker green for visibility
+                            "REVIEW_REQUIRED": "#d97706",  # Much darker orange for visibility
+                            "ESCALATE": "#dc2626"  # Much darker red for visibility
+                        },
+                        labels={"Decision": "Decision Type", "Count": "Number of Decisions"}
                     )
-                    # render_plotly_chart will apply light theme - just set basic layout here
-                    render_plotly_chart(fig, title="Decisions by Outcome", height=400, show_title=True)
-            
-            with col2:
-                by_risk = stats.get("by_risk_level", {})
-                if by_risk:
+                    # FIXED: Much darker colors, thicker borders, better contrast
+                    fig.update_layout(
+                        title={"text": "Decisions by Outcome", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
+                        height=400,
+                        paper_bgcolor='#ffffff',
+                        plot_bgcolor='#ffffff',
+                        font={"color": "#0f172a", "size": 14},
+                        margin=dict(l=60, r=20, t=50, b=60),
+                        xaxis={
+                            "title": {"text": "Decision Type", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                            "tickfont": {"color": "#0f172a", "size": 12},
+                            "gridcolor": "#64748b",
+                            "showline": True,
+                            "linecolor": "#475569",
+                            "linewidth": 3
+                        },
+                        yaxis={
+                            "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                            "tickfont": {"color": "#0f172a", "size": 12},
+                            "gridcolor": "#64748b",
+                            "showline": True,
+                            "linecolor": "#475569",
+                            "linewidth": 3
+                        },
+                        showlegend=False
+                    )
+                    # FIXED: Add thick borders to bars and dark text
+                    fig.update_traces(
+                        marker_line_width=3,
+                        marker_line_color="#0f172a",
+                        textfont_color="#0f172a",
+                        textfont_size=14
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="audit_outcome_chart")
+                except Exception as e:
+                    st.error(f"Chart rendering error: {str(e)}")
+                    st.info("📊 Chart data: " + str(by_outcome))
+            else:
+                st.info("📊 No outcome data available for chart.")
+        
+        with col2:
+            st.markdown("**Decisions by Risk Level**")
+            by_risk = stats.get("by_risk_level", {})
+            if by_risk and isinstance(by_risk, dict) and len(by_risk) > 0:
+                try:
+                    import plotly.express as px
                     df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
                     fig = px.bar(
                         df_risk,
@@ -872,16 +992,51 @@ if stats:
                         y="Count",
                         color="Risk Level",
                         color_discrete_map={
-                            "LOW": "#10b981",
-                            "MEDIUM": "#f59e0b",
-                            "HIGH": "#ef4444"
-                        }
+                            "LOW": "#059669",  # Much darker green for visibility
+                            "MEDIUM": "#d97706",  # Much darker orange for visibility
+                            "HIGH": "#dc2626"  # Much darker red for visibility
+                        },
+                        labels={"Risk Level": "Risk Level", "Count": "Number of Decisions"}
                     )
-                    # render_plotly_chart will apply light theme - just set basic layout here
-                    render_plotly_chart(fig, title="Decisions by Risk Level", height=400, show_title=True)
-        except ImportError:
-            # Fallback to simple text if Plotly not available
-            st.info("📊 Charts require Plotly. Install with: pip install plotly")
+                    # FIXED: Much darker colors, thicker borders, better contrast
+                    fig.update_layout(
+                        title={"text": "Decisions by Risk Level", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
+                        height=400,
+                        paper_bgcolor='#ffffff',
+                        plot_bgcolor='#ffffff',
+                        font={"color": "#0f172a", "size": 14},
+                        margin=dict(l=60, r=20, t=50, b=60),
+                        xaxis={
+                            "title": {"text": "Risk Level", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                            "tickfont": {"color": "#0f172a", "size": 12},
+                            "gridcolor": "#64748b",
+                            "showline": True,
+                            "linecolor": "#475569",
+                            "linewidth": 3
+                        },
+                        yaxis={
+                            "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
+                            "tickfont": {"color": "#0f172a", "size": 12},
+                            "gridcolor": "#64748b",
+                            "showline": True,
+                            "linecolor": "#475569",
+                            "linewidth": 3
+                        },
+                        showlegend=False
+                    )
+                    # FIXED: Add thick borders to bars and dark text
+                    fig.update_traces(
+                        marker_line_width=3,
+                        marker_line_color="#0f172a",
+                        textfont_color="#0f172a",
+                        textfont_size=14
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="audit_risk_chart")
+                except Exception as e:
+                    st.error(f"Chart rendering error: {str(e)}")
+                    st.info("📊 Chart data: " + str(by_risk))
+            else:
+                st.info("📊 No risk level data available for chart.")
 else:
     st.info("Statistics not available at this time.")
 

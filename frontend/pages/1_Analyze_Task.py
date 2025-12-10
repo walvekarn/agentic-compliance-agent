@@ -257,7 +257,7 @@ with st.form("task_check_form", clear_on_submit=False):
     from components.ui_helpers import render_section_header
     render_section_header("Your Company Information", icon="📋", level=2)
     
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1, 1], gap="medium")
     
     with col1:
         company_name = st.text_input(
@@ -333,7 +333,7 @@ with st.form("task_check_form", clear_on_submit=False):
         help="Describe the compliance task you need help with"
     )
     
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1, 1], gap="medium")
     
     with col1:
         task_type_index = TASK_TYPE_OPTIONS.index(form_defaults.get("task_type", TASK_TYPE_OPTIONS[0])) if form_defaults.get("task_type") in TASK_TYPE_OPTIONS else 0

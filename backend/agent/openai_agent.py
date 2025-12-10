@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, List, Optional
 import logging
-from backend.utils.llm_client import LLMClient, call_llm_async, call_llm_sync
+from backend.utils.llm_client import LLMClient
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,21 +28,27 @@ class ComplianceAgent:
         query: str,
         chat_history: Optional[List] = None,
         log_audit: bool = True,
-        db_session = None
+        db_session = None,
+        original_user_query: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Process a compliance query
         
         Args:
-            query: User's compliance question or request
+            query: User's compliance question or request (may include system prompts)
             chat_history: Optional chat history for context
             log_audit: Whether to log this query to audit trail
             db_session: Optional database session for audit logging
+            original_user_query: Original user query without system prompts (for audit logging)
             
         Returns:
             Dictionary containing the response and metadata
         """
         try:
+            # Use provided original_user_query if available, otherwise use query
+            # This ensures audit trail uses the actual user query, not system prompts
+            original_user_query = original_user_query or query
+            
             # Build prompt with chat history if available
             prompt = query
             if chat_history:
@@ -95,7 +101,7 @@ class ComplianceAgent:
                     
                     audit_entry = AuditService.log_custom_decision(
                         db=db_session,
-                        task_description=query[:500],  # Truncate long queries
+                        task_description=original_user_query[:500],  # Use original query, NOT system prompt
                         decision_outcome="RESPONSE_PROVIDED",
                         confidence_score=confidence,
                         reasoning_chain=[
@@ -106,7 +112,8 @@ class ComplianceAgent:
                         agent_type="openai_agent",
                         task_category="GENERAL_INQUIRY",
                         metadata={
-                            "query_length": len(query),
+                            "original_task_description": original_user_query,
+                            "query_length": len(original_user_query),
                             "response_length": len(response_text),
                             "has_chat_history": chat_history is not None
                         }
@@ -153,20 +160,26 @@ class ComplianceAgent:
         self,
         query: str,
         log_audit: bool = True,
-        db_session = None
+        db_session = None,
+        original_user_query: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Synchronous version of process_query
         
         Args:
-            query: User's compliance question or request
+            query: User's compliance question or request (may include system prompts)
             log_audit: Whether to log this query to audit trail
             db_session: Optional database session for audit logging
+            original_user_query: Original user query without system prompts (for audit logging)
             
         Returns:
             Dictionary containing the response and metadata
         """
         try:
+            # Use provided original_user_query if available, otherwise use query
+            # This ensures audit trail uses the actual user query, not system prompts
+            original_user_query = original_user_query or query
+            
             # Use unified LLM client
             openai_response = self.llm_client.call_sync(
                 prompt=query,
@@ -213,7 +226,7 @@ class ComplianceAgent:
                     
                     audit_entry = AuditService.log_custom_decision(
                         db=db_session,
-                        task_description=query[:500],  # Truncate long queries
+                        task_description=original_user_query[:500],  # Use original query, NOT system prompt
                         decision_outcome="RESPONSE_PROVIDED",
                         confidence_score=confidence,
                         reasoning_chain=[
@@ -224,7 +237,8 @@ class ComplianceAgent:
                         agent_type="openai_agent",
                         task_category="GENERAL_INQUIRY",
                         metadata={
-                            "query_length": len(query),
+                            "original_task_description": original_user_query,
+                            "query_length": len(original_user_query),
                             "response_length": len(response_text),
                             "sync_mode": True
                         }

@@ -44,8 +44,9 @@ class Settings(BaseSettings):
     ALLOW_DEMO_USER: bool = False
     
     # Agentic Engine Timeouts (in seconds)
-    AGENTIC_OPERATION_TIMEOUT: int = 120  # Default timeout for agentic operations (test suite, benchmarks, recovery)
-    AGENTIC_SECONDARY_TASK_TIMEOUT: int = 30  # Timeout for secondary tasks (AI analysis, etc.)
+    AGENTIC_OPERATION_TIMEOUT: int = 30  # Overall timeout for agentic operations (reduced from 120 for fast responses)
+    AGENTIC_SECONDARY_TASK_TIMEOUT: int = 8  # Timeout for secondary tasks like reflection (reduced from 30)
+    AGENTIC_LLM_CALL_TIMEOUT: int = 8  # Timeout for individual LLM calls in orchestrator (plan, execute, recommend) - reduced for speed
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

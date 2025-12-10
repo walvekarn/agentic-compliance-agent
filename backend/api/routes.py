@@ -21,6 +21,7 @@ class QueryRequest(BaseModel):
     """Request model for compliance queries"""
     query: str
     chat_history: Optional[List[dict]] = None
+    original_user_query: Optional[str] = None  # Original user query without system prompts (for audit logging)
 
 
 class QueryResponse(BaseModel):
@@ -95,13 +96,16 @@ async def process_compliance_query(
             raise HTTPException(status_code=400, detail="Query cannot be empty")
         
         # Process query with agent (with audit logging enabled) with timeout
+        # Use original_user_query if provided (for audit logging), otherwise use query
+        original_user_query = request.original_user_query or request.query
         try:
             result = await asyncio.wait_for(
                 get_agent().process_query(
                     query=request.query,
                     chat_history=request.chat_history,
                     log_audit=True,
-                    db_session=db
+                    db_session=db,
+                    original_user_query=original_user_query  # Pass original query for audit logging
                 ),
                 timeout=25.0  # 25 second timeout (frontend has 30s)
             )
@@ -306,44 +310,7 @@ def get_rule(rule_id: int, db: Session = Depends(get_db)):
     return rule
 
 
-# Export email endpoint (stub implementation)
-class EmailExportRequest(BaseModel):
-    """Request model for email export"""
-    recipient: str
-    subject: str
-    body: str
-    attachment_data: Optional[Dict[str, Any]] = None
-
-
-@router.post("/export/email")
-async def export_email(
-    request: EmailExportRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Email export functionality (NOT IMPLEMENTED).
-    
-    This endpoint is a placeholder. Email functionality requires SMTP configuration
-    and email service integration.
-    
-    Args:
-        request: EmailExportRequest with recipient, subject, body, and optional attachment
-        db: Database session
-        
-    Returns:
-        501 Not Implemented status
-        
-    Raises:
-        HTTPException: Always raises 501 Not Implemented
-    """
-    raise HTTPException(
-        status_code=501,
-        detail={
-            "status": "not_implemented",
-            "message": "Email export functionality is not yet implemented. Please use download options instead.",
-            "recipient": request.recipient,
-            "subject": request.subject,
-            "note": "This endpoint requires SMTP configuration and email service integration. Use download options (TXT, Excel, JSON) for now."
-        }
-    )
+# Email export endpoint removed (December 2025)
+# This functionality was not implemented and is not used by the frontend.
+# Users should use download options (TXT, Excel, JSON) available in the UI instead.
 

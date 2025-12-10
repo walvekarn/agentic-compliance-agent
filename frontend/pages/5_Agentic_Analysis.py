@@ -224,81 +224,106 @@ with st.form("agentic_analysis_form", clear_on_submit=False):
             st.error("**Please fix the following errors:**\n\n" + "\n".join([f"• {e}" for e in errors]))
             # Don't proceed if validation fails
         else:
-            # Set analysis in progress flag
-            st.session_state["agentic_analysis_in_progress"] = True
-            
-            # Prepare API request
-            request_payload = {
+            # Store payload for async processing (outside form to avoid blocking)
+            st.session_state["agentic_request_payload"] = {
                 "entity": {
                     "entity_name": entity_name.strip(),
-                    "entity_type": "PRIVATE_COMPANY",  # Default
+                    "entity_type": "PRIVATE_COMPANY",
                     "locations": locations,
                     "industry": industry,
                     "employee_count": employee_count,
-                    "has_personal_data": True,  # Default
-                    "is_regulated": False,  # Default
-                    "previous_violations": 0  # Default
+                    "has_personal_data": True,
+                    "is_regulated": False,
+                    "previous_violations": 0
                 },
                 "task": {
                     "task_description": task_description.strip(),
-                    "task_category": "DATA_PROTECTION",  # Default
+                    "task_category": "DATA_PROTECTION",
                     "priority": priority.upper(),
                     "deadline": None
                 },
-                "max_iterations": 10  # Default
+                "max_iterations": 10
             }
+            st.session_state["agentic_form_data"] = {
+                "entity_name": entity_name,
+                "task_description": task_description
+            }
+            st.session_state["agentic_analysis_in_progress"] = True
+            st.rerun()  # Rerun immediately - API call happens on next render
+
+# ============================================================================
+# PROCESS API CALL (Outside form - handles long-running operation)
+# ============================================================================
+if st.session_state.get("agentic_analysis_in_progress") and st.session_state.get("agentic_request_payload"):
+    request_payload = st.session_state["agentic_request_payload"]
+    
+    # Progress indicator (outside form, so it persists)
+    with st.spinner("🤖 **Processing**: This may take up to 2 minutes..."):
+        try:
+            response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=130)
             
-            # Call API with spinner - progress bar won't update during blocking call
-            with st.spinner("🤖 Connecting to agentic analysis engine... This may take a few moments."):
-                try:
-                    # Make API call with a firm timeout; keep UI responsive
-                    response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=60)
+            if response.success and response.data:
+                status, results, error, timestamp = parseAgenticResponse(response)
+                
+                # FIXED: Show results even if status is not "completed" or if some fields are missing
+                if results and isinstance(results, dict):
+                    # Check if we have any meaningful data to show
+                    has_plan = results.get("plan") and len(results.get("plan", [])) > 0
+                    has_outputs = results.get("step_outputs") and len(results.get("step_outputs", [])) > 0
+                    has_reflections = results.get("reflections") and len(results.get("reflections", [])) > 0
+                    has_recommendation = results.get("final_recommendation") and results.get("final_recommendation") != "No recommendation available"
                     
-                    # Parse response
-                    status, results, error, timestamp = parseAgenticResponse(response)
-                    
-                    if status == "completed" and results:
-                        st.success("✅ Analysis completed successfully!")
-                        
-                        # Save results and form data
+                    if has_plan or has_outputs or has_reflections or has_recommendation or status == "completed":
                         st.session_state.agentic_results = results
-                        st.session_state.agentic_form_data = {
-                            "entity_name": entity_name,
-                            "task_description": task_description
-                        }
+                        del st.session_state["agentic_request_payload"]
                         st.session_state["agentic_analysis_in_progress"] = False
+                        if status != "completed":
+                            st.warning(f"⚠️ **Partial Results**: Analysis status is '{status}'. Some data may be incomplete.")
                         st.rerun()
-                    elif status == "timeout":
-                        st.error(f"⏱️ **Timeout**: {error or 'Analysis timed out after 60 seconds'}")
-                        st.info("💡 **Tip**: Try simplifying the task description or try again later.")
-                    elif status == "error":
-                        error_msg = error or "Unknown error occurred"
-                        st.error(f"❌ **Error**: {error_msg}")
-                        st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Try again with a simpler task")
                     else:
-                        display_api_error(response)
-                except requests.exceptions.Timeout:
-                    st.error("⏱️ **Analysis timed out**. The request took too long to complete.")
-                    st.info("💡 **Tip**: Try simplifying the task description or check backend logs for issues.")
-                except requests.exceptions.ConnectionError:
-                    st.error("🔌 **Connection Error**: Could not connect to the backend server.")
-                    st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
-                except Exception as e:
-                    error_str = str(e)
-                    st.error(f"❌ **API Error**: {error_str}")
-                    st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Check backend logs for detailed error information")
-                    # Log the full exception for debugging
-                    import traceback
-                    with st.expander("🔍 Technical Details"):
-                        st.code(traceback.format_exc(), language="text")
-                finally:
-                    # Always clear the in-progress flag so the spinner stops
+                        # No meaningful data
+                        del st.session_state["agentic_request_payload"]
+                        st.session_state["agentic_analysis_in_progress"] = False
+                        st.error(f"❌ **No Results**: {error or 'Analysis completed but returned no data'}")
+                elif status == "timeout":
+                    del st.session_state["agentic_request_payload"]
                     st.session_state["agentic_analysis_in_progress"] = False
+                    st.error(f"⏱️ **Timeout**: {error or 'Analysis exceeded time limit'}")
+                    st.info("💡 **Tip**: Try simplifying the task description or try again later.")
+                else:
+                    del st.session_state["agentic_request_payload"]
+                    st.session_state["agentic_analysis_in_progress"] = False
+                    st.error(f"❌ **Analysis Failed**: {error or 'Unknown error'}")
+                    st.info("💡 **Troubleshooting**: Check backend logs and try again.")
+            else:
+                del st.session_state["agentic_request_payload"]
+                st.session_state["agentic_analysis_in_progress"] = False
+                st.error(f"❌ **API Error**: {response.error or 'Backend returned an error'}")
+                st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Check backend logs for details")
+                
+        except requests.exceptions.Timeout:
+            del st.session_state["agentic_request_payload"]
+            st.session_state["agentic_analysis_in_progress"] = False
+            st.error("⏱️ **Request Timeout**: The backend took too long to respond.")
+            st.info("💡 **Tip**: Try simplifying the task description or check backend logs for issues.")
+        except requests.exceptions.ConnectionError:
+            del st.session_state["agentic_request_payload"]
+            st.session_state["agentic_analysis_in_progress"] = False
+            st.error("🔌 **Connection Error**: Cannot reach the backend server.")
+            st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
+        except Exception as e:
+            del st.session_state["agentic_request_payload"]
+            st.session_state["agentic_analysis_in_progress"] = False
+            st.error(f"❌ **Error**: {str(e)}")
+            st.info("💡 **Troubleshooting**: Check backend logs for detailed error information.")
+            import traceback
+            with st.expander("🔍 Technical Details"):
+                st.code(traceback.format_exc(), language="text")
 
 # ============================================================================
 # DISPLAY RESULTS
 # ============================================================================
-if st.session_state.agentic_results:
+if st.session_state.get("agentic_results"):
     results = st.session_state.agentic_results
     
     st.markdown("---")

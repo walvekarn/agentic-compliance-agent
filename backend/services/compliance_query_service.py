@@ -2,6 +2,10 @@
 Compliance Query Service
 
 Business logic for compliance queries.
+
+NOTE (December 2025): This service is currently not used in production code.
+Routes directly use ComplianceAgent instead. This service may be intended for
+future refactoring to implement proper service/repository pattern separation.
 """
 
 from typing import Optional, Dict, Any

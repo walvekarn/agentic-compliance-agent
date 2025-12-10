@@ -13,6 +13,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -141,10 +142,10 @@ class LLMClient:
         Initialize the LLM client.
         
         Args:
-            api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
+            api_key: OpenAI API key (defaults to settings.OPENAI_API_KEY)
             model: Model to use (defaults to COMPLIANCE_MODEL)
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.OPENAI_API_KEY
         self.model = model or COMPLIANCE_MODEL
         
         # Initialize OpenAI client if we have an API key

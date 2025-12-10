@@ -10,6 +10,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 from backend.utils.llm_client import LLMClient, STANDARD_MODEL
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +38,22 @@ class ReasoningEngine:
         Initialize the reasoning engine.
         
         Args:
-            api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
+            api_key: OpenAI API key (defaults to settings.OPENAI_API_KEY)
             model: OpenAI model to use (defaults to OPENAI_MODEL env var)
             temperature: Temperature for generation (0.0 to 1.0)
             max_tokens: Maximum tokens per response
             enable_multi_pass: Enable multi-pass reasoning for complex tasks
             max_reasoning_passes: Maximum number of reasoning passes
         """
-        # Initialize OpenAI client using existing environment variables
+        # Initialize OpenAI client using settings (loaded from .env)
         # Support mock mode when API key is not set
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.OPENAI_API_KEY
         self.model = model or os.getenv("OPENAI_MODEL", STANDARD_MODEL)
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.enable_multi_pass = enable_multi_pass
         self.max_reasoning_passes = max_reasoning_passes
-        self.llm_client = LLMClient(api_key=api_key, model=self.model)
+        self.llm_client = LLMClient(api_key=self.api_key, model=self.model)
         self.mock_mode = not self.api_key or self.api_key == "mock" or (isinstance(self.api_key, str) and self.api_key.startswith("sk-mock"))
         
         if self.mock_mode:

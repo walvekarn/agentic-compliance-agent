@@ -1,7 +1,7 @@
 # Architecture v2 - Agentic Compliance Assistant
 
 **Version:** 2.0  
-**Last Updated:** November 2025  
+**Last Updated:** December 2025  
 **Status:** Production Ready
 
 ---
@@ -376,27 +376,378 @@ See `DB_DESIGN.md` for complete schema documentation.
 
 ## LLM Gateway
 
-See `LLM_GATEWAY.md` for complete documentation.
+**Location:** `backend/utils/llm_client.py`  
+**Purpose:** SINGLE unified gateway for all OpenAI calls. No endpoint or page may directly call OpenAI.
+
+### Architecture
+
+```
+All LLM Calls
+    ↓
+backend/utils/llm_client.py
+    ↓
+OpenAI API (client.chat.completions.create)
+    ↓
+Response (parsed JSON, raw text, confidence)
+```
+
+### Configuration
+
+- **Model:** `gpt-4o-mini`
+- **Timeout:** 45 seconds
+- **Max Output Tokens:** 2048
+- **Temperature:** 0.7
+- **Retries:** 2 attempts with exponential backoff
+- **JSON Schema:** Enforced for compliance tasks
+
+### Primary Method: `run_compliance_analysis()`
+
+```python
+def run_compliance_analysis(
+    prompt: str,
+    use_json_schema: bool = True
+) -> LLMResponse
+```
+
+**Returns:**
+```python
+class LLMResponse:
+    parsed_json: Optional[Dict[str, Any]]  # Structured JSON data
+    raw_text: Optional[str]                # Raw response text
+    confidence: Optional[float]             # Extracted confidence (0-1)
+    status: str                            # "completed", "error", "timeout"
+    error: Optional[str]                    # Error message if failed
+    timestamp: str                         # ISO timestamp
+```
+
+**Usage:**
+```python
+from backend.utils.llm_client import run_compliance_analysis
+
+response = run_compliance_analysis(
+    prompt="Analyze this compliance scenario...",
+    use_json_schema=True
+)
+
+if response.status == "completed":
+    analysis = response.parsed_json
+    confidence = response.confidence
+    raw_text = response.raw_text
+else:
+    error = response.error
+```
+
+### JSON Schema Enforcement
+
+When `use_json_schema=True`, responses are validated against a strict schema requiring:
+- `decision`: "AUTONOMOUS" | "REVIEW_REQUIRED" | "ESCALATE"
+- `confidence`: number (0-1)
+- `risk_level`: "LOW" | "MEDIUM" | "HIGH"
+- `risk_analysis`: array of risk factors
+- `why`: reasoning steps
+
+### Retry Logic
+
+- **Attempt 1:** Immediate
+- **Attempt 2:** Wait 1 second (exponential backoff)
+- **Attempt 3:** Wait 2 seconds
+- **Final:** Return error if all fail
+
+### Error Handling
+
+- **Timeout:** `status == "timeout"` after 45 seconds
+- **API Error:** `status == "error"` with error message
+- **Validation Error:** `status == "error"` if JSON parsing fails
+
+### Confidence Extraction
+
+Automatically extracts confidence from `parsed_json["confidence"]` and normalizes to 0-1 range.
+
+### Async Support
+
+```python
+from backend.utils.llm_client import run_compliance_analysis_async
+
+response = await run_compliance_analysis_async(prompt, use_json_schema=True)
+```
+
+### Best Practices
+
+1. **Always use `run_compliance_analysis()`** for compliance tasks
+2. **Set `use_json_schema=True`** for structured responses
+3. **Check `response.status`** before using data
+4. **Handle `None` confidence** gracefully
+5. **Never call OpenAI directly** - always use gateway
+
+---
+
+## Agent Loop Implementation
+
+**Location:** `backend/agentic_engine/agent_loop.py`  
+**Purpose:** Enhanced execution loop with reasoning engine integration, comprehensive metrics tracking, and robust error handling.
 
 ### Key Features
 
-- Single entry point: `backend/utils/llm_client.py`
-- JSON schema enforcement
-- Automatic retries (2 attempts)
-- 45-second timeout
-- 2048 max output tokens
-- Confidence extraction
+1. **Reasoning Engine Integration**
+   - Uses `reasoning_engine.generate_plan()` for planning
+   - Uses `reasoning_engine.run_step()` for execution
+   - Uses `reasoning_engine.reflect()` for reflection
+
+2. **Comprehensive Metrics Tracking**
+   - Execution time per step and total workflow time
+   - Success/failure rates
+   - Retry counts
+   - Tool usage tracking
+   - Error logging with context
+
+3. **Enhanced Error Handling**
+   - Automatic retry logic (configurable max_retries, default: 2)
+   - Graceful degradation on failures
+   - Never breaks the main orchestrator
+   - Returns structured error results
+
+4. **Structured Output**
+   - Step outputs with metadata
+   - Reflections with quality scores
+   - Complete execution history
 
 ### Usage
 
 ```python
-from backend.utils.llm_client import run_compliance_analysis
+from backend.agentic_engine.agent_loop import AgentLoop
+from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
 
-response = run_compliance_analysis(prompt, use_json_schema=True)
-if response.status == "completed":
-    analysis = response.parsed_json
-    confidence = response.confidence
+# Initialize reasoning engine
+reasoning = ReasoningEngine()
+
+# Initialize agent loop with reasoning engine
+loop = AgentLoop(
+    max_steps=10,
+    enable_reflection=True,
+    enable_memory=True,
+    reasoning_engine=reasoning
+)
+
+# Execute task
+result = loop.execute(
+    task="Assess data retention compliance",
+    context={"entity": "Healthcare Inc", "jurisdiction": "US"}
+)
+
+# Access results
+print(f"Success: {result['success']}")
+print(f"Steps: {len(result['step_outputs'])}")
+print(f"Metrics: {result['metrics']}")
 ```
+
+### Metrics Structure
+
+```python
+{
+    "total_steps": 5,
+    "successful_steps": 4,
+    "failed_steps": 1,
+    "total_retries": 2,
+    "total_execution_time": 12.345,
+    "step_times": [2.1, 2.5, 2.8, 2.3, 2.6],
+    "tools_used": ["calendar_tool", "entity_tool"],
+    "errors_encountered": [...],
+    "average_step_time": 2.46,
+    "success_rate": 80.0
+}
+```
+
+### Step Output Format
+
+```python
+{
+    "step_id": "step_1",
+    "status": "success",
+    "output": "Main execution result",
+    "findings": ["Finding 1", "Finding 2"],
+    "risks": ["Risk 1"],
+    "confidence": 0.85,
+    "tools_used": ["tool_name"],
+    "errors": [],
+    "metrics": {
+        "execution_time": 2.345,
+        "retry_count": 0,
+        "timestamp": "2024-01-15T10:30:45.123Z"
+    }
+}
+```
+
+### Reflection Format
+
+```python
+{
+    "overall_quality": 0.87,
+    "correctness_score": 0.9,
+    "completeness_score": 0.85,
+    "confidence_score": 0.88,
+    "issues": ["Issue 1", "Issue 2"],
+    "suggestions": ["Suggestion 1"],
+    "requires_retry": False,
+    "missing_data": ["Missing item 1"]
+}
+```
+
+### Error Handling Strategy
+
+**Three Levels of Protection:**
+1. **Retry Logic:** Failed steps automatically retry up to max_retries
+2. **Graceful Degradation:** Falls back to default behavior if reasoning engine unavailable
+3. **Complete Exception Handling:** Top-level try-catch, never crashes orchestrator
+
+### Performance
+
+- **Step execution:** 2-5 seconds (depends on reasoning engine)
+- **Reflection:** 2-4 seconds (if enabled)
+- **Retry overhead:** +2-5 seconds per retry
+- **Scalability:** Handles 100+ steps efficiently
+
+---
+
+## Reasoning Engine Implementation
+
+**Location:** `backend/agentic_engine/reasoning/reasoning_engine.py`  
+**Purpose:** Core reasoning engine for agentic decision-making with planning, execution, and reflection capabilities.
+
+### Core Methods
+
+#### 1. `generate_plan(entity, task, context=None)`
+
+Generates a strategic plan for a compliance task.
+
+**Returns:** List[Dict] with 3-7 steps, each containing:
+- `step_id`: Unique identifier (e.g., "step_1")
+- `description`: What needs to be done
+- `rationale`: Why this step is important
+- `expected_outcome`: What should result
+- `tools` (optional): Suggested tools or resources
+
+**Example:**
+```python
+engine = ReasoningEngine()
+plan = engine.generate_plan(
+    entity="Acme Corp",
+    task="Evaluate GDPR compliance for data processing",
+    context={"jurisdiction": "EU", "industry": "healthcare"}
+)
+```
+
+#### 2. `run_step(step, context=None)`
+
+Executes a single step from the plan.
+
+**Returns:**
+```python
+{
+    "step_id": "step_1",
+    "status": "success" | "failure",
+    "output": "Main execution result",
+    "findings": ["Finding 1", "Finding 2"],
+    "risks": ["Risk 1", "Risk 2"],
+    "confidence": 0.85,  # 0.0 to 1.0
+    "error": "..."  # Only on failure
+}
+```
+
+**Example:**
+```python
+step = {
+    "step_id": "step_1",
+    "description": "Analyze data processing activities",
+    "rationale": "Identify what personal data is collected"
+}
+result = engine.run_step(step, context={"previous_results": [...]})
+```
+
+#### 3. `reflect(step, output)`
+
+Critically evaluates a completed step and its output.
+
+**Returns:**
+```python
+{
+    "correctness_score": 0.9,      # 0.0 to 1.0
+    "completeness_score": 0.85,    # 0.0 to 1.0
+    "overall_quality": 0.87,       # 0.0 to 1.0
+    "confidence_score": 0.88,      # 0.0 to 1.0
+    "issues": ["Issue 1"],
+    "suggestions": ["Suggestion 1"],
+    "requires_retry": False,
+    "missing_data": ["Missing 1"]
+}
+```
+
+**Example:**
+```python
+reflection = engine.reflect(step, result)
+if reflection['requires_retry']:
+    # Re-execute step
+```
+
+### Prompt Files Integration
+
+The engine automatically loads prompts from:
+```
+backend/agentic_engine/reasoning/prompts/
+├── planner_prompt.txt
+├── executor_prompt.txt
+└── reflection_prompt.txt
+```
+
+### Error Handling
+
+**Multi-layered approach:**
+1. **API Call Protection:** Wraps all OpenAI calls in try-except blocks
+2. **JSON Parsing Safety:** Handles markdown code blocks, returns None on failures
+3. **Data Validation:** Validates scores in range [0.0, 1.0], ensures list fields are arrays
+4. **Fallback Mechanisms:** Default plan generation on API failures
+
+### Complete Workflow Example
+
+```python
+from backend.agentic_engine.reasoning.reasoning_engine import ReasoningEngine
+
+engine = ReasoningEngine()
+
+# Step 1: Generate plan
+plan = engine.generate_plan(
+    entity="Healthcare Provider Inc",
+    task="Assess HIPAA compliance for new patient portal",
+    context={"jurisdiction": "United States", "regulations": ["HIPAA"]}
+)
+
+# Step 2: Execute each step
+results = []
+for step in plan:
+    result = engine.run_step(step, context={"previous_results": results})
+    results.append(result)
+    
+    # Step 3: Reflect on result
+    reflection = engine.reflect(step, result)
+    
+    if reflection['requires_retry']:
+        # Re-execute if needed
+        result = engine.run_step(step, context={"previous_results": results})
+        results[-1] = result
+```
+
+### Performance Characteristics
+
+- **Planning:** 2-5 seconds, ~500-1000 tokens
+- **Execution:** 2-4 seconds, ~300-800 tokens
+- **Reflection:** 2-4 seconds, ~400-900 tokens
+
+### Best Practices
+
+1. **Always provide context** when available - improves reasoning quality
+2. **Check reflection scores** - use them to decide if steps need retry
+3. **Handle failures gracefully** - methods return error indicators
+4. **Use entity parameter** - helps provide more specific analysis
+5. **Review findings and risks** - they contain valuable insights
 
 ---
 
@@ -435,6 +786,6 @@ streamlit run frontend/Home.py --server.port 8501
 
 ---
 
-*Last Updated: November 2025*  
+*Last Updated: December 2025*  
 *Architecture Version: 2.0*
 

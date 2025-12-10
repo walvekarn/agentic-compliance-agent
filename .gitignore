@@ -95,6 +95,7 @@ test-results/
 .project
 .pydevproject
 .settings/
+.cursor/
 
 # OS
 .DS_Store

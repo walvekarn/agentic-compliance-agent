@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code Coverage](https://img.shields.io/badge/coverage-33%25-yellow.svg)]()
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](docs/) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
 
 ---
 
@@ -740,20 +740,20 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## 📚 Documentation
 
-### Core Documentation
-- **[Architecture Overview](docs/production_engine/ARCHITECTURE.md)** - System design deep dive
-- **[Feature Overview](docs/production_engine/FEATURE_INVENTORY.md)** - Detailed feature documentation
-- **[Glossary](docs/core/Glossary.md)** - Key terms and concepts
-
-### Agentic Engine Documentation
-- **[Agent Loop Implementation](docs/agentic_engine/AGENT_LOOP_IMPLEMENTATION.md)** - Plan-execute-reflect cycle
-- **[Reasoning Engine](docs/agentic_engine/REASONING_ENGINE_IMPLEMENTATION.md)** - LLM-based reasoning
-- **[Tools Implementation](docs/agentic_engine/TOOLS_IMPLEMENTATION.md)** - Tool registry and execution
-- **[Orchestrator](docs/agentic_engine/ORCHESTRATOR_IMPLEMENTATION.md)** - System coordination
+### Essential Reading
+- **[Architecture Overview](docs/ARCHITECTURE_v2.md)** - Complete system design, architecture, LLM Gateway, Agent Loop, and Reasoning Engine (v2.0)
+- **[API Schema Reference](docs/SCHEMA_v2.md)** - Unified data schemas and structures
+- **[Glossary](docs/core/Glossary.md)** - Key terms, concepts, and definitions
 
 ### Testing & Quality
-- **[Testing Checklist](docs/testing/TESTING_CHECKLIST.md)** - Complete testing procedures
-- **[Test Reports](docs/testing/)** - Test results and health checks
+- **[Testing Checklist](docs/testing/TESTING_CHECKLIST.md)** - Comprehensive testing procedures and verification guide
+
+### Quick Navigation
+- **For New Users:** Start with Architecture → Schema → Glossary
+- **For Developers:** Architecture (includes Agent Loop & Reasoning Engine) → Testing Checklist
+- **For Reference:** Glossary for terminology
+
+**Note:** All implementation details (LLM Gateway, Agent Loop, Reasoning Engine) are now consolidated in the Architecture document for easier reference.
 
 ---
 
@@ -808,6 +808,6 @@ Building intelligent systems that augment human expertise.
 
 *This is a portfolio/demonstration project. Not intended for production use without additional security hardening.*
 
-**Version 1.3.0-agentic-hardened** | **Released:** November 2025 | **Status:** Production Ready (MVP)
+**Version 1.3.0-agentic-hardened** | **Released:** November 2025 | **Last Updated:** December 2025 | **Status:** Production Ready (MVP)
 
 </div>

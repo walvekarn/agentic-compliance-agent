@@ -385,13 +385,13 @@ Use this checklist to verify the system is working correctly after setup or upda
 
 - [ ] **Directory structure exists**
   ```bash
-  ls -la src/agentic_engine/
+  ls -la backend/agentic_engine/
   ```
   - Expected: orchestrator.py, agent_loop.py, reasoning/, tools/, scoring/, memory/
   
 - [ ] **Files created successfully**
   ```bash
-  find src/agentic_engine -name "*.py" | wc -l
+  find backend/agentic_engine -name "*.py" | wc -l
   ```
   - Expected: 17+ Python files
 
@@ -470,13 +470,10 @@ Use this checklist to verify the system is working correctly after setup or upda
   - Check README.md contains agentic engine configuration section
   - Expected: Environment variables documented
 
-- [ ] **ARCHITECTURE.md updated**
-  - Check docs/production_engine/ARCHITECTURE.md
+- [ ] **ARCHITECTURE_v2.md updated**
+  - Check docs/ARCHITECTURE_v2.md
   - Expected: Agentic engine section present
-
-- [ ] **FEATURE_INVENTORY.md updated**
-  - Check docs/production_engine/FEATURE_INVENTORY.md
-  - Expected: Feature #6 describes agentic engine
+  - Note: Architecture documentation is consolidated in ARCHITECTURE_v2.md
 
 ### Status Notes
 
@@ -544,7 +541,7 @@ If all 6 pass, system is likely working correctly. Run full checklist for compre
 
 ---
 
-**Last Updated:** November 13, 2025  
+**Last Updated:** December 10, 2025  
 **Version:** 1.0.0  
 **Status:** ✅ All items verified and working
 
