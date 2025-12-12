@@ -8,7 +8,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Coverage](https://img.shields.io/badge/coverage-33%25-yellow.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-unreported-lightgrey.svg)]()
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
 
@@ -22,17 +22,14 @@
 
 The **AI Agentic Compliance Assistant** is an intelligent system that autonomously handles routine compliance tasks while intelligently escalating high-risk scenarios to human experts. Built with cutting-edge agentic AI capabilities, it combines a **6-factor risk assessment engine**, **persistent entity memory**, **human feedback learning**, **proactive recommendations**, and **counterfactual reasoning** to deliver transparent, auditable compliance decisions.
 
-**Key Metrics:**
-- 🤖 **Target autonomy rate: ~60%** on routine compliance queries (estimated based on risk thresholds)
-- 🎯 **84 automated tests** with measured coverage ~33%
-- 🧠 **Zero false negatives** on high-risk scenarios (conservative escalation)
-- 📊 **Complete audit trail** for regulatory compliance
-- 🔄 **Continuous learning** from human feedback
-- ⚙️ **Dynamic confidence scoring** (70-90% range based on risk assessment)
-- 📈 **Health checks** with dynamic pass/fail rates (not fixed counts)
-- ⚠️ **Note**: Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned for PHASE 3
+**Current State (truthful):**
+- Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
+- Small test suite in `tests/` (coverage not reported); expand before production use.
+- Demo credentials enabled (`demo/demo123`) — replace with real auth + secrets in production.
+- Complete audit trail path is wired, but database/LLM configs must be supplied via env.
+- Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not shipped.
 
-**Perfect for:** Portfolio demonstrations, compliance automation research, agentic AI architecture showcases, and production deployment with additional security hardening.
+**Use it for:** Portfolio demos, architecture exploration, and a starting point for hardened deployments (add real secrets, DB, auth, and more tests before production).
 
 ---
 
@@ -76,7 +73,7 @@ graph TB
         TOOLS[Tool Registry<br/>Entity/Calendar/Task/HTTP]
         MEMORY[Memory Store<br/>Episodic/Semantic]
         
-        DECISION[Decision Algorithm<br/>AUTONOMOUS | REVIEW | ESCALATE]
+        DECISION[Decision Algorithm<br/>AUTONOMOUS \| REVIEW \| ESCALATE]
     end
     
     subgraph "Intelligent Modules"
@@ -696,6 +693,63 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 4. **Performance:** Agentic analysis can take 30-90 seconds (LLM calls)
 5. **Mock Mode:** Limited functionality without real API key
 6. **Browser Support:** Tested on Chrome, Firefox, Safari (latest versions)
+
+---
+
+## ⚙️ Configuration
+
+### Timeout Configuration
+
+All timeout values are defined in `backend/config/settings.py` and `frontend/components/constants.py`. Frontend timeouts should be >= backend timeouts to prevent premature client-side timeouts.
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| AGENTIC_OPERATION_TIMEOUT | 120s | Overall timeout for agentic analysis |
+| AGENTIC_SECONDARY_TASK_TIMEOUT | 30s | Timeout for reflection/secondary tasks |
+| AGENTIC_LLM_CALL_TIMEOUT | 20s | Timeout for individual LLM calls |
+| API_TIMEOUT (frontend) | 120s | Frontend API request timeout |
+| LLM_COMPLIANCE_TIMEOUT | 45s | Compliance analysis LLM calls |
+
+**Note:** For agentic operations, the timeout hierarchy is: Frontend >= Backend >= LLM call timeout
+
+---
+
+## 🛠️ Troubleshooting
+
+### Agentic Analysis Timeout
+
+**Symptom:** "Analysis timed out after X seconds"
+
+**Cause:** Complex tasks require multiple LLM calls (plan → execute → reflect loop)
+
+**Fix:** 
+- Simplify task description to reduce complexity
+- Increase `AGENTIC_OPERATION_TIMEOUT` in `backend/config/settings.py` (default: 120s)
+- Ensure frontend `API_TIMEOUT` is >= backend timeout
+
+### Charts Not Displaying
+
+**Symptom:** Empty chart area in Audit Trail page
+
+**Cause:** No audit data available or API returning null/empty data
+
+**Fix:** 
+- Submit a task analysis first to generate audit trail data
+- Check backend logs for API errors
+- Verify database connection and audit trail entries exist
+- Refresh the page after submitting an analysis
+
+### API Connection Errors
+
+**Symptom:** "Failed to connect" or "Network error" messages
+
+**Cause:** Backend not running or incorrect API_BASE_URL
+
+**Fix:**
+- Verify backend is running: `make start` or `uvicorn backend.main:app --reload`
+- Check `API_BASE_URL` in `frontend/components/constants.py` matches backend URL
+- Ensure backend is accessible at the configured URL
+- Check firewall/network settings
 
 ### License
 

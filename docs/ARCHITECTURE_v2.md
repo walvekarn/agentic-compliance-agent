@@ -2,7 +2,7 @@
 
 **Version:** 2.0  
 **Last Updated:** December 2025  
-**Status:** Production Ready
+**Status:** Demo/portfolio build (needs hardening for production)
 
 ---
 
@@ -15,7 +15,7 @@ The Agentic Compliance Assistant follows a **unified schema architecture** with 
 1. **Unified Schemas** - Single source of truth for all data structures
 2. **Single LLM Gateway** - All OpenAI calls through `backend/utils/llm_client.py`
 3. **Complete Audit Trail** - Every decision logged to database
-4. **No Demo Data** - Production-ready, real data only
+4. **Demo Defaults** - Ships with demo login and mock-mode LLM; replace secrets/LLM for prod
 5. **Error Handling** - Standardized, no swallowed exceptions
 6. **Schema Compliance** - Frontend and backend use identical schemas
 
@@ -119,11 +119,12 @@ def reflect(self, step: Dict, output: Dict) -> Dict:
 | **Memory System** | Episodic memory for entity context, improves consistency over time |
 | **Test Suite Engine** | Automated scenario testing, validates decision accuracy, CI/CD ready |
 
-### Key Metrics
+### Current State / Metrics
 
-- **84 automated tests** | **33% code coverage** | **~60% target autonomy rate**
-- **6-factor risk model** | **3-tier decisions** (AUTONOMOUS/REVIEW/ESCALATE)
-- **Complete audit trail** | **Zero false negatives** on high-risk scenarios
+- Small test suite (`tests/` + limited frontend tests); coverage not reported
+- 6-factor risk model with 3-tier decisions (AUTONOMOUS/REVIEW/ESCALATE)
+- Audit trail implemented; persistence depends on configured `DATABASE_URL`
+- Mock-mode available when `OPENAI_API_KEY` is absent; production should supply a real key
 
 **Tech Stack**: Python 3.11+, FastAPI, Streamlit, SQLAlchemy, OpenAI GPT-4o-mini, SQLite/PostgreSQL
 
@@ -502,11 +503,20 @@ Response (parsed JSON, raw text, confidence)
 ### Configuration
 
 - **Model:** `gpt-4o-mini`
-- **Timeout:** 45 seconds
 - **Max Output Tokens:** 2048
 - **Temperature:** 0.7
 - **Retries:** 2 attempts with exponential backoff
 - **JSON Schema:** Enforced for compliance tasks
+
+### Timeout Configuration
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| AGENTIC_OPERATION_TIMEOUT | 120s | Overall timeout for agentic analysis |
+| AGENTIC_SECONDARY_TASK_TIMEOUT | 30s | Timeout for reflection/secondary tasks |
+| AGENTIC_LLM_CALL_TIMEOUT | 20s | Timeout for individual LLM calls |
+| API_TIMEOUT (frontend) | 120s | Frontend API request timeout |
+| LLM_COMPLIANCE_TIMEOUT | 45s | Compliance analysis LLM calls |
 
 ### Primary Method: `run_compliance_analysis()`
 
@@ -563,7 +573,7 @@ When `use_json_schema=True`, responses are validated against a strict schema req
 
 ### Error Handling
 
-- **Timeout:** `status == "timeout"` after 45 seconds
+- **Timeout:** `status == "timeout"` after LLM_COMPLIANCE_TIMEOUT (45 seconds)
 - **API Error:** `status == "error"` with error message
 - **Validation Error:** `status == "error"` if JSON parsing fails
 

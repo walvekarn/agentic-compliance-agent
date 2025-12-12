@@ -11,8 +11,8 @@ Use this checklist to verify the system is working correctly after setup or upda
 - [ ] Python 3.11+ installed (`python3 --version`)
 - [ ] Virtual environment created and activated
 - [ ] All dependencies installed (`pip list` shows fastapi, streamlit, etc.)
-- [ ] `.env` file exists with valid `OPENAI_API_KEY`
-- [ ] Database file `compliance.db` exists
+- [ ] `.env` file exists with required secrets (`SECRET_KEY`, `JWT_SECRET`), optional `OPENAI_API_KEY` (mock mode when absent)
+- [ ] Database file `compliance.db` will be created on first run (sqlite) or point `DATABASE_URL` to your DB
 
 ---
 
@@ -21,28 +21,25 @@ Use this checklist to verify the system is working correctly after setup or upda
 ### 1. Backend Startup
 - [ ] **Backend starts without errors**
   ```bash
-  uvicorn main:app --port 8000
+  uvicorn backend.main:app --host 0.0.0.0 --port 8000
   ```
   - Expected: "Application startup complete"
   - No import errors
-  - No database connection errors
+  - Database tables created/connected successfully
 
 ### 2. Health Endpoint
 - [ ] **Health endpoint returns 200**
   ```bash
   curl http://localhost:8000/health
   ```
-  - Expected: `{"status": "healthy", "version": "1.0.0"}`
+  - Expected: JSON with `status: healthy` (LLM may be `skipped` if no API key)
   - Status code: 200
 
 ### 3. Database Initialization
 - [ ] **Database is initialized**
-  ```bash
-  python scripts/setup_database.py
-  ```
-  - Expected: "✅ Database tables created successfully"
-  - Tables created: `audit_trail`, `entity_history`, `feedback_log`
-  - File `compliance.db` exists and has size > 0
+  - Triggered automatically on backend startup via `Base.metadata.create_all`
+  - Tables should include: `audit_trail`, `entity_history`, `feedback_log`
+  - For sqlite, file `compliance.db` should exist and have size > 0
 
 ### 4. API Endpoints Respond Correctly
 
@@ -134,7 +131,7 @@ Use this checklist to verify the system is working correctly after setup or upda
 ### 5. Dashboard Startup
 - [ ] **Dashboard loads without errors**
   ```bash
-  streamlit run dashboard/Home.py
+  streamlit run frontend/Home.py
   ```
   - Expected: "You can now view your Streamlit app in your browser"
   - URL: http://localhost:8501
@@ -144,10 +141,9 @@ Use this checklist to verify the system is working correctly after setup or upda
 - [ ] **Authentication works**
   - Navigate to http://localhost:8501
   - See login page with password field
-  - Enter password: `demo123`
+  - Demo credentials (default): `demo/demo123` (replace with real auth for production)
   - Click "Login"
-  - Expected: Redirected to dashboard home
-  - Session persists on page refresh
+  - Expected: Redirected to dashboard home; session persists on refresh
 
 ### 7. Home Page
 - [ ] **Home page renders correctly**
@@ -326,9 +322,53 @@ Use this checklist to verify the system is working correctly after setup or upda
 
 ---
 
-## 📊 Performance Checks
+## 📊 Performance Testing
 
-### 23. Response Times
+### Page Load Times
+- [ ] **Login page loads in < 3 seconds**
+  - Navigate to login page
+  - Measure time from navigation to fully rendered
+  - Expected: Complete render in < 3 seconds
+
+- [ ] **Home page loads in < 3 seconds**
+  - After login, navigate to Home page
+  - Measure time from navigation to fully rendered
+  - Expected: All cards and metrics visible in < 3 seconds
+
+- [ ] **Analyze Task page loads in < 3 seconds**
+  - Navigate to "Analyze Task" page
+  - Measure time from navigation to form fully rendered
+  - Expected: All form fields visible in < 3 seconds
+
+- [ ] **Audit Trail page loads in < 5 seconds (with data)**
+  - Navigate to "Audit Trail" page
+  - Measure time from navigation to data displayed
+  - Expected: Charts and table visible in < 5 seconds (may be longer with large datasets)
+
+- [ ] **Agentic Analysis page loads in < 3 seconds**
+  - Navigate to "Agentic Analysis" page
+  - Measure time from navigation to form fully rendered
+  - Expected: Form and tabs visible in < 3 seconds
+
+### Agentic Operations
+- [ ] **Agentic Analysis completes in < 120 seconds**
+  - Submit a task for agentic analysis
+  - Monitor progress indicators
+  - Expected: Complete analysis within 120 seconds (AGENTIC_OPERATION_TIMEOUT)
+  - No timeout errors for standard tasks
+
+- [ ] **Test Suite completes all scenarios in < 180 seconds**
+  - Run the Agentic Test Suite
+  - Monitor execution time
+  - Expected: All test scenarios complete within 180 seconds
+  - Progress indicators show advancement
+
+- [ ] **Timeout errors show user-friendly messages**
+  - If timeout occurs, verify error message is displayed
+  - Expected: Clear message like "Analysis timed out after 120 seconds"
+  - Message includes troubleshooting guidance
+
+### Response Times (Legacy)
 - [ ] **System responds within acceptable time**
   - Health check: < 100ms
   - Task analysis: < 10 seconds
@@ -336,13 +376,96 @@ Use this checklist to verify the system is working correctly after setup or upda
   - Audit trail load: < 2 seconds
   - Dashboard page load: < 3 seconds
 
-### 24. Concurrent Requests
+### Concurrent Requests
 - [ ] **System handles multiple requests**
   - Open 2-3 browser tabs
   - Perform actions simultaneously
   - Expected: All complete successfully
 
 ---
+
+## 🖥️ Display Validation
+
+### Audit Trail Charts
+- [ ] **"Decisions by Outcome" chart displays with data**
+  - Navigate to Audit Trail page
+  - Ensure audit data exists (submit a task analysis first)
+  - Expected: Pie or bar chart showing AUTONOMOUS, REVIEW_REQUIRED, ESCALATE counts
+  - Chart is interactive (hover shows values)
+
+- [ ] **"Decisions by Risk Level" chart displays with data**
+  - On Audit Trail page with data
+  - Expected: Chart showing LOW, MEDIUM, HIGH risk level distribution
+  - Chart renders correctly with proper labels
+
+- [ ] **Charts show correct colors (green/yellow/red)**
+  - Verify color coding:
+    - Green: Low risk / AUTONOMOUS decisions
+    - Yellow: Medium risk / REVIEW_REQUIRED decisions
+    - Red: High risk / ESCALATE decisions
+  - Expected: Colors match risk/decision semantics
+
+- [ ] **Empty state shows helpful message**
+  - Navigate to Audit Trail page with no data
+  - Expected: Message like "No audit data available. Submit a task analysis first."
+  - No broken chart placeholders
+
+### Agentic Test Suite
+- [ ] **Confidence Deviations chart renders**
+  - Run Agentic Test Suite
+  - Navigate to results section
+  - Expected: Bar chart showing confidence deviations for each scenario
+  - Chart shows positive (green) and negative (red) deviations
+
+- [ ] **Deviation Data Table shows all columns**
+  - In Test Suite results, check deviation table
+  - Expected: Columns visible: scenario, expected_min, actual, deviation, adequate
+  - All columns have data (no empty cells for valid scenarios)
+
+- [ ] **Detailed Test Results table displays**
+  - Check "Detailed Test Results" section
+  - Expected: Table with columns: Scenario, Status, Decision Match, Risk Match, Confidence OK, Expected/Actual values
+  - All test scenarios listed
+
+- [ ] **Pass/Fail indicators are visible**
+  - In Detailed Test Results table
+  - Expected: ✅ for pass, ❌ for fail
+  - Status column shows "✅ Pass" or "❌ Fail"
+  - Match indicators (Decision Match, Risk Match, Confidence OK) show ✅ or ❌
+
+## 📋 Data Integrity
+
+- [ ] **All audit records show complete data (no empty fields)**
+  - Navigate to Audit Trail page
+  - Review several audit entries
+  - Expected: All required fields populated:
+    - entity_name (not "Unknown Entity" unless actually unknown)
+    - task_description (not "No description")
+    - decision_outcome (not empty)
+    - risk_level (not empty)
+    - confidence_score (not 0.5 default unless actually 0.5)
+    - agent_type (not empty)
+  - Check backend logs for validation warnings
+
+- [ ] **Statistics match actual record counts**
+  - On Audit Trail page, note statistics shown
+  - Count actual entries in table/list
+  - Expected: Statistics totals match visible entries
+  - Decision outcome counts match actual distribution
+  - Risk level counts match actual distribution
+
+- [ ] **Test results match expected format**
+  - Run Agentic Test Suite
+  - Review test results structure
+  - Expected: Each result contains:
+    - scenario (with title)
+    - expected (decision, risk_level, min_confidence)
+    - actual (decision, risk_level, confidence)
+    - passed (boolean)
+    - decision_correct (boolean)
+    - risk_level_correct (boolean)
+    - confidence_adequate (boolean)
+  - All boolean fields are properly set (not None)
 
 ## 🔐 Security Checks
 
@@ -492,9 +615,14 @@ Use this checklist to verify the system is working correctly after setup or upda
 
 ## 📝 Checklist Summary
 
-**Total Items:** 28 major checkpoints + 10 experimental (agentic)  
-**Time to Complete:** 30-45 minutes (core) + 10 minutes (experimental)  
+**Total Items:** 28 major checkpoints + 19 performance/display/data items + 10 experimental (agentic)  
+**Time to Complete:** 30-45 minutes (core) + 15 minutes (performance/display) + 10 minutes (experimental)  
 **Required for:** Initial setup, after updates, before deployment
+
+**New Sections Added:**
+- Performance Testing: Page load times, agentic operation timeouts
+- Display Validation: Chart rendering, test suite displays
+- Data Integrity: Audit record completeness, statistics accuracy
 
 ---
 
