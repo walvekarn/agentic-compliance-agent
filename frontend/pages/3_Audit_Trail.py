@@ -500,19 +500,27 @@ try:
         render_divider()
         render_section_header("Audit Records", icon="📋", level=3)
         
+        def safe_get(entry, *keys, default="N/A"):
+            """Safely get nested dictionary values"""
+            value = entry
+            for key in keys:
+                if isinstance(value, dict):
+                    value = value.get(key)
+                else:
+                    return default
+                if value is None:
+                    return default
+            return value if value is not None else default
+        
         for entry in filtered_entries:
             # Support both old/new backend fields
             audit_id = get_audit_id(entry)
             if audit_id is None:
                 continue  # skip invalid rows
             
-            # Safely get nested values with fallbacks
-            task = entry.get('task', {})
-            entity = entry.get('entity', {})
-            decision = entry.get('decision', {})
-            
+            # Use safe_get for all data extraction
             # Get task description with fallback
-            task_description = task.get('description') if isinstance(task, dict) else entry.get('task_description', 'N/A')
+            task_description = safe_get(entry, "task", "description", default=safe_get(entry, "task_description", default="N/A"))
             
             # FIX: Extract better description from system prompts or metadata
             def extract_better_description(desc, entry):
@@ -526,12 +534,10 @@ try:
                 is_system_prompt = any(indicator in desc_str.lower() for indicator in system_indicators)
                 
                 if is_system_prompt:
-                    # Try to get original task from metadata
-                    metadata = entry.get('metadata', {}) or entry.get('meta_data', {})
-                    if isinstance(metadata, dict):
-                        original_task = metadata.get('original_task_description')
-                        if original_task and len(str(original_task)) > 10:
-                            return str(original_task)
+                    # Try to get original task from metadata using safe_get
+                    original_task = safe_get(entry, "metadata", "original_task_description", default=safe_get(entry, "meta_data", "original_task_description", default=None))
+                    if original_task and original_task != "N/A" and len(str(original_task)) > 10:
+                        return str(original_task)
                     
                     # Try to extract from common patterns
                     markers = ["user question:", "user query:", "current query:", "query:", "task:"]
@@ -547,11 +553,11 @@ try:
                                 return extracted[:200]  # Limit length
                     
                     # If it's clearly a system prompt, use entity name or category as fallback
-                    entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
-                    category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
-                    if entity_name:
+                    entity_name = safe_get(entry, "entity", "name", default=safe_get(entry, "entity_name", default=None))
+                    category = safe_get(entry, "task", "category", default=safe_get(entry, "task_category", default=None))
+                    if entity_name and entity_name != "N/A":
                         return f"Query for {entity_name}"
-                    elif category:
+                    elif category and category != "N/A":
                         return f"{category.replace('_', ' ').title()} Query"
                     else:
                         return "Compliance Query"
@@ -562,8 +568,8 @@ try:
             improved_task_description = extract_better_description(task_description, entry)
             task_desc_display = improved_task_description[:80] + '...' if len(str(improved_task_description)) > 80 else improved_task_description
             
-            # Get entity name for display
-            entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
+            # Get entity name for display using safe_get
+            entity_name = safe_get(entry, "entity", "name", default=safe_get(entry, "entity_name", default="N/A"))
             
             # FIX: Include entity name in display if available to make records more distinguishable
             if entity_name and entity_name != 'N/A' and entity_name:
@@ -571,9 +577,9 @@ try:
             else:
                 display_label = f"{audit_id} | {task_desc_display}"
             
-            # Get decision outcome with fallback
-            outcome = decision.get('outcome') if isinstance(decision, dict) else entry.get('decision_outcome', 'UNKNOWN')
-            risk_level = decision.get('risk_level') if isinstance(decision, dict) else entry.get('risk_level')
+            # Get decision outcome with fallback using safe_get
+            outcome = safe_get(entry, "decision", "outcome", default=safe_get(entry, "decision_outcome", default="UNKNOWN"))
+            risk_level = safe_get(entry, "decision", "risk_level", default=safe_get(entry, "risk_level", default="N/A"))
             
             with st.expander(
                 f"{display_label} | "
@@ -585,39 +591,47 @@ try:
                 with col1:
                     # Use improved task description for display
                     st.markdown(f"**Task:** {improved_task_description}")
-                    # Handle None category gracefully
-                    category = task.get('category') if isinstance(task, dict) else entry.get('task_category')
-                    category_label = category.replace('_', ' ').title() if category else 'N/A'
+                    # Handle None category gracefully using safe_get
+                    category = safe_get(entry, "task", "category", default=safe_get(entry, "task_category", default="N/A"))
+                    category_label = category.replace('_', ' ').title() if category and category != "N/A" else 'N/A'
                     st.markdown(f"**Category:** {category_label}")
                     
-                    entity_name = entity.get('name') if isinstance(entity, dict) else entry.get('entity_name')
-                    if entity_name:
-                        # Handle None entity type gracefully
-                        entity_type = entity.get('type') if isinstance(entity, dict) else entry.get('entity_type')
-                        entity_type_label = entity_type.replace('_', ' ').title() if entity_type else 'N/A'
+                    # Get entity name and type using safe_get
+                    entity_name = safe_get(entry, "entity", "name", default=safe_get(entry, "entity_name", default="N/A"))
+                    if entity_name and entity_name != "N/A":
+                        entity_type = safe_get(entry, "entity", "type", default=safe_get(entry, "entity_type", default="N/A"))
+                        entity_type_label = entity_type.replace('_', ' ').title() if entity_type and entity_type != "N/A" else 'N/A'
                         st.markdown(f"**Entity:** {entity_name} ({entity_type_label})")
                     
-                    agent_type = entry.get('agent_type', 'N/A')
+                    agent_type = safe_get(entry, "agent_type", default="N/A")
                     st.markdown(f"**Agent:** {agent_type}")
-                    timestamp = entry.get('timestamp', 'N/A')
+                    timestamp = safe_get(entry, "timestamp", default="N/A")
                     st.markdown(f"**Timestamp:** {timestamp}")
                 
                 with col2:
                     st.markdown(f"**Decision:** {show_decision_badge(outcome)}")
-                    if risk_level:
+                    if risk_level and risk_level != "N/A":
                         st.markdown(f"**Risk:** {show_risk_badge(risk_level)}")
-                        risk_score = decision.get('risk_score') if isinstance(decision, dict) else entry.get('risk_score')
-                        if risk_score is not None:
-                            st.markdown(f"**Risk Score (0–100):** {risk_score*100:.0f}")
+                        risk_score = safe_get(entry, "decision", "risk_score", default=safe_get(entry, "risk_score", default=None))
+                        if risk_score is not None and risk_score != "N/A":
+                            try:
+                                risk_score_float = float(risk_score)
+                                st.markdown(f"**Risk Score (0–100):** {risk_score_float*100:.0f}")
+                            except (ValueError, TypeError):
+                                st.markdown(f"**Risk Score (0–100):** N/A")
                         else:
                             st.markdown(f"**Risk Score (0–100):** N/A")
                     # Unified schema uses "confidence" at top level, legacy uses "decision.confidence_score"
-                    confidence_score = entry.get('confidence_score') or (decision.get('confidence_score') if isinstance(decision, dict) else None)
-                    if confidence_score is not None and isinstance(confidence_score, (int, float)):
-                        # Normalize to 0-1 range if needed
-                        if confidence_score > 1.0:
-                            confidence_score = confidence_score / 100.0
-                        st.markdown(f"**Confidence Level:** {confidence_score*100:.1f}%")
+                    confidence_score = safe_get(entry, "confidence_score", default=safe_get(entry, "decision", "confidence_score", default=None))
+                    if confidence_score is not None and confidence_score != "N/A":
+                        try:
+                            confidence_float = float(confidence_score)
+                            # Normalize to 0-1 range if needed
+                            if confidence_float > 1.0:
+                                confidence_float = confidence_float / 100.0
+                            st.markdown(f"**Confidence Level:** {confidence_float*100:.1f}%")
+                        except (ValueError, TypeError):
+                            st.markdown(f"**Confidence Level:** N/A")
                     else:
                         st.markdown(f"**Confidence Level:** N/A")
                 
@@ -628,12 +642,14 @@ try:
                 # Reasoning chain (unified schema uses why.reasoning_steps)
                 with tab1:
                     reasoning_steps = []
-                    # Try unified schema format first
-                    if entry.get("why") and isinstance(entry["why"], dict):
-                        reasoning_steps = entry["why"].get("reasoning_steps", [])
-                    # Fallback to legacy format
-                    if not reasoning_steps:
-                        reasoning_steps = entry.get("reasoning_chain", [])
+                    # Try unified schema format first using safe_get
+                    reasoning_steps = safe_get(entry, "why", "reasoning_steps", default=[])
+                    # Fallback to legacy format if empty
+                    if not reasoning_steps or reasoning_steps == "N/A":
+                        reasoning_steps = safe_get(entry, "reasoning_chain", default=[])
+                    # Ensure it's a list
+                    if not isinstance(reasoning_steps, list):
+                        reasoning_steps = []
                     
                     if reasoning_steps and isinstance(reasoning_steps, list) and len(reasoning_steps) > 0:
                         for reason in reasoning_steps:
@@ -644,34 +660,44 @@ try:
                 
                 # Risk factors (unified schema uses risk_analysis list)
                 with tab2:
-                    risk_analysis = entry.get("risk_analysis", [])
-                    risk_factors = entry.get("risk_factors", {})
+                    risk_analysis = safe_get(entry, "risk_analysis", default=[])
+                    risk_factors = safe_get(entry, "risk_factors", default={})
+                    
+                    # Ensure risk_analysis is a list
+                    if not isinstance(risk_analysis, list):
+                        risk_analysis = []
+                    # Ensure risk_factors is a dict
+                    if not isinstance(risk_factors, dict):
+                        risk_factors = {}
                     
                     # Convert unified schema format if needed
-                    if risk_analysis and isinstance(risk_analysis, list) and len(risk_analysis) > 0:
+                    if risk_analysis and len(risk_analysis) > 0:
                         risk_factors = {}
                         for item in risk_analysis:
                             if isinstance(item, dict):
-                                factor_name = item.get('factor', '')
-                                score = item.get('score', 0.0)
-                                if factor_name:
-                                    risk_factors[factor_name] = score
+                                factor_name = safe_get(item, "factor", default="")
+                                score = safe_get(item, "score", default=0.0)
+                                if factor_name and factor_name != "N/A":
+                                    try:
+                                        risk_factors[factor_name] = float(score) if score != "N/A" else 0.0
+                                    except (ValueError, TypeError):
+                                        risk_factors[factor_name] = 0.0
                     
-                    if risk_factors and isinstance(risk_factors, dict) and len(risk_factors) > 0:
+                    if risk_factors and len(risk_factors) > 0:
                         col1, col2, col3 = st.columns(3)
                         with col1:
-                            j_risk = risk_factors.get('jurisdiction_risk', 0) or 0
-                            e_risk = risk_factors.get('entity_risk', 0) or 0
+                            j_risk = float(safe_get(risk_factors, "jurisdiction_risk", default=0)) if isinstance(risk_factors, dict) else 0
+                            e_risk = float(safe_get(risk_factors, "entity_risk", default=0)) if isinstance(risk_factors, dict) else 0
                             st.metric("Jurisdiction", f"{j_risk*100:.0f}%")
                             st.metric("Entity", f"{e_risk*100:.0f}%")
                         with col2:
-                            t_risk = risk_factors.get('task_risk', 0) or 0
-                            d_risk = risk_factors.get('data_sensitivity_risk', 0) or 0
+                            t_risk = float(safe_get(risk_factors, "task_risk", default=0)) if isinstance(risk_factors, dict) else 0
+                            d_risk = float(safe_get(risk_factors, "data_sensitivity_risk", default=0)) if isinstance(risk_factors, dict) else 0
                             st.metric("Task", f"{t_risk*100:.0f}%")
                             st.metric("Data Sensitivity", f"{d_risk*100:.0f}%")
                         with col3:
-                            r_risk = risk_factors.get('regulatory_risk', 0) or 0
-                            i_risk = risk_factors.get('impact_risk', 0) or 0
+                            r_risk = float(safe_get(risk_factors, "regulatory_risk", default=0)) if isinstance(risk_factors, dict) else 0
+                            i_risk = float(safe_get(risk_factors, "impact_risk", default=0)) if isinstance(risk_factors, dict) else 0
                             st.metric("Regulatory", f"{r_risk*100:.0f}%")
                             st.metric("Impact", f"{i_risk*100:.0f}%")
                     else:
@@ -679,8 +705,11 @@ try:
                 
                 # Recommendations
                 with tab3:
-                    if entry.get("recommendations"):
-                        for rec in entry["recommendations"]:
+                    recommendations = safe_get(entry, "recommendations", default=[])
+                    if recommendations and recommendations != "N/A":
+                        if not isinstance(recommendations, list):
+                            recommendations = [recommendations] if recommendations else []
+                        for rec in recommendations:
                             st.info(rec)
                     else:
                         st.info("No recommendations available for this entry.")
@@ -932,151 +961,107 @@ if stats and isinstance(stats, dict):
     
     # Charts - COMPLETELY REWRITTEN: Direct Plotly rendering with explicit styling
     st.markdown("### 📊 Decision Statistics")
+    
+    # DEBUG: Check data before rendering charts
+    with st.expander("🔍 Debug: Chart Data", expanded=False):
+        st.write("**stats object type:**", type(stats))
+        st.write("**stats keys:**", list(stats.keys()) if isinstance(stats, dict) else "Not a dict")
+        st.write("**by_outcome:**", stats.get("by_outcome") if stats else None)
+        st.write("**by_outcome type:**", type(stats.get("by_outcome")) if stats else None)
+        st.write("**by_risk_level:**", stats.get("by_risk_level") if stats else None)
+        st.write("**by_risk_level type:**", type(stats.get("by_risk_level")) if stats else None)
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("**Decisions by Outcome**")
-        by_outcome = stats.get("by_outcome", {})
-        # Explicit null checks
-        if by_outcome is None:
-            st.info("📊 No outcome data available. Statistics may still be loading or there are no audit entries yet.")
-        elif not isinstance(by_outcome, dict):
-            st.warning(f"⚠️ Unexpected by_outcome format: {type(by_outcome)}. Expected dict, got {type(by_outcome)}")
-            st.info(f"📊 Raw data: {str(by_outcome)[:200]}")
-        elif len(by_outcome) == 0:
-            st.info("📊 No outcome data available for chart. This means there are no audit entries in the database yet. Submit a task analysis to generate audit data.")
+        by_outcome = stats.get("by_outcome", {}) if stats else {}
+        
+        # Ensure by_outcome is a non-empty dict
+        if not by_outcome or not isinstance(by_outcome, dict) or len(by_outcome) == 0:
+            st.info("📊 No outcome data available yet. Submit a task analysis to generate data.")
         else:
             try:
                 import plotly.express as px
-                df_outcome = pd.DataFrame(list(by_outcome.items()), columns=["Decision", "Count"])
-                # Verify DataFrame is not empty
-                if df_outcome.empty:
-                    st.info("📊 No outcome data available for chart.")
+                df_outcome = pd.DataFrame([
+                    {"Decision": k, "Count": v} 
+                    for k, v in by_outcome.items()
+                ])
+                
+                if df_outcome.empty or df_outcome["Count"].sum() == 0:
+                    st.info("📊 No decisions recorded yet.")
                 else:
-                        fig = px.bar(
-                            df_outcome,
-                            x="Decision",
-                            y="Count",
-                            color="Decision",
-                            color_discrete_map={
-                                "AUTONOMOUS": "#059669",  # Much darker green for visibility
-                                "REVIEW_REQUIRED": "#d97706",  # Much darker orange for visibility
-                                "ESCALATE": "#dc2626"  # Much darker red for visibility
-                            },
-                            labels={"Decision": "Decision Type", "Count": "Number of Decisions"}
-                        )
-                        # FIXED: Much darker colors, thicker borders, better contrast
-                        fig.update_layout(
-                            title={"text": "Decisions by Outcome", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
-                            height=400,
-                            paper_bgcolor='#ffffff',
-                            plot_bgcolor='#ffffff',
-                            font={"color": "#0f172a", "size": 14},
-                            margin=dict(l=60, r=20, t=50, b=60),
-                            xaxis={
-                                "title": {"text": "Decision Type", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                                "tickfont": {"color": "#0f172a", "size": 12},
-                                "gridcolor": "#64748b",
-                                "showline": True,
-                                "linecolor": "#475569",
-                                "linewidth": 3
-                            },
-                            yaxis={
-                                "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                                "tickfont": {"color": "#0f172a", "size": 12},
-                                "gridcolor": "#64748b",
-                                "showline": True,
-                                "linecolor": "#475569",
-                                "linewidth": 3
-                            },
-                            showlegend=False
-                        )
-                        # FIXED: Add thick borders to bars and dark text
-                        fig.update_traces(
-                            marker_line_width=3,
-                            marker_line_color="#0f172a",
-                            textfont_color="#0f172a",
-                            textfont_size=14
-                        )
-                        st.plotly_chart(fig, use_container_width=True, key="audit_outcome_chart")
+                    fig = px.bar(
+                        df_outcome,
+                        x="Decision",
+                        y="Count",
+                        color="Decision",
+                        color_discrete_map={
+                            "AUTONOMOUS": "#22c55e",
+                            "REVIEW_REQUIRED": "#f59e0b",
+                            "ESCALATE": "#ef4444"
+                        }
+                    )
+                    fig.update_layout(
+                        height=350,
+                        paper_bgcolor='white',
+                        plot_bgcolor='white',
+                        font=dict(color='#1e293b', size=12),
+                        showlegend=False,
+                        margin=dict(l=40, r=40, t=40, b=40)
+                    )
+                    fig.update_traces(
+                        textposition='outside',
+                        texttemplate='%{y}'
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="outcome_chart_fixed")
             except Exception as e:
-                st.error(f"Chart rendering error: {str(e)}")
-                import traceback
-                with st.expander("🔍 Error Details"):
-                    st.code(traceback.format_exc())
-                st.info(f"📊 Chart data: {str(by_outcome)}")
+                st.error(f"Chart error: {str(e)}")
     
     with col2:
         st.markdown("**Decisions by Risk Level**")
-        by_risk = stats.get("by_risk_level", {})
-        # Explicit null checks
-        if by_risk is None:
-            st.info("📊 No risk level data available. Statistics may still be loading or there are no audit entries yet.")
-        elif not isinstance(by_risk, dict):
-            st.warning(f"⚠️ Unexpected by_risk_level format: {type(by_risk)}. Expected dict, got {type(by_risk)}")
-            st.info(f"📊 Raw data: {str(by_risk)[:200]}")
-        elif len(by_risk) == 0:
-            st.info("📊 No risk level data available for chart. This means there are no audit entries with risk levels in the database yet. Submit a task analysis to generate audit data.")
+        by_risk_level = stats.get("by_risk_level", {}) if stats else {}
+        
+        # Ensure by_risk_level is a non-empty dict
+        if not by_risk_level or not isinstance(by_risk_level, dict) or len(by_risk_level) == 0:
+            st.info("📊 No risk level data available yet. Submit a task analysis to generate data.")
         else:
             try:
                 import plotly.express as px
-                df_risk = pd.DataFrame(list(by_risk.items()), columns=["Risk Level", "Count"])
-                # Verify DataFrame is not empty
-                if df_risk.empty:
-                    st.info("📊 No risk level data available for chart.")
+                df_risk = pd.DataFrame([
+                    {"Risk Level": k, "Count": v} 
+                    for k, v in by_risk_level.items()
+                ])
+                
+                if df_risk.empty or df_risk["Count"].sum() == 0:
+                    st.info("📊 No decisions recorded yet.")
                 else:
-                        fig = px.bar(
-                            df_risk,
-                            x="Risk Level",
-                            y="Count",
-                            color="Risk Level",
-                            color_discrete_map={
-                                "LOW": "#059669",  # Much darker green for visibility
-                                "MEDIUM": "#d97706",  # Much darker orange for visibility
-                                "HIGH": "#dc2626"  # Much darker red for visibility
-                            },
-                            labels={"Risk Level": "Risk Level", "Count": "Number of Decisions"}
-                        )
-                        # FIXED: Much darker colors, thicker borders, better contrast
-                        fig.update_layout(
-                            title={"text": "Decisions by Risk Level", "font": {"color": "#0f172a", "size": 18, "weight": "bold"}},
-                            height=400,
-                            paper_bgcolor='#ffffff',
-                            plot_bgcolor='#ffffff',
-                            font={"color": "#0f172a", "size": 14},
-                            margin=dict(l=60, r=20, t=50, b=60),
-                            xaxis={
-                                "title": {"text": "Risk Level", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                                "tickfont": {"color": "#0f172a", "size": 12},
-                                "gridcolor": "#64748b",
-                                "showline": True,
-                                "linecolor": "#475569",
-                                "linewidth": 3
-                            },
-                            yaxis={
-                                "title": {"text": "Count", "font": {"color": "#0f172a", "size": 14, "weight": "bold"}},
-                                "tickfont": {"color": "#0f172a", "size": 12},
-                                "gridcolor": "#64748b",
-                                "showline": True,
-                                "linecolor": "#475569",
-                                "linewidth": 3
-                            },
-                            showlegend=False
-                        )
-                        # FIXED: Add thick borders to bars and dark text
-                        fig.update_traces(
-                            marker_line_width=3,
-                            marker_line_color="#0f172a",
-                            textfont_color="#0f172a",
-                            textfont_size=14
-                        )
-                        st.plotly_chart(fig, use_container_width=True, key="audit_risk_chart")
+                    fig = px.bar(
+                        df_risk,
+                        x="Risk Level",
+                        y="Count",
+                        color="Risk Level",
+                        color_discrete_map={
+                            "LOW": "#22c55e",
+                            "MEDIUM": "#f59e0b",
+                            "HIGH": "#ef4444"
+                        }
+                    )
+                    fig.update_layout(
+                        height=350,
+                        paper_bgcolor='white',
+                        plot_bgcolor='white',
+                        font=dict(color='#1e293b', size=12),
+                        showlegend=False,
+                        margin=dict(l=40, r=40, t=40, b=40)
+                    )
+                    fig.update_traces(
+                        textposition='outside',
+                        texttemplate='%{y}'
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="risk_chart_fixed")
             except Exception as e:
-                st.error(f"Chart rendering error: {str(e)}")
-                import traceback
-                with st.expander("🔍 Error Details"):
-                    st.code(traceback.format_exc())
-                st.info(f"📊 Chart data: {str(by_risk)}")
+                st.error(f"Chart error: {str(e)}")
 else:
     st.info("📊 Statistics not available at this time. This could mean:\n- The backend is still loading\n- There are no audit entries in the database yet\n- The API endpoint is not responding\n\nTry submitting a task analysis first to generate audit data.")
 

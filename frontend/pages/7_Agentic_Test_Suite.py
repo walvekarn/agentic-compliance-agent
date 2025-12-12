@@ -300,34 +300,31 @@ if st.session_state.test_results and not st.session_state.test_running:
                         deviation = c.get("deviation", 0)
                         st.warning(f"**Confidence Below Threshold**: Expected min `{c.get('expected_min'):.2f}`, got `{c.get('actual'):.2f}` (deviation: {deviation:+.2f})")
     
-    # Confidence deviations - Build with guaranteed fallback
+    # Get test results and build deviations
+    test_results = results.get("test_results", []) if results else []
+    summary = results.get("summary", {}) if results else {}
     confidence_deviations = summary.get("confidence_deviations", [])
-    test_results = results.get("test_results", [])
     
-    # Always build deviations from test_results if we have them (even if backend returned empty)
-    # This ensures we show the chart even when all tests pass (100% adequacy)
-    if test_results and len(test_results) > 0:
-        # Check if we need to build deviations (either empty or missing)
-        if not confidence_deviations or len(confidence_deviations) == 0:
-            confidence_deviations = []
-            for r in test_results:
-                scenario = r.get("scenario", {})
-                title = scenario.get("title", f"Scenario {len(confidence_deviations) + 1}")
-                expected_min = r.get("expected", {}).get("min_confidence", 0.5)
-                actual_conf = r.get("actual", {}).get("confidence")
-                
-                # Handle None actual confidence
-                if actual_conf is None:
-                    actual_conf = expected_min  # Assume adequate if not reported
-                
+    # Build deviations from test_results if not provided by backend
+    if not confidence_deviations and test_results:
+        confidence_deviations = []
+        for i, r in enumerate(test_results):
+            scenario = r.get("scenario", {})
+            expected = r.get("expected", {})
+            actual = r.get("actual", {})
+            
+            expected_min = expected.get("min_confidence", 0.5)
+            actual_conf = actual.get("confidence")
+            
+            if actual_conf is not None:
                 confidence_deviations.append({
-                    "scenario": title,
-                    "expected_min": expected_min,
-                    "actual": actual_conf,
+                    "scenario": scenario.get("title", f"Test {i+1}"),
+                    "expected_min": round(expected_min, 3),
+                    "actual": round(actual_conf, 3),
                     "deviation": round(actual_conf - expected_min, 3),
                     "adequate": actual_conf >= expected_min
                 })
-
+    
     # Confidence Deviations Chart - Using Altair for simple bar chart
     render_section_header("Confidence Deviations", icon="📈", level=2)
     
@@ -389,20 +386,23 @@ if st.session_state.test_results and not st.session_state.test_running:
                     
                     with col2:
                         st.markdown("**Deviation Data Table**")
-                        display_cols = ["scenario", "expected_min", "actual", "deviation", "adequate"]
-                        available_cols = [col for col in display_cols if col in deviation_df.columns]
-                        if available_cols:
-                            st.dataframe(deviation_df[available_cols], use_container_width=True)
+                        if not deviation_df.empty:
+                            try:
+                                display_cols = ["scenario", "expected_min", "actual", "deviation", "adequate"]
+                                available_cols = [col for col in display_cols if col in deviation_df.columns]
+                                if available_cols:
+                                    st.dataframe(deviation_df[available_cols], use_container_width=True)
+                                else:
+                                    # Show available columns if expected ones are missing
+                                    st.dataframe(deviation_df, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error creating table: {str(e)}")
                         else:
-                            # Show available columns if expected ones are missing
-                            st.dataframe(deviation_df, use_container_width=True)
+                            st.info("📊 Run the test suite to see confidence deviations.")
         
         except Exception as e:
             st.error(f"❌ **Data processing error**: {str(e)}")
             st.info("📊 Raw data sample: " + str(confidence_deviations[:3] if confidence_deviations else "None"))
-            import traceback
-            with st.expander("🔍 Error Details", expanded=False):
-                st.code(traceback.format_exc())
     
     else:
         # No deviations data available - this should be rare since we build from test_results above
@@ -430,63 +430,39 @@ if st.session_state.test_results and not st.session_state.test_running:
         else:
             st.info("📊 No test results available. Run the test suite to see confidence deviations.")
     
-    # Detailed results table - only show header when results are ready
-    test_results = results.get("test_results", [])
-    if test_results:
+    # Detailed Test Results section
+    test_results = results.get("test_results", []) if results else []
+    
+    if test_results and len(test_results) > 0:
         render_section_header("Detailed Test Results", icon="🔍", level=2)
+        
+        # Build results table
         results_data = []
         for r in test_results:
             scenario = r.get("scenario", {})
+            expected = r.get("expected", {})
+            actual = r.get("actual", {})
+            
             results_data.append({
                 "Scenario": scenario.get("title", "Unknown"),
-                "Status": "✅ Pass" if r.get("passed") else "❌ Fail",
-                "Decision": "✅" if r.get("decision_correct") else "❌",
-                "Risk Level": "✅" if r.get("risk_level_correct") else "❌",
-                "Confidence": "✅" if r.get("confidence_adequate") else "❌",
-                "Expected Decision": r.get("expected", {}).get("decision", "N/A"),
-                "Actual Decision": r.get("actual", {}).get("decision", "N/A"),
-                "Expected Risk": r.get("expected", {}).get("risk_level", "N/A"),
-                "Actual Risk": r.get("actual", {}).get("risk_level", "N/A"),
-                "Expected Min Conf": f"{r.get('expected', {}).get('min_confidence', 0):.2f}",
-                "Actual Conf": f"{r.get('actual', {}).get('confidence', 0):.2f}" if r.get('actual', {}).get('confidence') is not None else "N/A",
-                "Execution Time (s)": f"{r.get('execution_time', 0):.2f}"
+                "Status": "✅ Pass" if r.get("passed", False) else "❌ Fail",
+                "Decision Match": "✅" if r.get("decision_correct", False) else "❌",
+                "Risk Match": "✅" if r.get("risk_level_correct", False) else "❌",
+                "Confidence OK": "✅" if r.get("confidence_adequate", False) else "❌",
+                "Expected Decision": expected.get("decision", "N/A"),
+                "Actual Decision": actual.get("decision", "N/A"),
+                "Expected Risk": expected.get("risk_level", "N/A"),
+                "Actual Risk": actual.get("risk_level", "N/A"),
+                "Confidence": f"{actual.get('confidence', 0):.2f}" if actual.get('confidence') is not None else "N/A"
             })
         
-        df = pd.DataFrame(results_data)
-        st.dataframe(df, width="stretch")
-        
-        # Expandable details for each test
-        for i, result in enumerate(test_results):
-            scenario = result.get("scenario", {})
-            scenario_name = scenario.get("title", f"Test {i+1}")
-            
-            with st.expander(f"{'✅' if result.get('passed') else '❌'} {scenario_name}"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("**Expected:**")
-                    expected = result.get("expected", {})
-                    st.write(f"- Decision: `{expected.get('decision', 'N/A')}`")
-                    st.write(f"- Risk Level: `{expected.get('risk_level', 'N/A')}`")
-                    st.write(f"- Min Confidence: `{expected.get('min_confidence', 0):.2f}`")
-                
-                with col2:
-                    st.markdown("**Actual:**")
-                    actual = result.get("actual", {})
-                    st.write(f"- Decision: `{actual.get('decision', 'N/A')}`")
-                    st.write(f"- Risk Level: `{actual.get('risk_level', 'N/A')}`")
-                    st.write(f"- Confidence: `{actual.get('confidence', 'N/A')}`")
-                
-                diff = result.get("diff", {})
-                if diff:
-                    st.markdown("**Differences:**")
-                    st.json(diff)
-                
-                if result.get("error"):
-                    st.error(f"**Error**: {result.get('error')}")
+        if results_data:
+            df = pd.DataFrame(results_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No test results to display.")
     else:
-        # No test results in the data
-        st.info("📊 No detailed test results available in the response.")
+        st.info("📊 Run the test suite to see detailed results.")
 else:
     # No results available and test is not running
     if not st.session_state.test_running:

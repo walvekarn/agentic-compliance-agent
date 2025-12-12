@@ -37,7 +37,7 @@ from components.chat_assistant import render_chat_panel
 # Page config
 st.set_page_config(page_title="Check a Task", page_icon="✅", layout="wide")
 
-# Force light theme for consistent UI (avoids dark bleed on inputs/progress/checkboxes)
+# Force light theme FIRST - before any rendering to ensure consistent UI
 apply_light_theme_css()
 
 # Authentication
@@ -257,7 +257,7 @@ with st.form("task_check_form", clear_on_submit=False):
     from components.ui_helpers import render_section_header
     render_section_header("Your Company Information", icon="📋", level=2)
     
-    col1, col2 = st.columns([1, 1], gap="medium")
+    col1, col2 = st.columns([1, 1], gap="large")
     
     with col1:
         company_name = st.text_input(
@@ -285,6 +285,20 @@ with st.form("task_check_form", clear_on_submit=False):
             key="industry_select",
             help="Select your industry or sector"
         )
+        
+        handles_customer_data = st.checkbox(
+            "We handle customer or user data",
+            value=form_defaults.get("handles_data", False),
+            key="handles_data_checkbox",
+            help="Check if your organization processes customer or user data"
+        )
+        
+        is_regulated = st.checkbox(
+            "We're a regulated entity (bank, healthcare, etc.)",
+            value=form_defaults.get("is_regulated", False),
+            key="is_regulated_checkbox",
+            help="Check if your organization is directly regulated by government agencies. 💡 Examples: Banks (FDIC), Healthcare (HIPAA), Public Companies (SEC), Financial Services (FINRA). If unsure, leave unchecked."
+        )
     
     with col2:
         employee_count = st.text_input(
@@ -304,25 +318,13 @@ with st.form("task_check_form", clear_on_submit=False):
             help="Select all locations where your organization operates. Required field. 💡 Tip: 'Jurisdictions' are countries/regions with different compliance rules (e.g., US, EU, UK). Each location may have different regulations.",
             inside_form=True
         )
-        
-        handles_customer_data = st.checkbox(
-            "We handle customer or user data",
-            value=form_defaults.get("handles_data", False),
-            key="handles_data_checkbox",
-            help="Check if your organization processes customer or user data"
-        )
-        
-        is_regulated = st.checkbox(
-            "We're a regulated entity (bank, healthcare, etc.)",
-            value=form_defaults.get("is_regulated", False),
-            key="is_regulated_checkbox",
-            help="Check if your organization is directly regulated by government agencies. 💡 Examples: Banks (FDIC), Healthcare (HIPAA), Public Companies (SEC), Financial Services (FINRA). If unsure, leave unchecked."
-        )
     
     st.markdown("---")
+    st.markdown("")  # Extra spacing
     # Update progress indicator
     st.progress(1.0, text="Step 2 of 2: Task Details")
     render_section_header("About This Task", icon="📝", level=2)
+    st.markdown("")  # Extra spacing
     
     task_description = st.text_area(
         "What do you need to do? *",
@@ -333,7 +335,7 @@ with st.form("task_check_form", clear_on_submit=False):
         help="Describe the compliance task you need help with"
     )
     
-    col1, col2 = st.columns([1, 1], gap="medium")
+    col1, col2 = st.columns([1, 1], gap="large")
     
     with col1:
         task_type_index = TASK_TYPE_OPTIONS.index(form_defaults.get("task_type", TASK_TYPE_OPTIONS[0])) if form_defaults.get("task_type") in TASK_TYPE_OPTIONS else 0
@@ -344,7 +346,8 @@ with st.form("task_check_form", clear_on_submit=False):
             key="task_type_select",
             help="Select the category that best describes your task"
         )
-        
+    
+    with col2:
         involves_personal_info = st.checkbox(
             "This task involves customer personal information",
             value=form_defaults.get("involves_personal", False),
@@ -365,8 +368,7 @@ with st.form("task_check_form", clear_on_submit=False):
             key="crosses_borders_checkbox",
             help="Check if this task involves cross-border data transfer"
         )
-    
-    with col2:
+        
         has_deadline = st.checkbox(
             "There's a specific deadline for this task",
             value=form_defaults.get("has_deadline", False),
@@ -410,6 +412,7 @@ with st.form("task_check_form", clear_on_submit=False):
         )
     
     st.markdown("---")
+    st.markdown("")  # Extra spacing
     st.markdown("<p style='font-size: 1.3rem; text-align: center; color: #3b82f6; margin: 1.5rem 0; font-weight: 600;'>Ready to get your answer? Click below:</p>", unsafe_allow_html=True)
     
     submitted = st.form_submit_button(

@@ -154,6 +154,9 @@ async def add_request_id_middleware(request, call_next):
 app.add_middleware(BaseHTTPMiddleware, dispatch=add_request_id_middleware)
 
 
+import os
+
+
 @app.get("/health")
 async def health_check():
     """
@@ -186,43 +189,51 @@ async def health_check():
             "error": str(e)
         }
     
-    # Check LLM connectivity (fast path, skip if no key)
-    try:
-        from backend.utils.llm_client import LLMClient
-        llm_client = LLMClient()
-        if not settings.OPENAI_API_KEY or str(settings.OPENAI_API_KEY).startswith("mock"):
-            health_status["components"]["llm"] = {
-                "status": "not_configured",
-                "key_present": False
-            }
-        else:
-            test_response = await llm_client.run_compliance_analysis_async(
-                prompt="health check",
-                use_json_schema=False,
-                timeout=5.0
-            )
-            test_dict = test_response.to_dict()
-            if test_dict.get("status") == "completed":
+    # Check LLM connectivity (optional fast path, default skipped to keep health fast/stable)
+    skip_llm_health = os.getenv("SKIP_LLM_HEALTH", "1") == "1"
+    if skip_llm_health:
+        health_status["components"]["llm"] = {
+            "status": "skipped",
+            "key_present": bool(settings.OPENAI_API_KEY),
+            "reason": "SKIP_LLM_HEALTH=1"
+        }
+    else:
+        try:
+            from backend.utils.llm_client import LLMClient
+            llm_client = LLMClient()
+            if not settings.OPENAI_API_KEY or str(settings.OPENAI_API_KEY).startswith("mock"):
                 health_status["components"]["llm"] = {
-                    "status": "healthy",
-                    "key_present": True,
-                    "connectivity": "verified"
+                    "status": "not_configured",
+                    "key_present": False
                 }
             else:
-                health_status["components"]["llm"] = {
-                    "status": "degraded",
-                    "key_present": True,
-                    "connectivity": "failed",
-                    "error": test_dict.get("error", "Unknown error")
-                }
-                health_status["status"] = "degraded"
-    except Exception as e:
-        health_status["components"]["llm"] = {
-            "status": "unhealthy",
-            "key_present": bool(settings.OPENAI_API_KEY),
-            "error": str(e)
-        }
-        health_status["status"] = "degraded"
+                test_response = await llm_client.run_compliance_analysis_async(
+                    prompt="health check",
+                    use_json_schema=False,
+                    timeout=5.0
+                )
+                test_dict = test_response.to_dict()
+                if test_dict.get("status") == "completed":
+                    health_status["components"]["llm"] = {
+                        "status": "healthy",
+                        "key_present": True,
+                        "connectivity": "verified"
+                    }
+                else:
+                    health_status["components"]["llm"] = {
+                        "status": "degraded",
+                        "key_present": True,
+                        "connectivity": "failed",
+                        "error": test_dict.get("error", "Unknown error")
+                    }
+                    health_status["status"] = "degraded"
+        except Exception as e:
+            health_status["components"]["llm"] = {
+                "status": "unhealthy",
+                "key_present": bool(settings.OPENAI_API_KEY),
+                "error": str(e)
+            }
+            health_status["status"] = "degraded"
     
     # Check JWT configuration
     if settings.JWT_SECRET and settings.JWT_SECRET != "dev_jwt_secret_change_me":

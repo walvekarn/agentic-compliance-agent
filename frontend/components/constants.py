@@ -211,7 +211,18 @@ if _env_backend and _env_backend.strip():
     API_BASE_URL = _env_backend.rstrip("/")
 else:
     API_BASE_URL = "http://localhost:8000"  # Default to localhost instead of LAN IP
-API_TIMEOUT = int(os.getenv("API_TIMEOUT", "30"))
+
+# ============================================================================
+# TIMEOUT CONFIGURATION
+# ============================================================================
+# All timeouts are in seconds. Frontend timeouts should be >= backend timeouts.
+# For agentic operations: Frontend >= Backend >= LLM call timeout
+# ============================================================================
+
+# API timeout must be >= backend AGENTIC_OPERATION_TIMEOUT for long-running operations
+API_TIMEOUT = int(os.getenv("API_TIMEOUT", "90"))
+# Frontend Timeouts (for API client)
+FRONTEND_API_TIMEOUT = 120  # Must match API_LONG_OPERATION_TIMEOUT
 
 # ============================================================================
 # APP STATES

@@ -43,10 +43,27 @@ class Settings(BaseSettings):
     # Local/demo bypass flag (dangerous outside dev)
     ALLOW_DEMO_USER: bool = False
     
+    # ============================================================================
+    # TIMEOUT CONFIGURATION
+    # ============================================================================
+    # All timeouts are in seconds. Frontend timeouts should be >= backend timeouts.
+    # For agentic operations: Frontend >= Backend >= LLM call timeout
+    # ============================================================================
+    
     # Agentic Engine Timeouts (in seconds)
-    AGENTIC_OPERATION_TIMEOUT: int = 30  # Overall timeout for agentic operations (reduced from 120 for fast responses)
-    AGENTIC_SECONDARY_TASK_TIMEOUT: int = 8  # Timeout for secondary tasks like reflection (reduced from 30)
-    AGENTIC_LLM_CALL_TIMEOUT: int = 8  # Timeout for individual LLM calls in orchestrator (plan, execute, recommend) - reduced for speed
+    # These values are tuned for LLM orchestration chains that require multiple API calls
+    # Plan→Execute→Reflect loop typically needs 60-90 seconds total
+    AGENTIC_OPERATION_TIMEOUT: int = 60  # Overall timeout for agentic operations
+    AGENTIC_SECONDARY_TASK_TIMEOUT: int = 20  # Timeout for secondary tasks like reflection
+    AGENTIC_LLM_CALL_TIMEOUT: int = 15  # Timeout for individual LLM calls in orchestrator (plan, execute, recommend)
+    
+    # API Client Timeouts
+    API_DEFAULT_TIMEOUT: int = 30  # Default timeout for API calls
+    API_LONG_OPERATION_TIMEOUT: int = 120  # For agentic/analysis operations
+    
+    # LLM Timeouts
+    LLM_COMPLIANCE_TIMEOUT: int = 45  # For compliance analysis calls
+    LLM_STANDARD_TIMEOUT: int = 30  # For standard LLM calls
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

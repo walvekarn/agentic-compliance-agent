@@ -374,10 +374,11 @@ async def analyze_with_agentic_engine(
     """
     try:
         # Initialize orchestrator with database session for tools
+        max_iters = min(request.max_iterations, 2)  # Force demo mode
         orchestrator = AgenticAIOrchestrator(
             config={
-                "max_iterations": request.max_iterations,
-                "enable_reflection": True,
+                "max_iterations": max_iters,
+                "enable_reflection": False,
                 "enable_memory": True
             },
             db_session=db
@@ -403,7 +404,7 @@ async def analyze_with_agentic_engine(
                     orchestrator.run,
                     task_description,
                     context,
-                    request.max_iterations
+                    max_iters
                 ),
                 timeout=settings.AGENTIC_OPERATION_TIMEOUT
             )

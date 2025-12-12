@@ -432,9 +432,11 @@ def render_chat_panel(context_data=None):
     # Display page-specific chat history
     for message in page_chat_messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            
-            # Show timestamp
+            st.markdown(f"""
+            <div style="background-color: #2d2d3d; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #404050;">
+                <p style="color: #e0e0e0; margin: 0;">{message["content"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
             if message.get("timestamp"):
                 st.caption(f"_{message['timestamp']}_")
     
@@ -468,7 +470,11 @@ def render_chat_panel(context_data=None):
         
         # Display user message
         with st.chat_message("user"):
-            st.markdown(user_query)
+            st.markdown(f"""
+            <div style="background-color: #2d2d3d; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #404050;">
+                <p style="color: #e0e0e0; margin: 0;">{user_query}</p>
+            </div>
+            """, unsafe_allow_html=True)
             st.caption(f"_{timestamp}_")
         
         # Process the query using helper function with context data

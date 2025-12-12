@@ -26,7 +26,7 @@ from components.ui_helpers import apply_light_theme_css
 # Page config
 st.set_page_config(page_title="Agentic Analysis", page_icon="🤖", layout="wide")
 
-# Apply light theme CSS only
+# Apply light theme CSS FIRST - before any rendering to ensure consistent theme
 apply_light_theme_css()
 
 # Authentication
@@ -258,142 +258,299 @@ if st.session_state.get("agentic_analysis_in_progress") and st.session_state.get
     request_payload = st.session_state["agentic_request_payload"]
     
     # Progress indicator (outside form, so it persists)
-    with st.spinner("🤖 **Processing**: This may take up to 2 minutes..."):
+    progress_bar = st.progress(0, text="Starting agentic analysis...")
+    # #region agent log
+    import json
+    import os
+    import time
+    try:
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "debug.log")
+        with open(log_path, "a") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "agentic-run",
+                "hypothesisId": "A1",
+                "location": "5_Agentic_Analysis.py:api_call_start",
+                "message": "Starting agentic API call",
+                "data": {"has_payload": bool(request_payload)},
+                "timestamp": int(time.time() * 1000)
+            }) + "\n")
+    except Exception:
+        pass
+    # #endregion
+    
+    try:
+        with st.spinner("🤖 Agentic engine processing... This may take up to 2 minutes."):
+            # Increase timeout to align with backend long-running agentic flow
+            response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=150)
+        
+        # Clear progress bar
+        progress_bar.empty()
+        
+        # #region agent log
         try:
-            response = api_client.post("/api/v1/agentic/analyze", request_payload, timeout=130)
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, "debug.log")
+            with open(log_path, "a") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "agentic-run",
+                    "hypothesisId": "A1",
+                    "location": "5_Agentic_Analysis.py:api_call_complete",
+                    "message": "Agentic API call completed",
+                    "data": {
+                        "success": response.success if response else False,
+                        "status_code": response.status_code if response else None,
+                        "has_data": bool(response.data if response else False),
+                        "error": response.error if response else None
+                    },
+                    "timestamp": int(time.time() * 1000)
+                }) + "\n")
+        except Exception:
+            pass
+        # #endregion
+        
+        # #region agent log
+        try:
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, "debug.log")
+            with open(log_path, "a") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "agentic-run",
+                    "hypothesisId": "A1",
+                    "location": "5_Agentic_Analysis.py:api_call_result",
+                    "message": "Agentic API response received",
+                    "data": {
+                        "success": response.success if response else False,
+                        "status_code": response.status_code if response else None,
+                        "error": response.error if response else None,
+                        "has_data": bool(response.data if response else False)
+                    },
+                    "timestamp": int(time.time() * 1000)
+                }) + "\n")
+        except Exception:
+            pass
+        # #endregion
+        
+        if response.success:
+            # Handle success
+            status, results, error, timestamp = parseAgenticResponse(response)
             
-            # DEBUG: Show raw response for troubleshooting
-            with st.expander("🔍 Debug: API Response", expanded=False):
-                st.json({
-                    "success": response.success,
-                    "error": response.error,
-                    "status_code": response.status_code,
-                    "data_keys": list(response.data.keys()) if response.data and isinstance(response.data, dict) else None,
-                    "data_sample": {k: str(v)[:200] for k, v in (response.data.items() if response.data and isinstance(response.data, dict) else {})} if response.data else None
-                })
-            
-            if response.success and response.data:
-                status, results, error, timestamp = parseAgenticResponse(response)
+            # FIXED: Show results even if status is not "completed" or if some fields are missing
+            # More lenient: accept ANY results dict, even if empty - let the display logic handle empty states
+            if results and isinstance(results, dict):
+                # Check if we have any meaningful data to show
+                # More lenient checks - accept results if status is completed or if we have any data at all
+                has_plan = bool(results.get("plan")) and (isinstance(results.get("plan"), list) and len(results.get("plan", [])) > 0)
+                has_outputs = bool(results.get("step_outputs")) and (isinstance(results.get("step_outputs"), list) and len(results.get("step_outputs", [])) > 0)
+                has_reflections = bool(results.get("reflections")) and (isinstance(results.get("reflections"), list) and len(results.get("reflections", [])) > 0)
+                has_recommendation = bool(results.get("final_recommendation")) and str(results.get("final_recommendation", "")).strip() and results.get("final_recommendation") != "No recommendation available"
                 
-                # DEBUG: Show parsed response
-                with st.expander("🔍 Debug: Parsed Response", expanded=False):
+                # FIXED: Always display if we have results dict, even if empty - user should see what was returned
+                # Accept results if status is completed, partial, or if we have ANY data (even empty lists)
+                # This ensures users see what the API returned, even if incomplete
+                should_display = (
+                    status == "completed" or 
+                    status == "partial" or
+                    status == "unknown" or  # Accept unknown status if we have data
+                    has_plan or 
+                    has_outputs or 
+                    has_reflections or 
+                    has_recommendation or
+                    len(results) > 0  # If results dict has any keys, show it
+                )
+                
+                if should_display:
+                    # #region agent log
+                    try:
+                        with open(log_path, "a") as f:
+                            f.write(json.dumps({
+                                "sessionId": "debug-session",
+                                "runId": "agentic-api-call",
+                                "hypothesisId": "C",
+                                "location": "5_Agentic_Analysis.py:display_results",
+                                "message": "Results will be displayed",
+                                "data": {
+                                    "status": status,
+                                    "has_plan": has_plan,
+                                    "has_outputs": has_outputs,
+                                    "has_reflections": has_reflections,
+                                    "has_recommendation": has_recommendation
+                                },
+                                "timestamp": int(__import__("time").time() * 1000)
+                            }) + "\n")
+                    except:
+                        pass
+                    # #endregion
+                    
+                    # Store results BEFORE clearing state to ensure they persist
+                    st.session_state.agentic_results = results
+                    st.session_state["agentic_analysis_in_progress"] = False
+                    # Clear request payload AFTER storing results
+                    if "agentic_request_payload" in st.session_state:
+                        del st.session_state["agentic_request_payload"]
+                    
+                    if status != "completed":
+                        st.warning(f"⚠️ **Partial Results**: Analysis status is '{status}'. Some data may be incomplete.")
+                    
+                    # FIXED: Use rerun only once, and ensure results are stored first
+                    # Clear any error states that might prevent display
+                    if "agentic_error" in st.session_state:
+                        del st.session_state["agentic_error"]
+                    
+                    # Force rerun to display results - results are already in session_state
+                    st.rerun()
+                else:
+                    # No meaningful data
+                    del st.session_state["agentic_request_payload"]
+                    st.session_state["agentic_analysis_in_progress"] = False
+                    st.error(f"❌ **No Results**: {error or 'Analysis completed but returned no data'}")
+                    # Show debug info
                     st.json({
                         "status": status,
-                        "error": error,
-                        "timestamp": timestamp,
-                        "results_type": type(results).__name__,
-                        "results_keys": list(results.keys()) if results and isinstance(results, dict) else None,
-                        "has_plan": bool(results.get("plan") if results and isinstance(results, dict) else False),
-                        "has_step_outputs": bool(results.get("step_outputs") if results and isinstance(results, dict) else False),
-                        "has_reflections": bool(results.get("reflections") if results and isinstance(results, dict) else False),
-                        "has_final_recommendation": bool(results.get("final_recommendation") if results and isinstance(results, dict) else False)
+                        "has_plan": has_plan,
+                        "has_outputs": has_outputs,
+                        "has_reflections": has_reflections,
+                        "has_recommendation": has_recommendation,
+                        "results_keys": list(results.keys()) if results else None
                     })
-                
-                # FIXED: Show results even if status is not "completed" or if some fields are missing
-                if results and isinstance(results, dict):
-                    # Check if we have any meaningful data to show
-                    # More lenient checks - accept results if status is completed or if we have any data at all
-                    has_plan = bool(results.get("plan")) and (isinstance(results.get("plan"), list) and len(results.get("plan", [])) > 0)
-                    has_outputs = bool(results.get("step_outputs")) and (isinstance(results.get("step_outputs"), list) and len(results.get("step_outputs", [])) > 0)
-                    has_reflections = bool(results.get("reflections")) and (isinstance(results.get("reflections"), list) and len(results.get("reflections", [])) > 0)
-                    has_recommendation = bool(results.get("final_recommendation")) and str(results.get("final_recommendation", "")).strip() and results.get("final_recommendation") != "No recommendation available"
-                    
-                    # Accept results if status is completed, or if we have any meaningful data
-                    # Also accept if status is "partial" (partial results are still useful)
-                    should_display = (
-                        status == "completed" or 
-                        status == "partial" or
-                        has_plan or 
-                        has_outputs or 
-                        has_reflections or 
-                        has_recommendation
-                    )
-                    
-                    if should_display:
-                        st.session_state.agentic_results = results
-                        del st.session_state["agentic_request_payload"]
-                        st.session_state["agentic_analysis_in_progress"] = False
-                        if status != "completed":
-                            st.warning(f"⚠️ **Partial Results**: Analysis status is '{status}'. Some data may be incomplete.")
-                        # Force rerun to display results
-                        st.rerun()
-                    else:
-                        # No meaningful data
-                        del st.session_state["agentic_request_payload"]
-                        st.session_state["agentic_analysis_in_progress"] = False
-                        st.error(f"❌ **No Results**: {error or 'Analysis completed but returned no data'}")
-                        # Show debug info
-                        st.json({
-                            "status": status,
-                            "has_plan": has_plan,
-                            "has_outputs": has_outputs,
-                            "has_reflections": has_reflections,
-                            "has_recommendation": has_recommendation,
-                            "results_keys": list(results.keys()) if results else None
-                        })
-                elif status == "timeout":
-                    del st.session_state["agentic_request_payload"]
-                    st.session_state["agentic_analysis_in_progress"] = False
-                    st.error(f"⏱️ **Timeout**: {error or 'Analysis exceeded time limit'}")
-                    st.info("💡 **Tip**: Try simplifying the task description or try again later.")
-                else:
-                    del st.session_state["agentic_request_payload"]
-                    st.session_state["agentic_analysis_in_progress"] = False
-                    st.error(f"❌ **Analysis Failed**: {error or 'Unknown error'}")
-                    st.info("💡 **Troubleshooting**: Check backend logs and try again.")
+            elif status == "timeout":
+                del st.session_state["agentic_request_payload"]
+                st.session_state["agentic_analysis_in_progress"] = False
+                st.error("⏱️ Analysis timed out. The task may be too complex. Try simplifying the task description.")
+                st.info("💡 Tip: Break down complex tasks into smaller, more specific questions.")
             else:
                 del st.session_state["agentic_request_payload"]
                 st.session_state["agentic_analysis_in_progress"] = False
-                st.error(f"❌ **API Error**: {response.error or 'Backend returned an error'}")
-                st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Check backend logs for details")
-                
-        except requests.exceptions.Timeout:
+                st.error(f"❌ **Analysis Failed**: {error or 'Unknown error'}")
+                st.info("💡 **Troubleshooting**: Check backend logs and try again.")
+        elif response.status_code == 504:
+            # Clear progress bar
+            progress_bar.empty()
             del st.session_state["agentic_request_payload"]
             st.session_state["agentic_analysis_in_progress"] = False
-            st.error("⏱️ **Request Timeout**: The backend took too long to respond.")
-            st.info("💡 **Tip**: Try simplifying the task description or check backend logs for issues.")
-        except requests.exceptions.ConnectionError:
+            st.error("⏱️ Analysis timed out. The task may be too complex. Try simplifying the task description.")
+            st.info("💡 Tip: Break down complex tasks into smaller, more specific questions.")
+        else:
+            # Clear progress bar
+            progress_bar.empty()
             del st.session_state["agentic_request_payload"]
             st.session_state["agentic_analysis_in_progress"] = False
-            st.error("🔌 **Connection Error**: Cannot reach the backend server.")
-            st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
-        except Exception as e:
-            del st.session_state["agentic_request_payload"]
-            st.session_state["agentic_analysis_in_progress"] = False
-            st.error(f"❌ **Error**: {str(e)}")
-            st.info("💡 **Troubleshooting**: Check backend logs for detailed error information.")
-            import traceback
-            with st.expander("🔍 Technical Details"):
-                st.code(traceback.format_exc(), language="text")
+            st.error(f"❌ Analysis failed: {response.error or 'Backend returned an error'}")
+            st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify your network connection\n3. Check backend logs for details")
+    
+    except requests.exceptions.Timeout:
+        progress_bar.empty()
+        del st.session_state["agentic_request_payload"]
+        st.session_state["agentic_analysis_in_progress"] = False
+        st.error("⏱️ Analysis timed out. The task may be too complex. Try simplifying the task description.")
+        st.info("💡 Tip: Break down complex tasks into smaller, more specific questions.")
+        try:
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, "debug.log")
+            with open(log_path, "a") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "agentic-run",
+                    "hypothesisId": "A1",
+                    "location": "5_Agentic_Analysis.py:api_call_timeout",
+                    "message": "Agentic API timeout",
+                    "data": {},
+                    "timestamp": int(time.time() * 1000)
+                }) + "\n")
+        except Exception:
+            pass
+    except requests.exceptions.ConnectionError:
+        progress_bar.empty()
+        del st.session_state["agentic_request_payload"]
+        st.session_state["agentic_analysis_in_progress"] = False
+        st.error("🔌 **Connection Error**: Cannot reach the backend server.")
+        st.info("💡 **Troubleshooting**:\n1. Check that the backend is running\n2. Verify the API_BASE_URL setting\n3. Check your network connection")
+        try:
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, "debug.log")
+            with open(log_path, "a") as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "agentic-run",
+                    "hypothesisId": "A1",
+                    "location": "5_Agentic_Analysis.py:api_call_conn_error",
+                    "message": "Agentic API connection error",
+                    "data": {},
+                    "timestamp": int(time.time() * 1000)
+                }) + "\n")
+        except Exception:
+            pass
+    except Exception as e:
+        progress_bar.empty()
+        del st.session_state["agentic_request_payload"]
+        st.session_state["agentic_analysis_in_progress"] = False
+        st.error(f"❌ Unexpected error: {str(e)}")
+        st.info("Please try again or contact support if the issue persists.")
+        import traceback
+        with st.expander("🔍 Technical Details"):
+            st.code(traceback.format_exc(), language="text")
 
 # ============================================================================
 # DISPLAY RESULTS
 # ============================================================================
+# FIXED: Check for results more robustly - handle None, empty dict, etc.
 agentic_results = st.session_state.get("agentic_results")
-if agentic_results:
+# Display results if we have a non-None value (even if empty dict)
+if agentic_results is not None:
     results = agentic_results
-    
-    # DEBUG: Show what we're displaying
-    with st.expander("🔍 Debug: Displaying Results", expanded=False):
-        st.json({
-            "results_type": type(results).__name__,
-            "results_keys": list(results.keys()) if isinstance(results, dict) else None,
-            "plan_count": len(results.get("plan", [])) if isinstance(results, dict) else 0,
-            "step_outputs_count": len(results.get("step_outputs", [])) if isinstance(results, dict) else 0,
-            "reflections_count": len(results.get("reflections", [])) if isinstance(results, dict) else 0,
-            "has_final_recommendation": bool(results.get("final_recommendation")) if isinstance(results, dict) else False
-        })
     
     st.markdown("---")
     st.markdown("## 📊 Analysis Results")
+    st.markdown(
+        "<style>div[data-testid='stVerticalBlock'] { background-color: transparent !important; }</style>",
+        unsafe_allow_html=True
+    )
     
-    # Status check
+    # Pull key fields for summary card
+    decision = results.get("decision") or results.get("final_decision") or "REVIEW_REQUIRED"
+    risk_level = results.get("risk_level") or "MEDIUM"
+    confidence = results.get("confidence_score", 0.0)
+    
+    risk_icon = {"LOW": "🟢", "MEDIUM": "🟡", "MEDIUM-HIGH": "🟠", "HIGH": "🔴"}.get(risk_level, "⚪")
+    decision_badge = {
+        "AUTONOMOUS": "✅ Autonomous",
+        "REVIEW_REQUIRED": "⚠️ Review Required",
+        "ESCALATE": "🚨 Escalate"
+    }.get(decision, decision)
+    
+    col_summary = st.container()
+    with col_summary:
+        st.markdown(
+            f"""
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Summary</div>
+                <div style="display:flex; gap:24px; flex-wrap:wrap;">
+                    <div><strong>Decision:</strong> {decision_badge}</div>
+                    <div><strong>Risk:</strong> {risk_icon} {risk_level}</div>
+                    <div><strong>Confidence:</strong> {int(confidence*100)}%</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    # Status check - handle error status but don't stop, show what we have
     status = results.get("status", "unknown")
     if status == "error":
-        st.error("❌ **Analysis Error**: The analysis encountered an error. Please try again.")
+        st.error("❌ **Analysis Error**: The analysis encountered an error.")
         if results.get("error"):
             st.code(results.get("error"), language="text")
-        st.stop()
+        # Don't stop - show any partial results that might exist
+        if not any([results.get("plan"), results.get("step_outputs"), results.get("reflections"), results.get("final_recommendation")]):
+            st.stop()  # Only stop if there's truly nothing to show
     
     # Tabs for different sections
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -533,7 +690,17 @@ if agentic_results:
             st.info("💡 **No Recommendation Yet**: The final recommendation will appear here once you run an analysis.")
         else:
             st.markdown(f"**🎯 AI Recommendation:**")
+            # Render markdown nicely
             st.markdown(final_recommendation)
+            
+            # Copy to clipboard (Streamlit workaround via text input)
+            st.text_input(
+                "Copy Recommendation (Ctrl/Cmd+C to copy)",
+                value=final_recommendation,
+                key="final_recommendation_copy",
+                label_visibility="collapsed"
+            )
+            
             st.markdown("---")
             st.metric("Confidence Score", f"{confidence_score:.2%}")
             

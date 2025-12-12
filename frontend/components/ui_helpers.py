@@ -14,6 +14,40 @@ def apply_light_theme_css():
     Includes complete styling for all components: checkboxes, dropdowns, buttons, inputs, filters, etc.
     Call this at the top of each page to ensure consistent light theme.
     """
+    # PERFORMANCE FIX: Use a single session-wide flag to prevent redundant CSS injection
+    # CSS is idempotent, but injecting 1488 lines on every page load is expensive
+    # Use a persistent key that survives page switches but resets on app restart
+    theme_applied_key = "_light_theme_css_applied_v1"
+
+    # Only inject CSS once per session - Streamlit will maintain it across page switches
+    if st.session_state.get(theme_applied_key, False):
+        return  # CSS already injected, skip expensive operation
+
+    # #region agent log
+    import json
+    import os
+    import time
+    try:
+        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "debug.log")
+        with open(log_path, "a") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": "theme-apply",
+                "hypothesisId": "T1",
+                "location": "ui_helpers.py:apply_light_theme_css",
+                "message": "Applying light theme CSS",
+                "data": {
+                    "page": st.session_state.get("_current_page", "unknown"),
+                    "theme_applied": False
+                },
+                "timestamp": int(time.time() * 1000)
+            }) + "\n")
+    except Exception:
+        pass
+    # #endregion
+    
     st.markdown("""
     <style>
         /* ====================================================================
@@ -30,6 +64,22 @@ def apply_light_theme_css():
         
         section[data-testid="stSidebar"] * {
             color: #1e293b !important;
+        }
+
+        /* Force sidebar light theme regardless of user theme */
+        [data-testid="stSidebar"] {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        [data-testid="stSidebar"] a, [data-testid="stSidebar"] span, [data-testid="stSidebar"] button {
+            color: #0f172a !important;
+        }
+        [data-testid="stSidebar"] button {
+            background: #e2e8f0 !important;
         }
         
         .stApp {
@@ -103,6 +153,17 @@ def apply_light_theme_css():
         [data-testid="stTextInput"] input:focus {
             border-color: #3b82f6 !important;
             outline: 2px solid #3b82f6 !important;
+        }
+
+        /* Force all form inputs to light backgrounds */
+        input, textarea, select, option {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        [data-baseweb="input"] input,
+        [data-testid="stNumberInput"] input {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
         }
         
         /* Chat input container */
@@ -182,203 +243,44 @@ def apply_light_theme_css():
         }
         
         /* ====================================================================
-           CHECKBOXES - Complete Styling (Enhanced for Light Theme)
-           REWRITTEN: Fixed width constraints to prevent vertical layout collapse
+           CHECKBOXES
            ==================================================================== */
-        /* Checkbox container - CRITICAL: width constraints prevent collapse */
+        /* Checkbox container - horizontal layout */
         .stCheckbox {
-            margin-bottom: 0.35rem !important;
-            display: flex !important;
-            align-items: flex-start !important;
-            gap: 0.5rem !important;
-            flex-wrap: nowrap !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
-            box-sizing: border-box !important;
-            flex-shrink: 0 !important;
-        }
-        
-        /* Checkbox label - Prevent vertical text wrapping */
-        .stCheckbox > label,
-        .stCheckbox label:first-of-type {
-            color: #1e293b !important;
-            font-size: 1rem !important;
             display: flex !important;
             align-items: center !important;
             gap: 0.5rem !important;
-            line-height: 1.4 !important;
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            flex: 1 1 auto !important;
-            min-width: 0 !important;
-            max-width: 100% !important;
-            width: auto !important;
+            margin-bottom: 0.75rem !important;
+            min-height: 2.5rem !important;
         }
         
-        /* Checkbox box styling - Multiple selectors to override Streamlit defaults */
-        .stCheckbox [data-baseweb="checkbox"],
-        .stCheckbox input[type="checkbox"],
-        input[type="checkbox"][data-baseweb="checkbox"],
-        [data-baseweb="checkbox"],
-        div[data-baseweb="checkbox"],
-        .stCheckbox > div > div[data-baseweb="checkbox"] {
+        /* Checkbox label text */
+        .stCheckbox label {
+            color: #1e293b !important;
+            font-size: 0.95rem !important;
+            line-height: 1.4 !important;
+            margin: 0 !important;
+        }
+        
+        /* Checkbox box - unchecked state */
+        .stCheckbox [data-baseweb="checkbox"] > div:first-child {
             background-color: #ffffff !important;
             border: 2px solid #cbd5e1 !important;
             border-radius: 4px !important;
-            width: 20px !important;
-            height: 20px !important;
-            min-width: 20px !important;
-            min-height: 20px !important;
-            display: inline-block !important;
+            width: 18px !important;
+            height: 18px !important;
+            min-width: 18px !important;
         }
         
-        .stCheckbox [data-baseweb="checkbox"]:checked,
-        .stCheckbox input[type="checkbox"]:checked,
-        input[type="checkbox"][data-baseweb="checkbox"]:checked,
-        [data-baseweb="checkbox"]:checked,
-        div[data-baseweb="checkbox"]:checked {
+        /* Checkbox box - checked state */
+        .stCheckbox [data-baseweb="checkbox"][aria-checked="true"] > div:first-child {
             background-color: #3b82f6 !important;
             border-color: #3b82f6 !important;
         }
         
-        /* Force checkbox visibility and proper styling */
-        .stCheckbox [data-baseweb="checkbox"] *,
-        [data-baseweb="checkbox"] * {
+        /* Remove any black backgrounds */
+        .stCheckbox [data-baseweb="checkbox"] * {
             background-color: transparent !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:checked *,
-        [data-baseweb="checkbox"]:checked * {
-            background-color: transparent !important;
-        }
-        
-        /* Ensure checkmark is visible */
-        .stCheckbox [data-baseweb="checkbox"]:checked svg path,
-        [data-baseweb="checkbox"]:checked svg path {
-            stroke: #ffffff !important;
-            fill: #ffffff !important;
-            stroke-width: 2px !important;
-        }
-        
-        /* Override any dark theme checkbox styling */
-        .stCheckbox [data-baseweb="checkbox"] svg,
-        [data-baseweb="checkbox"] svg {
-            color: #3b82f6 !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:checked svg,
-        [data-baseweb="checkbox"]:checked svg {
-            color: #ffffff !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:hover {
-            border-color: #3b82f6 !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:focus {
-            outline: 2px solid #3b82f6 !important;
-            outline-offset: 2px !important;
-        }
-        
-        /* Force checkbox background - stronger override for dark theme */
-        .stCheckbox [data-baseweb="checkbox"] > div,
-        .stCheckbox [data-baseweb="checkbox"] > div > div {
-            background-color: #ffffff !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:checked > div,
-        .stCheckbox [data-baseweb="checkbox"]:checked > div > div {
-            background-color: #3b82f6 !important;
-        }
-        
-        /* Checkbox SVG checkmark - ensure white on blue */
-        .stCheckbox [data-baseweb="checkbox"]:checked svg path,
-        .stCheckbox [data-baseweb="checkbox"]:checked svg {
-            stroke: #ffffff !important;
-            fill: #ffffff !important;
-            color: #ffffff !important;
-        }
-        
-        /* Override any dark checkbox backgrounds */
-        .stCheckbox [data-baseweb="checkbox"] {
-            background: #ffffff !important;
-        }
-        
-        .stCheckbox [data-baseweb="checkbox"]:checked {
-            background: #3b82f6 !important;
-        }
-        
-        /* Force checkbox caret/text to stay horizontal - CRITICAL */
-        .stCheckbox [data-baseweb="checkbox"] span,
-        .stCheckbox span {
-            writing-mode: horizontal-tb !important;
-            transform: none !important;
-            text-orientation: mixed !important;
-            text-align: left !important;
-        }
-        
-        /* Checkbox wrapper div - prevent width collapse */
-        .stCheckbox > div {
-            display: flex !important;
-            align-items: center !important;
-            gap: 0.5rem !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
-            flex-wrap: nowrap !important;
-        }
-        
-        /* ====================================================================
-           CHECKBOXES - Additional Fixes for Black Background Issue
-           ==================================================================== */
-        /* Target ALL nested checkbox elements - Streamlit has 3-4 levels of nesting */
-        .stCheckbox [data-baseweb="checkbox"] *,
-        [data-baseweb="checkbox"] *,
-        .stCheckbox [data-baseweb="checkbox"] > *,
-        .stCheckbox [data-baseweb="checkbox"] > * > *,
-        .stCheckbox [data-baseweb="checkbox"] > * > * > * {
-            background-color: transparent !important;
-        }
-        
-        /* Force white background on ALL unchecked checkbox containers */
-        .stCheckbox [data-baseweb="checkbox"] > div,
-        .stCheckbox [data-baseweb="checkbox"] > div > div,
-        .stCheckbox [data-baseweb="checkbox"] > div > div > div,
-        .stCheckbox [data-baseweb="checkbox"] > div > div > div > div,
-        [data-baseweb="checkbox"] > div,
-        [data-baseweb="checkbox"] > div > div,
-        [data-baseweb="checkbox"] > div > div > div,
-        [data-baseweb="checkbox"] > div > div > div > div {
-            background-color: #ffffff !important;
-            border: 2px solid #cbd5e1 !important;
-        }
-        
-        /* Force blue background on ALL checked checkbox containers */
-        .stCheckbox [data-baseweb="checkbox"]:checked > div,
-        .stCheckbox [data-baseweb="checkbox"]:checked > div > div,
-        .stCheckbox [data-baseweb="checkbox"]:checked > div > div > div,
-        .stCheckbox [data-baseweb="checkbox"]:checked > div > div > div > div,
-        [data-baseweb="checkbox"]:checked > div,
-        [data-baseweb="checkbox"]:checked > div > div,
-        [data-baseweb="checkbox"]:checked > div > div > div,
-        [data-baseweb="checkbox"]:checked > div > div > div > div {
-            background-color: #3b82f6 !important;
-            border-color: #3b82f6 !important;
-        }
-        
-        /* Remove any black box-shadows or outlines */
-        .stCheckbox [data-baseweb="checkbox"],
-        [data-baseweb="checkbox"] {
-            box-shadow: none !important;
-            background-image: none !important;
-        }
-        
-        /* Ensure checkbox input itself is white when unchecked */
-        .stCheckbox input[type="checkbox"]:not(:checked) {
-            background-color: #ffffff !important;
-            border: 2px solid #cbd5e1 !important;
         }
         
         /* ====================================================================
@@ -1201,6 +1103,9 @@ def apply_light_theme_css():
         }
     </style>
     """, unsafe_allow_html=True)
+    
+    # Mark as applied - this persists across page switches in Streamlit
+    st.session_state[theme_applied_key] = True
 
 
 def multiselect_with_select_all(
@@ -1380,6 +1285,174 @@ def get_aria_label(label: str, help_text: Optional[str] = None) -> str:
     return aria
 
 
+# Override theme helper with dark-compatible CSS to ensure text visibility
+def apply_light_theme_css():
+    """Apply consistent theme CSS that works in both light and dark modes."""
+    st.markdown("""
+    <style>
+    /* ============================================
+       GLOBAL TEXT VISIBILITY FIXES
+       ============================================ */
+    
+    .main .block-container,
+    .main .block-container * { color: inherit; }
+    
+    .main h1, .main h2, .main h3, 
+    .main .stMarkdown h1, .main .stMarkdown h2, .main .stMarkdown h3 {
+        color: #ffffff !important;
+    }
+    .main p, .main li, .main span, .main label {
+        color: #e0e0e0 !important;
+    }
+    
+    /* What To Do Next / alerts */
+    .stAlert, [data-testid="stAlert"],
+    .element-container div[data-testid="stAlert"] {
+        background-color: #2d2d3d !important;
+        border: 1px solid #404050 !important;
+    }
+    .stAlert p, .stAlert li, .stAlert span,
+    [data-testid="stAlert"] p, [data-testid="stAlert"] li, [data-testid="stAlert"] span {
+        color: #e0e0e0 !important;
+    }
+    .stAlert[data-baseweb="notification"] { background-color: #1e3a5f !important; }
+    div[data-baseweb="notification"][kind="positive"] { background-color: #1e4d3d !important; }
+    div[data-baseweb="notification"][kind="warning"] { background-color: #4d3d1e !important; }
+    
+    /* Expanders */
+    .streamlit-expanderHeader,
+    [data-testid="stExpander"] summary,
+    button[kind="secondary"] {
+        color: #ffffff !important;
+        background-color: #2d2d3d !important;
+    }
+    .streamlit-expanderContent,
+    [data-testid="stExpander"] > div {
+        background-color: #1e1e2e !important;
+        color: #e0e0e0 !important;
+    }
+    
+    /* Chat */
+    .stChatMessage,
+    [data-testid="stChatMessage"],
+    [data-testid="stChatMessageContent"] {
+        background-color: #2d2d3d !important;
+        border: 1px solid #404050 !important;
+    }
+    .stChatMessage p, .stChatMessage span, .stChatMessage li,
+    [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] span, [data-testid="stChatMessage"] li {
+        color: #e0e0e0 !important;
+    }
+    .stChatInput, [data-testid="stChatInput"] { background-color: #2d2d3d !important; }
+    .stChatInput input, .stChatInput textarea {
+        color: #ffffff !important; background-color: #1e1e2e !important;
+    }
+    
+    /* Tabs/results */
+    .stTabs [data-baseweb="tab-panel"],
+    [data-testid="stTabs"] > div { background-color: transparent !important; }
+    .stTabs [data-baseweb="tab-panel"] > div,
+    .stTabs [data-baseweb="tab-panel"] p,
+    .stTabs [data-baseweb="tab-panel"] li,
+    .stTabs [data-baseweb="tab-panel"] span { color: #e0e0e0 !important; }
+    div[style*="background-color: white"],
+    div[style*="background-color: #fff"],
+    div[style*="background: white"],
+    div[style*="background: #fff"] { background-color: #2d2d3d !important; background: #2d2d3d !important; }
+    
+    /* Form elements */
+    .stTextInput input,
+    .stTextArea textarea,
+    .stNumberInput input,
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        background-color: #1e1e2e !important;
+        color: #ffffff !important;
+        border: 1px solid #404050 !important;
+    }
+    .stSelectbox > div > div,
+    .stMultiSelect > div > div,
+    [data-testid="stSelectbox"] > div > div {
+        background-color: #1e1e2e !important;
+        color: #ffffff !important;
+    }
+    [data-baseweb="popover"],
+    [data-baseweb="menu"],
+    [data-baseweb="select"] [role="listbox"] { background-color: #2d2d3d !important; }
+    [data-baseweb="menu"] li, [role="option"] { color: #e0e0e0 !important; }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"], [data-testid="stSidebar"] > div { background-color: #1a1a2e !important; }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] li, [data-testid="stSidebar"] .stMarkdown { color: #e0e0e0 !important; }
+    
+    /* Metrics */
+    .stMetric, [data-testid="stMetric"], [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+        color: #ffffff !important;
+    }
+    .stMetric label { color: #b0b0b0 !important; }
+    
+    /* Tables */
+    .stDataFrame, [data-testid="stDataFrame"], .stTable { background-color: #1e1e2e !important; }
+    .stDataFrame th, .stDataFrame td, .stTable th, .stTable td {
+        color: #e0e0e0 !important; border-color: #404050 !important;
+    }
+    
+    /* Buttons */
+    .stButton button { color: #ffffff !important; }
+    .stButton button[kind="primary"] { background-color: #ff4b4b !important; }
+    .stButton button[kind="secondary"] { background-color: #2d2d3d !important; border: 1px solid #404050 !important; }
+    
+    /* Code blocks */
+    .stCodeBlock, code, pre { background-color: #1e1e2e !important; color: #e0e0e0 !important; }
+    
+    /* Markdown containers */
+    .stMarkdown div[data-testid="stMarkdownContainer"] { color: #e0e0e0 !important; }
+    blockquote {
+        border-left: 4px solid #ff4b4b !important;
+        background-color: #2d2d3d !important;
+        color: #e0e0e0 !important;
+        padding: 10px 15px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def force_dark_theme():
+    """Nuclear option - force dark theme on everything"""
+    st.markdown("""
+    <style>
+    /* Override EVERYTHING */
+    * {
+        color: #e0e0e0 !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+    
+    /* Except buttons which need specific colors */
+    button, .stButton button {
+        color: #ffffff !important;
+    }
+    
+    /* And inputs which need dark text on light bg sometimes */
+    input, textarea, select {
+        color: #ffffff !important;
+        background-color: #1e1e2e !important;
+    }
+    
+    /* Remove all white backgrounds */
+    div, section, article, aside, header, footer, main {
+        background-color: transparent !important;
+    }
+    
+    /* Set main container background */
+    .main .block-container {
+        background-color: #0e1117 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 # ============================================================================
 # STANDARDIZED UI COMPONENTS
 # ============================================================================

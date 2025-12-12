@@ -704,10 +704,10 @@ All timeout values are defined in `backend/config/settings.py` and `frontend/com
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
-| AGENTIC_OPERATION_TIMEOUT | 120s | Overall timeout for agentic analysis |
-| AGENTIC_SECONDARY_TASK_TIMEOUT | 30s | Timeout for reflection/secondary tasks |
-| AGENTIC_LLM_CALL_TIMEOUT | 20s | Timeout for individual LLM calls |
-| API_TIMEOUT (frontend) | 120s | Frontend API request timeout |
+| AGENTIC_OPERATION_TIMEOUT | 60s | Overall timeout for agentic analysis |
+| AGENTIC_SECONDARY_TASK_TIMEOUT | 20s | Timeout for reflection/secondary tasks |
+| AGENTIC_LLM_CALL_TIMEOUT | 15s | Timeout for individual LLM calls |
+| API_TIMEOUT (frontend) | 90s | Frontend API request timeout |
 | LLM_COMPLIANCE_TIMEOUT | 45s | Compliance analysis LLM calls |
 
 **Note:** For agentic operations, the timeout hierarchy is: Frontend >= Backend >= LLM call timeout
@@ -724,7 +724,7 @@ All timeout values are defined in `backend/config/settings.py` and `frontend/com
 
 **Fix:** 
 - Simplify task description to reduce complexity
-- Increase `AGENTIC_OPERATION_TIMEOUT` in `backend/config/settings.py` (default: 120s)
+- Increase `AGENTIC_OPERATION_TIMEOUT` in `backend/config/settings.py` (default: 60s)
 - Ensure frontend `API_TIMEOUT` is >= backend timeout
 
 ### Charts Not Displaying

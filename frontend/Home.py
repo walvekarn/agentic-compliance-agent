@@ -8,6 +8,7 @@ import streamlit as st
 from datetime import datetime
 import sys
 from pathlib import Path
+from functools import lru_cache
 
 # Add frontend directory to path for imports
 frontend_dir = Path(__file__).parent
@@ -20,6 +21,28 @@ from components.api_client import APIClient, display_api_error
 from components.ui_helpers import apply_light_theme_css
 from components.theme import apply_home_theme_css
 
+# Cached API helper functions for improved performance
+# FIXED: Increased TTL and added show_spinner=False to prevent blocking
+@st.cache_data(ttl=600, show_spinner=False, max_entries=10)
+def get_cached_health_status():
+    """Cached health check to reduce API calls"""
+    try:
+        api_client = APIClient()
+        response = api_client.get("/health", timeout=5)
+        return response.data if response.success else None
+    except Exception:
+        return None
+
+@st.cache_data(ttl=600, show_spinner=False, max_entries=10)
+def get_cached_audit_stats():
+    """Cached audit statistics for home dashboard"""
+    try:
+        api_client = APIClient()
+        response = api_client.get("/api/v1/audit/statistics", timeout=5)
+        return response.data if response.success else None
+    except Exception:
+        return None
+
 # Page configuration
 st.set_page_config(
     page_title="Compliance Assistant",
@@ -27,6 +50,32 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Apply theme immediately so login page also uses light theme
+apply_light_theme_css()
+apply_home_theme_css()
+
+# #region agent log
+import json
+import os
+import time
+try:
+    log_dir = os.path.join(os.path.dirname(__file__), ".cursor")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "debug.log")
+    with open(log_path, "a") as f:
+        f.write(json.dumps({
+            "sessionId": "debug-session",
+            "runId": "page-load",
+            "hypothesisId": "T2",
+            "location": "Home.py:page_init",
+            "message": "Home page init",
+            "data": {"timestamp_ms": int(time.time() * 1000)},
+            "timestamp": int(time.time() * 1000)
+        }) + "\n")
+except Exception:
+    pass
+# #endregion
 
 # ============================================================================
 # AUTHENTICATION - JWT via backend
@@ -41,9 +90,6 @@ with hdr_c2:
 if not show_login_page():
     st.stop()
 # ============================================================================
-
-apply_light_theme_css()
-apply_home_theme_css()
 
 # Header with Clear Value Proposition
 st.title("🛡️ AI Compliance Assistant")
@@ -91,6 +137,7 @@ if not st.session_state.has_seen_onboarding:
     """)
     if st.button("✅ Got it!", key="onboarding_ok", width="stretch"):
         st.session_state.has_seen_onboarding = True
+        # Use rerun only when necessary - avoid cascading reruns
         st.rerun()
 
 # Project description
@@ -101,14 +148,21 @@ The system uses multi-step reasoning to analyze compliance tasks and provide tra
 
 # Check API connection (health endpoint is unprotected)
 api = APIClient()
-health = api.health_check()
-if health.success:
+health_data = get_cached_health_status()
+health_success = health_data is not None
+if health_success:
     st.success("✅ System is ready and connected")
 else:
-    display_api_error(health)
-    test_btn = st.button("🔄 Test Connection Again")
-    if test_btn:
-        st.rerun()
+    # Fallback: try direct call if cache fails
+    health = api.health_check()
+    health_success = health.success
+    if health_success:
+        st.success("✅ System is ready and connected")
+    else:
+        display_api_error(health)
+        test_btn = st.button("🔄 Test Connection Again")
+        if test_btn:
+            st.rerun()
 
 # Separator
 st.markdown("---")
@@ -179,16 +233,20 @@ else:
 # Agent activity metrics - only load if authenticated
 stats = None
 if is_authenticated():
-    try:
-        with st.spinner("Loading statistics..."):
-            stats_resp = api.get("/api/v1/audit/statistics")
-        if stats_resp.success and isinstance(stats_resp.data, dict):
-            stats = stats_resp.data
-    except Exception:
-        stats = None
+    stats = get_cached_audit_stats()
+    # Fallback: try direct call if cache fails
+    if stats is None:
+        try:
+            with st.spinner("Loading statistics..."):
+                stats_resp = api.get("/api/v1/audit/statistics")
+            if stats_resp.success and isinstance(stats_resp.data, dict):
+                stats = stats_resp.data
+        except Exception:
+            stats = None
 
-status_text = "🟢 Active" if health.success else "🔴 Offline"
-status_help = "Health check passed" if health.success else "Health check failed. Please verify backend connectivity."
+# Use health status determined above for status display
+status_text = "🟢 Active" if health_success else "🔴 Offline"
+status_help = "Health check passed" if health_success else "Health check failed. Please verify backend connectivity."
 
 if stats and stats.get("total_decisions", 0) > 0:
     total = stats.get("total_decisions", 0)

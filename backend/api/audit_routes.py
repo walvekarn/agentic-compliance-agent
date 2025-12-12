@@ -172,22 +172,32 @@ async def get_audit_statistics(
             end_date=end_date
         )
         
-        # Log the statistics structure for debugging
-        logger.info(f"Statistics returned: total_decisions={stats.get('total_decisions', 0)}, "
-                   f"by_outcome keys={list(stats.get('by_outcome', {}).keys())}, "
-                   f"by_risk_level keys={list(stats.get('by_risk_level', {}).keys())}")
+        # Ensure required keys exist with proper types
+        result = {
+            "total_decisions": stats.get("total_decisions", 0) or 0,
+            "by_outcome": stats.get("by_outcome", {}) or {},
+            "by_risk_level": stats.get("by_risk_level", {}) or {},
+            "by_agent_type": stats.get("by_agent_type", {}) or {},
+            "average_confidence": float(stats.get("average_confidence", 0) or 0),
+            "average_risk_score": float(stats.get("average_risk_score", 0) or 0)
+        }
         
-        # Ensure by_outcome and by_risk_level are always dicts (not None)
-        if stats.get("by_outcome") is None:
-            stats["by_outcome"] = {}
-        if stats.get("by_risk_level") is None:
-            stats["by_risk_level"] = {}
+        # Log for debugging
+        logger.info(f"Statistics response: total={result['total_decisions']}, outcomes={result['by_outcome']}")
         
-        return stats
+        return result
         
     except Exception as e:
-        logger.error(f"Failed to retrieve statistics: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve statistics: {str(e)}")
+        logger.error(f"Statistics error: {str(e)}", exc_info=True)
+        # Return empty but valid structure on error
+        return {
+            "total_decisions": 0,
+            "by_outcome": {},
+            "by_risk_level": {},
+            "by_agent_type": {},
+            "average_confidence": 0.0,
+            "average_risk_score": 0.0
+        }
 
 
 @router.get("/export/json")

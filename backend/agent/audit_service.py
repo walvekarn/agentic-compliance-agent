@@ -1,11 +1,14 @@
 """Audit trail service for logging agent decisions"""
 
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from backend.db.models import AuditTrail
 from backend.agent.risk_models import DecisionAnalysis
+
+logger = logging.getLogger(__name__)
 
 
 class AuditService:
@@ -92,6 +95,31 @@ class AuditService:
         return text[:500] if len(text) > 500 else text
     
     @staticmethod
+    def _validate_audit_entry(entry_data: dict) -> dict:
+        """Ensure all required fields have values"""
+        required_fields = {
+            "entity_name": "Unknown Entity",
+            "task_description": "No description",
+            "decision_outcome": "REVIEW_REQUIRED",
+            "risk_level": "MEDIUM",
+            "confidence_score": 0.5,
+            "agent_type": "decision_engine",
+            "reasoning_chain": []
+        }
+        
+        for field, default in required_fields.items():
+            # Check if field is missing or None (but allow 0 for numeric fields)
+            if field not in entry_data or entry_data[field] is None:
+                logger.warning(f"Audit entry missing {field}, using default: {default}")
+                entry_data[field] = default
+            # For string fields, also check if empty string
+            elif isinstance(default, str) and not entry_data[field]:
+                logger.warning(f"Audit entry has empty {field}, using default: {default}")
+                entry_data[field] = default
+        
+        return entry_data
+    
+    @staticmethod
     def log_decision_analysis(
         db: Session,
         analysis: DecisionAnalysis,
@@ -121,26 +149,35 @@ class AuditService:
             "overall_score": analysis.risk_factors.overall_score
         }
         
+        # Prepare entry data
+        entry_data = {
+            "timestamp": analysis.timestamp,
+            "agent_type": agent_type,
+            "task_description": analysis.task_context.description,
+            "task_category": analysis.task_context.category.value,
+            "entity_name": analysis.entity_context.name,
+            "entity_type": analysis.entity_context.entity_type.value,
+            "decision_outcome": analysis.decision.value,
+            "confidence_score": analysis.confidence,
+            "risk_level": analysis.risk_level.value,
+            "risk_score": analysis.risk_factors.overall_score,
+            "reasoning_chain": analysis.reasoning,
+            "risk_factors": risk_factors_dict,
+            "recommendations": analysis.recommendations,
+            "escalation_reason": analysis.escalation_reason,
+            "entity_context": analysis.entity_context.model_dump(mode='json'),
+            "task_context": analysis.task_context.model_dump(mode='json'),
+            "meta_data": metadata or {}
+        }
+        
+        # Validate entry data
+        validated_data = AuditService._validate_audit_entry(entry_data)
+        
+        # Log what's being saved
+        logger.info(f"Creating audit entry: entity={validated_data.get('entity_name')}, decision={validated_data.get('decision_outcome')}")
+        
         # Create audit trail entry
-        audit_entry = AuditTrail(
-            timestamp=analysis.timestamp,
-            agent_type=agent_type,
-            task_description=analysis.task_context.description,
-            task_category=analysis.task_context.category.value,
-            entity_name=analysis.entity_context.name,
-            entity_type=analysis.entity_context.entity_type.value,
-            decision_outcome=analysis.decision.value,
-            confidence_score=analysis.confidence,
-            risk_level=analysis.risk_level.value,
-            risk_score=analysis.risk_factors.overall_score,
-            reasoning_chain=analysis.reasoning,
-            risk_factors=risk_factors_dict,
-            recommendations=analysis.recommendations,
-            escalation_reason=analysis.escalation_reason,
-            entity_context=analysis.entity_context.model_dump(mode='json'),
-            task_context=analysis.task_context.model_dump(mode='json'),
-            meta_data=metadata or {}
-        )
+        audit_entry = AuditTrail(**validated_data)
         
         db.add(audit_entry)
         db.commit()
@@ -203,25 +240,35 @@ class AuditService:
                 # Try to extract user task from the prompt
                 task_description = AuditService._extract_user_task(task_description)
         
-        audit_entry = AuditTrail(
-            timestamp=datetime.utcnow(),
-            agent_type=agent_type,
-            task_description=task_description,
-            task_category=task_category,
-            entity_name=entity_name,
-            entity_type=entity_type,
-            decision_outcome=decision_outcome,
-            confidence_score=confidence_score,
-            risk_level=risk_level,
-            risk_score=risk_score,
-            reasoning_chain=reasoning_chain,
-            risk_factors=risk_factors,
-            recommendations=recommendations,
-            escalation_reason=escalation_reason,
-            entity_context=entity_context,
-            task_context=task_context,
-            metadata=metadata or {}
-        )
+        # Prepare entry data
+        entry_data = {
+            "timestamp": datetime.utcnow(),
+            "agent_type": agent_type,
+            "task_description": task_description,
+            "task_category": task_category,
+            "entity_name": entity_name,
+            "entity_type": entity_type,
+            "decision_outcome": decision_outcome,
+            "confidence_score": confidence_score,
+            "risk_level": risk_level,
+            "risk_score": risk_score,
+            "reasoning_chain": reasoning_chain,
+            "risk_factors": risk_factors,
+            "recommendations": recommendations,
+            "escalation_reason": escalation_reason,
+            "entity_context": entity_context,
+            "task_context": task_context,
+            "meta_data": metadata or {}
+        }
+        
+        # Validate entry data
+        validated_data = AuditService._validate_audit_entry(entry_data)
+        
+        # Log what's being saved
+        logger.info(f"Creating audit entry: entity={validated_data.get('entity_name')}, decision={validated_data.get('decision_outcome')}")
+        
+        # Create audit trail entry
+        audit_entry = AuditTrail(**validated_data)
         
         db.add(audit_entry)
         db.commit()
@@ -511,26 +558,35 @@ class AuditService:
                 # Try to extract user task from the prompt
                 task_description = AuditService._extract_user_task(task_description)
         
+        # Prepare entry data
+        entry_data = {
+            "timestamp": datetime.now(timezone.utc),
+            "agent_type": agent_type,
+            "task_description": task_description,
+            "task_category": None,  # Could extract from task if available
+            "entity_name": entity_name,
+            "entity_type": None,
+            "decision_outcome": decision_outcome,
+            "confidence_score": confidence_score,
+            "risk_level": risk_level,
+            "risk_score": risk_assessment.get("score") if risk_assessment else None,
+            "reasoning_chain": reasoning_chain,
+            "risk_factors": risk_factors,
+            "recommendations": [recommendation] if recommendation else None,
+            "escalation_reason": None,
+            "entity_context": {"entity_name": entity_name},
+            "task_context": {"task_description": task_description},
+            "meta_data": comprehensive_metadata
+        }
+        
+        # Validate entry data
+        validated_data = AuditService._validate_audit_entry(entry_data)
+        
+        # Log what's being saved
+        logger.info(f"Creating audit entry: entity={validated_data.get('entity_name')}, decision={validated_data.get('decision_outcome')}")
+        
         # Create audit trail entry
-        audit_entry = AuditTrail(
-            timestamp=datetime.now(timezone.utc),
-            agent_type=agent_type,
-            task_description=task_description,
-            task_category=None,  # Could extract from task if available
-            entity_name=entity_name,
-            entity_type=None,
-            decision_outcome=decision_outcome,
-            confidence_score=confidence_score,
-            risk_level=risk_level,
-            risk_score=risk_assessment.get("score") if risk_assessment else None,
-            reasoning_chain=reasoning_chain,
-            risk_factors=risk_factors,
-            recommendations=[recommendation] if recommendation else None,
-            escalation_reason=None,
-            entity_context={"entity_name": entity_name},
-            task_context={"task_description": task_description},
-            meta_data=comprehensive_metadata
-        )
+        audit_entry = AuditTrail(**validated_data)
         
         db.add(audit_entry)
         db.commit()
