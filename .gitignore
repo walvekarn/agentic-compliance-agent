@@ -1,6 +1,10 @@
 ## Environment & Secrets
 .env
 .env.*
+!.env.example
+secrets.toml
+frontend/secrets.toml
+!frontend/secrets.toml.example
 
 ## Python
 __pycache__/
@@ -59,6 +63,12 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+# keep example files tracked
+!.env.example
+!frontend/secrets.toml.example
+# ignore real secrets files
+secrets.toml
+frontend/secrets.toml
 
 # Database files
 test_decision_outcomes.db

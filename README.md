@@ -302,7 +302,7 @@ Changed Factors: [regulatory_oversight +0.3, impact_severity +0.2]
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/agentic-compliance-agent.git
+git clone https://github.com/walvekarn/agentic-compliance-agent.git
 cd agentic-compliance-agent
 
 # 2. Create virtual environment
@@ -327,12 +327,14 @@ pip install -r requirements.txt
 # Copy example environment file
 cp .env.example .env
 
-# Edit .env and add your OpenAI API key (optional)
+# Edit .env and fill in required values (see .env.example)
+# Optional: set OPENAI_API_KEY for live LLM calls; leave empty for mock mode.
 # Use any text editor:
 nano .env  # or vim, notepad, VS Code, etc.
 
-# Add this line to .env (optional - system works without it):
-OPENAI_API_KEY=sk-proj-your-actual-key-here
+# (Optional) Streamlit secrets for the dashboard
+cp frontend/secrets.toml.example frontend/secrets.toml
+# Update login_password before production; file remains local and gitignored.
 ```
 
 **Note:** The system works in **mock mode** without an API key for testing and demos. Real API key enables full LLM-powered agentic features.
