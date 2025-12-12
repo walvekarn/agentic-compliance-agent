@@ -88,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool Metrics**: Comprehensive tracking of tool usage
 - **Enhanced Prompts**: Expanded planner, executor, and reflection prompts
 
-## [1.0.0] - 2024-11-13
+## [1.0.0] - 2025-11-05
 
 ### Added
 - Initial MVP release
