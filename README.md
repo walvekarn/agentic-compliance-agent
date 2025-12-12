@@ -25,7 +25,7 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 **Current State (truthful):**
 - Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
 - Small test suite in `tests/` (coverage not reported); expand before production use.
-- Demo credentials enabled (`demo/demo123`) — replace with real auth + secrets in production.
+- Default demo login: Username `demo`, Password `demo123` — replace with real auth + secrets in production.
 - Complete audit trail path is wired, but database/LLM configs must be supplied via env.
 - Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not shipped.
 
@@ -38,184 +38,27 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 ### System Overview
 
 ```mermaid
-graph TB
-    subgraph "User Interface Layer"
-        USER[👤 User]
-        DASH[Streamlit Dashboard<br/>5 Core Pages + Chat]
-        HOME[Home Dashboard]
-        ANALYZE[Analyze Task]
-        AUDIT[Audit Trail]
-        AGENTIC[Agentic Analysis]
-        TEST[Test Suite]
-    end
-    
-    subgraph "API Gateway Layer"
-        API[FastAPI Backend<br/>:8000]
-        AUTH[JWT Authentication]
-        RATE[Rate Limiting]
-        CORS[CORS Middleware]
-    end
-    
-    subgraph "Agentic Decision Engine"
-        ORCH[🤖 AI Orchestrator]
-        LOOP[Agent Loop<br/>Plan-Execute-Reflect]
-        
-        subgraph "6-Factor Risk Engine"
-            R1[Jurisdiction 15%]
-            R2[Entity Risk 15%]
-            R3[Task Complexity 20%]
-            R4[Data Sensitivity 20%]
-            R5[Regulatory 20%]
-            R6[Impact 10%]
-        end
-        
-        REASON[Reasoning Engine<br/>LLM-based]
-        TOOLS[Tool Registry<br/>Entity/Calendar/Task/HTTP]
-        MEMORY[Memory Store<br/>Episodic/Semantic]
-        
-        DECISION[Decision Algorithm<br/>AUTONOMOUS \| REVIEW \| ESCALATE]
-    end
-    
-    subgraph "Intelligent Modules"
-        MEM[🧠 Entity Memory<br/>Persistent History]
-        FEED[🔄 Feedback Loop<br/>Learning System]
-        PROACT[💡 Proactive Suggestions<br/>Predictive Alerts]
-        COUNTER[🔍 Counterfactual<br/>What-If Analysis]
-        WHATIF[What-If Engine]
-    end
-    
-    subgraph "External Services"
-        OPENAI[OpenAI API<br/>GPT-4o-mini]
-        MOCK[Mock Mode<br/>No API Key Required]
-    end
-    
-    subgraph "Data Layer"
-        DB[(SQLite/PostgreSQL<br/>Database)]
-        AUDIT[Audit Trail]
-        ENTITIES[Entity History]
-        FEEDBACK[Feedback Log]
-        MEMORY_DB[Memory Records]
-    end
-    
-    USER --> DASH
-    DASH --> HOME & ANALYZE & AUDIT & AGENTIC & TEST
-    DASH --> API
-    API --> AUTH & RATE & CORS
-    
-    ORCH --> LOOP
-    LOOP --> REASON
-    REASON --> OPENAI
-    REASON --> MOCK
-    LOOP --> TOOLS
-    LOOP --> MEMORY
-    
-    ORCH --> R1 & R2 & R3 & R4 & R5 & R6
-    R1 & R2 & R3 & R4 & R5 & R6 --> DECISION
-    
-    ORCH --> MEM & FEED & PROACT & COUNTER & WHATIF
-    ORCH --> OPENAI
-    OPENAI --> MOCK
-    
-    DECISION --> AUDIT
-    MEM --> ENTITIES
-    FEED --> FEEDBACK
-    MEMORY --> MEMORY_DB
-    
-    AUDIT & ENTITIES & FEEDBACK & MEMORY_DB --> DB
-    
-    style ORCH fill:#4CAF50,stroke:#2E7D32,stroke-width:3px
-    style LOOP fill:#2196F3,stroke:#1565C0,stroke-width:2px
-    style DECISION fill:#FF9800,stroke:#E65100,stroke-width:2px
-    style DB fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px
-    style OPENAI fill:#00BCD4,stroke:#0097A7,stroke-width:2px
-    style MOCK fill:#FFC107,stroke:#F57C00,stroke-width:2px
+graph TD
+    User[User] --> UI[Streamlit UI]
+    UI --> API[FastAPI API]
+    API --> Engine[Agentic Engine]
+    Engine --> Risk[Risk Engine]
+    Engine --> Tools[Tools: Entity/Calendar/Task/HTTP]
+    Engine --> Memory[Memory & Audit DB]
+    Engine --> LLM[OpenAI API]
+    Engine --> Mock[Mock Mode]
+    API --> DB[(Database/Audit Trail)]
+    UI --> Reports[Audit Trail & Insights]
 ```
 
 ### Agentic Workflow
 
-The system implements a sophisticated **Plan-Execute-Reflect** agentic loop:
+The system implements a **Plan → Execute → Reflect** agentic loop:
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Dashboard
-    participant API
-    participant Orchestrator
-    participant AgentLoop
-    participant ReasoningEngine
-    participant Tools
-    participant Memory
-    participant OpenAI
-
-    User->>Dashboard: Submit compliance task
-    Dashboard->>API: POST /api/v1/agentic/analyze
-    API->>Orchestrator: Initialize analysis
-    
-    Orchestrator->>AgentLoop: Start execution
-    AgentLoop->>ReasoningEngine: Generate plan (3-7 steps)
-    
-    alt Mock Mode (No API Key)
-        ReasoningEngine-->>AgentLoop: Return mock plan
-    else Real Mode (API Key Present)
-        ReasoningEngine->>OpenAI: LLM planning request
-        OpenAI-->>ReasoningEngine: JSON plan steps
-        ReasoningEngine-->>AgentLoop: Validated plan
-    end
-    
-    loop For each plan step
-        AgentLoop->>Tools: Execute step with tools
-        Tools-->>AgentLoop: Step results
-        
-        AgentLoop->>ReasoningEngine: Reflect on step quality
-        alt Mock Mode
-            ReasoningEngine-->>AgentLoop: Mock reflection scores
-        else Real Mode
-            ReasoningEngine->>OpenAI: Reflection request
-            OpenAI-->>ReasoningEngine: Quality assessment
-            ReasoningEngine-->>AgentLoop: Reflection results
-        end
-        
-        alt Quality < 0.75
-            AgentLoop->>ReasoningEngine: Replan step
-            ReasoningEngine-->>AgentLoop: Revised plan
-        end
-    end
-    
-    AgentLoop->>Memory: Store execution context
-    AgentLoop->>Orchestrator: Final results
-    Orchestrator->>API: Complete analysis
-    API->>Dashboard: Response with plan, outputs, reflection
-    Dashboard->>User: Display results
-```
-
-**Key Workflow Steps:**
-
-1. **Planning Phase**
-   - LLM breaks task into 3-7 strategic steps
-   - Each step includes description, rationale, expected outcome
-   - Tool suggestions for each step
-
-2. **Execution Phase**
-   - Execute each step sequentially
-   - Use tools (Entity, Calendar, Task, HTTP) as needed
-   - Collect outputs and findings
-
-3. **Reflection Phase**
-   - Evaluate step quality (correctness, completeness)
-   - Detect hallucinations and missing data
-   - Generate improvement suggestions
-
-4. **Replanning (if needed)**
-   - If quality score < 0.75, replan the step
-   - Iterate until quality threshold met or max steps reached
-
-5. **Final Output**
-   - Complete plan (original + revisions)
-   - All tool outputs
-   - Reflection summaries
-   - Risk assessment
-   - Final recommendation
-   - Audit-ready JSON
+- User submits a task from the dashboard (`/api/v1/agentic/analyze`).
+- Orchestrator builds a 3–7 step plan (mock responses if no OpenAI key; live LLM if provided).
+- For each step: execute tools (Entity, Calendar, Task, HTTP), capture outputs, and reflect; replan if quality < 0.75.
+- Persist results to memory/audit trail and return decision outcome (AUTONOMOUS, REVIEW_REQUIRED, ESCALATE) with rationale and confidence.
 
 ---
 
@@ -295,6 +138,7 @@ Changed Factors: [regulatory_oversight +0.3, impact_severity +0.2]
 - **OpenAI API key** (optional - system works in mock mode without it)
 - **Terminal/Command Prompt** access
 - **10 minutes** of your time
+- If you skip `OPENAI_API_KEY`, all LLM calls use deterministic mock responses (no cost).
 
 ### Installation & Setup
 
@@ -378,7 +222,7 @@ streamlit run frontend/Home.py --server.port 8501
    {
      "status": "healthy",
      "version": "1.3.0-agentic-hardened",
-     "timestamp": "2025-01-XX...",
+     "timestamp": "2025-12-12T14:00:00Z (example)",
      "components": {
        "database": {"status": "healthy", "type": "sqlite"},
        "openai": {"status": "not_configured", "key_present": false, "note": "Agentic features will use mock mode"},
@@ -391,7 +235,7 @@ streamlit run frontend/Home.py --server.port 8501
    Navigate to http://localhost:8501 in your browser
 
 3. **Login:**
-   - Default credentials: `demo123` (or check your auth configuration)
+   - Default credentials: Username `demo`, Password `demo123` (update for production)
 
 4. **Run Tests (Optional):**
    ```bash
@@ -401,7 +245,7 @@ streamlit run frontend/Home.py --server.port 8501
 
 ### 🎯 Quick Demo (2 minutes)
 
-1. **Login** with password `demo123`
+1. **Login** with Username `demo`, Password `demo123`
 2. Click **"Analyze Task"** in the sidebar
 3. Fill out the form:
    - Entity: "Test Company"
@@ -418,7 +262,7 @@ streamlit run frontend/Home.py --server.port 8501
 - **🔌 Backend API:** http://localhost:8000
 - **📚 Interactive API Docs:** http://localhost:8000/docs
 - **📖 API Reference:** http://localhost:8000/redoc
-- **🔐 Login Password:** `demo123` (default)
+- **🔐 Demo login:** Username `demo`, Password `demo123`
 
 ---
 
@@ -430,8 +274,6 @@ Screenshots are not included in this release. Run the app locally (`make start`)
 - **Audit Trail** - Complete decision history and statistics
 - **Agentic Analysis** - Advanced plan-execute-reflect workflow
 - **Agentic Test Suite** - Comprehensive test scenarios
-
-For screenshots, see `docs/screenshots/` directory (if available).
 
 ---
 
@@ -551,7 +393,7 @@ GET    /redoc                              # ReDoc (alternative API docs)
 
 2. **Navigate to Dashboard**
    - Open http://localhost:8501
-   - Login with `demo123`
+   - Login with Username `demo`, Password `demo123`
 
 3. **Analyze a Simple Task**
    - Go to "Analyze Task" page

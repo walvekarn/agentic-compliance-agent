@@ -530,7 +530,7 @@ if agentic_results is not None:
     with col_summary:
         st.markdown(
             f"""
-            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc; color:#0f172a;">
                 <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Summary</div>
                 <div style="display:flex; gap:24px; flex-wrap:wrap;">
                     <div><strong>Decision:</strong> {decision_badge}</div>

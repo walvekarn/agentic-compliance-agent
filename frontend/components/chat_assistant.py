@@ -365,7 +365,7 @@ def render_chat_panel(context_data=None):
         /* Chat header - Light Theme */
         .chat-header {
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-            color: #1e293b !important;
+            color: #0f172a !important;
             padding: 1rem;
             border-radius: 10px;
             margin-bottom: 1rem;
@@ -377,7 +377,7 @@ def render_chat_panel(context_data=None):
         }
         
         .chat-header p {
-            color: #475569 !important;
+            color: #0f172a !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -386,7 +386,7 @@ def render_chat_panel(context_data=None):
     st.markdown(f"""
     <div class='chat-header'>
         <h3 style='color: #0f172a !important; margin: 0; text-align: center;'>💬 AI Assistant</h3>
-        <p style='color: #475569 !important; margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;'>
+        <p style='color: #0f172a !important; margin: 0.5rem 0 0 0; text-align: center; font-size: 0.9rem;'>
             Ask questions about compliance, decisions, or how to use this tool
         </p>
     </div>

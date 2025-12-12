@@ -357,15 +357,15 @@ def render_recommendations(analysis: Dict[str, Any]) -> None:
                 
                 priority_emoji = "🔴" if priority == "HIGH" else "🟡" if priority == "MEDIUM" else "🟢"
                 st.markdown(f"""
-                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6;'>
+                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6; color: #0f172a;'>
                     <strong>{priority_emoji} {i}. {title}</strong><br>
-                    <span style='color: #475569;'>{description}</span>
+                    <span style='color: #0f172a;'>{description}</span>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 # Handle string recommendation
                 st.markdown(f"""
-                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6;'>
+                <div style='background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin: 0.75rem 0; border-left: 4px solid #3b82f6; color: #0f172a;'>
                     <strong>{i}.</strong> {rec}
                 </div>
                 """, unsafe_allow_html=True)
@@ -577,10 +577,10 @@ def render_stakeholders(analysis: Dict[str, Any]) -> None:
     
     for stakeholder in stakeholders:
         st.markdown(f"""
-        <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #3b82f6;'>
+        <div style='background-color: #f0f9ff; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #3b82f6; color: #0f172a;'>
             <strong>👤 {stakeholder['role']}</strong><br>
-            <small><strong>Why:</strong> {stakeholder['reason']}</small><br>
-            <small><strong>When:</strong> {stakeholder['when']}</small>
+            <small style='color: #0f172a;'><strong>Why:</strong> {stakeholder['reason']}</small><br>
+            <small style='color: #0f172a;'><strong>When:</strong> {stakeholder['when']}</small>
         </div>
         """, unsafe_allow_html=True)
 

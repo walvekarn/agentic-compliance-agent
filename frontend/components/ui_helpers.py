@@ -1470,7 +1470,7 @@ def render_page_header(title: str, icon: str = "", description: str = "", margin
     icon_text = f"{icon} " if icon else ""
     st.markdown(f"""
     <div style='margin-bottom: {margin_bottom};'>
-        <h1 style='font-size: 2.5rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;'>
+        <h1 style='font-size: 2.5rem; font-weight: 700; color: #0f172a !important; margin-bottom: 0.5rem;'>
             {icon_text}{title}
         </h1>
         {f"<p style='font-size: 1.1rem; color: #64748b; margin: 0;'>{description}</p>" if description else ""}
