@@ -228,8 +228,8 @@ Use this checklist to verify the system is working correctly after setup or upda
   ```bash
   pytest -v
   ```
-  - Expected (run 22 Sep 2026): 13 collected, 3 passed, 10 failed
-  - The 10 failures are against the current API surface: `tests/backend/test_agent.py` (5 tests) asserts attributes that no longer exist on `ComplianceAgent`; `tests/backend/test_api.py` (5 tests) calls `/api/v1/query`, `/api/v1/rules` and `/api/v1/queries` without an auth token and gets 401
+  - Expected: 16 tests passing (re-run 22 Sep 2026)
+  - The API tests log in with the demo credentials and send a bearer token; the agent tests patch the LLM client
   - Execution time: < 5 seconds
 
 ### 15. Coverage Report
@@ -237,7 +237,7 @@ Use this checklist to verify the system is working correctly after setup or upda
   ```bash
   pytest --cov=backend --cov-report=term-missing
   ```
-  - Expected (measured 22 Sep 2026): total coverage of `backend/` 25%
+  - Expected (measured 22 Sep 2026): total coverage of `backend/` 27%
 
 ### 16. Dashboard Component Tests
 - [ ] **Dashboard tests pass**
@@ -667,5 +667,5 @@ If all 6 pass, system is likely working correctly. Run full checklist for compre
 
 **Last Updated:** 22 Sep 2026  
 **Version:** 1.0.0  
-**Status:** Test-suite figures refreshed 22 Sep 2026; 10 of 13 pytest tests fail against the current API surface
+**Status:** Test-suite figures refreshed 22 Sep 2026; 16 tests passing against the current API surface
 

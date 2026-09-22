@@ -10,7 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Coverage](https://img.shields.io/badge/coverage-25%25-lightgrey.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-27%25-lightgrey.svg)]()
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
 
@@ -26,7 +26,7 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 
 **Current State (truthful):**
 - Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
-- 8 curated scenario files plus an automated pytest harness. The current branch has known test regressions documented in the Testing section; expand and stabilize coverage before production use.
+- 8 curated scenario files in `test_scenarios/` plus an automated pytest suite: 16 tests passing (re-run 22 Sep 2026), measured coverage 27%. Expand before production use.
 - Default demo login: Username `demo`, Password `demo123` — replace with real auth + secrets in production.
 - Complete audit trail path is wired, but database/LLM configs must be supplied via env.
 - Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not implemented.
@@ -243,7 +243,7 @@ streamlit run frontend/Home.py --server.port 8501
    ```bash
    pytest -v
    ```
-   Test suite: 13 collected, 3 passed, 10 failed (re-run 22 Sep 2026). The failures are against the current API surface: `tests/backend/test_agent.py` asserts attributes that no longer exist on `ComplianceAgent`, and `tests/backend/test_api.py` calls authenticated routes without a token.
+   Test suite: 16 tests passing (re-run 22 Sep 2026). The API tests log in with the demo credentials and send a bearer token; the agent tests patch the LLM client, so no network call is made.
 
 ### 🎯 Quick Demo (2 minutes)
 
@@ -479,7 +479,7 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - Streamlit dashboard (5 core pages focused on agentic AI)
 - FastAPI backend with JWT auth
 - SQLite database (PostgreSQL-ready)
-- 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25%
+- 16 pytest tests in `tests/` passing (re-run 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 27%
 - Mock mode for testing without API key
 
 **❌ Not Included (Future Roadmap):**
@@ -633,7 +633,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 | Tool | Purpose |
 |------|---------|
-| **Pytest** | Test framework. 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25% |
+| **Pytest** | Test framework. 16 tests passing (re-run 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 27% |
 | **Black** | Code formatting (PEP 8) |
 | **MyPy** | Static type checking |
 | **Make** | Build automation |
