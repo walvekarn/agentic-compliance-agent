@@ -2,13 +2,15 @@
 
 # 🤖 AI Agentic Compliance Assistant
 
+**Status:** working prototype with mock mode. Not production-hardened; see the production notes below.
+
 ### *Intelligent compliance automation with human oversight*
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Coverage](https://img.shields.io/badge/coverage-unreported-lightgrey.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-25%25-lightgrey.svg)]()
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
 
@@ -24,10 +26,10 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 
 **Current State (truthful):**
 - Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
-- Small test suite in `tests/` (coverage not reported); expand before production use.
+- 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25%. Expand before production use.
 - Default demo login: Username `demo`, Password `demo123` — replace with real auth + secrets in production.
 - Complete audit trail path is wired, but database/LLM configs must be supplied via env.
-- Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not shipped.
+- Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not implemented.
 
 **Use it for:** Portfolio demos, architecture exploration, and a starting point for hardened deployments (add real secrets, DB, auth, and more tests before production).
 
@@ -241,7 +243,7 @@ streamlit run frontend/Home.py --server.port 8501
    ```bash
    pytest -v
    ```
-   Should show: `84+ passed`
+   Note: the suite collects 13 tests; 10 currently fail against the current API surface (22 Sep 2026).
 
 ### 🎯 Quick Demo (2 minutes)
 
@@ -273,7 +275,7 @@ Screenshots are not included in this release. Run the app locally (`make start`)
 - **Analyze Task** - Single task analysis with 6-factor risk model
 - **Audit Trail** - Complete decision history and statistics
 - **Agentic Analysis** - Advanced plan-execute-reflect workflow
-- **Agentic Test Suite** - Comprehensive test scenarios
+- **Agentic Test Suite** - 8 curated scenario files
 
 ---
 
@@ -477,11 +479,11 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - Streamlit dashboard (5 core pages focused on agentic AI)
 - FastAPI backend with JWT auth
 - SQLite database (PostgreSQL-ready)
-- Comprehensive test suite (measured coverage ~33%)
+- 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25%
 - Mock mode for testing without API key
 
 **❌ Not Included (Future Roadmap):**
-- Production-grade security hardening
+- Security hardening beyond the demo defaults
 - Role-based access control (RBAC)
 - Multi-tenant architecture
 - Advanced memory persistence
@@ -629,7 +631,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 | Tool | Purpose |
 |------|---------|
-| **Pytest** | Test framework (84+ tests, ~33% coverage) |
+| **Pytest** | Test framework. 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25% |
 | **Black** | Code formatting (PEP 8) |
 | **MyPy** | Static type checking |
 | **Make** | Build automation |
@@ -644,7 +646,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 - **[Glossary](docs/core/Glossary.md)** - Key terms, concepts, and definitions
 
 ### Testing & Quality
-- **[Testing Checklist](docs/testing/TESTING_CHECKLIST.md)** - Comprehensive testing procedures and verification guide
+- **[Testing Checklist](docs/testing/TESTING_CHECKLIST.md)** - Testing procedures and verification guide
 
 ### Quick Navigation
 - **For New Users:** Start with Architecture → Schema → Glossary
@@ -682,13 +684,13 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 👤 Author
 
 **Nikita Walvekar**  
-*AI & Automations Program Lead*
+*AI Product Manager | GenAI & Agentic Systems*
 
 Building intelligent systems that augment human expertise.
 
 ### 🔗 Connect
 
-- 💼 **LinkedIn:** [linkedin.com/in/nikitawalvekar](https://www.linkedin.com/in/nikitawalvekar)
+- 💼 **LinkedIn:** [linkedin.com/in/nikitaw3](https://www.linkedin.com/in/nikitaw3)
 - 📧 **Email:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
 - 🐙 **GitHub:** [github.com/walvekarn](https://github.com/walvekarn)
 
@@ -706,6 +708,6 @@ Building intelligent systems that augment human expertise.
 
 *This is a portfolio/demonstration project. Not intended for production use without additional security hardening.*
 
-**Version 1.3.0-agentic-hardened** | **Released:** November 2025 | **Last Updated:** December 2025 | **Status:** Production Ready (MVP)
+**Last Updated:** 22 Sep 2026 | **Status:** Working prototype with mock mode
 
 </div>

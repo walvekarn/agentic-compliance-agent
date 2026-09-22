@@ -228,20 +228,16 @@ Use this checklist to verify the system is working correctly after setup or upda
   ```bash
   pytest -v
   ```
-  - Expected: "84 passed"
-  - No failures
+  - Expected (run 22 Sep 2026): 13 collected, 3 passed, 10 failed
+  - The 10 failures are against the current API surface: `tests/backend/test_agent.py` (5 tests) asserts attributes that no longer exist on `ComplianceAgent`; `tests/backend/test_api.py` (5 tests) calls `/api/v1/query`, `/api/v1/rules` and `/api/v1/queries` without an auth token and gets 401
   - Execution time: < 5 seconds
 
 ### 15. Coverage Report
 - [ ] **Coverage meets threshold**
   ```bash
-  pytest --cov=src --cov-report=term-missing
+  pytest --cov=backend --cov-report=term-missing
   ```
-  - Expected: Total coverage ≥ 84%
-  - Core modules ≥ 90%:
-    - decision_engine.py: ≥ 96%
-    - risk_models.py: ≥ 99%
-    - entity_analyzer.py: ≥ 98%
+  - Expected (measured 22 Sep 2026): total coverage of `backend/` 25%
 
 ### 16. Dashboard Component Tests
 - [ ] **Dashboard tests pass**
@@ -669,7 +665,7 @@ If all 6 pass, system is likely working correctly. Run full checklist for compre
 
 ---
 
-**Last Updated:** December 10, 2025  
+**Last Updated:** 22 Sep 2026  
 **Version:** 1.0.0  
-**Status:** ✅ All items verified and working
+**Status:** Test-suite figures refreshed 22 Sep 2026; 10 of 13 pytest tests fail against the current API surface
 
