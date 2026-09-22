@@ -26,7 +26,7 @@ The **AI Agentic Compliance Assistant** is an intelligent system that autonomous
 
 **Current State (truthful):**
 - Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
-- 13 pytest tests in `tests/` (3 pass, 10 fail against the current API surface as of 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 25%. Expand before production use.
+- 8 curated scenario files plus an automated pytest harness. The current branch has known test regressions documented in the Testing section; expand and stabilize coverage before production use.
 - Default demo login: Username `demo`, Password `demo123` — replace with real auth + secrets in production.
 - Complete audit trail path is wired, but database/LLM configs must be supplied via env.
 - Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not implemented.
