@@ -2,7 +2,7 @@
 
 # 🤖 AI Agentic Compliance Assistant
 
-**Status:** working prototype with mock mode. Not production-hardened; see the production notes below.
+**Status:** working prototype with mock mode. Not production-hardened; see Production notes.
 
 ### *Intelligent compliance automation with human oversight*
 
@@ -243,7 +243,7 @@ streamlit run frontend/Home.py --server.port 8501
    ```bash
    pytest -v
    ```
-   Note: the suite collects 13 tests; 10 currently fail against the current API surface (22 Sep 2026).
+   Test suite: 13 collected, 3 passed, 10 failed (re-run 22 Sep 2026). The failures are against the current API surface: `tests/backend/test_agent.py` asserts attributes that no longer exist on `ComplianceAgent`, and `tests/backend/test_api.py` calls authenticated routes without a token.
 
 ### 🎯 Quick Demo (2 minutes)
 
@@ -510,6 +510,8 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - ⚠️ No input sanitization for all endpoints
 - ⚠️ No API key rotation
 - ⚠️ No audit log encryption
+
+### Production notes
 
 **For Production Use:**
 1. Change all default secrets
