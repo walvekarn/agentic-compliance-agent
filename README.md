@@ -35,7 +35,7 @@ The **AI Agentic Compliance Assistant** is a prototype that handles routine comp
 - **Business problem:** Reviewers spend time on routine compliance tasks, while high-risk tasks need a logged reason to escalate.
 - **User:** Compliance analysts who submit tasks; reviewers who approve or override decisions.
 - **Scope:** In: 6-factor risk score, act / review / escalate decision, agent loop, audit trail, feedback, what-if, mock mode. Out: RBAC, multi-tenancy, integrations (see MVP Scope).
-- **Key requirements and decisions:** Risk under 0.4 acts, 0.4 to 0.7 goes to human review, over 0.7 escalates. Each decision is logged with rationale and confidence. Feedback produces threshold suggestions, not automatic changes.
+- **Key requirements and decisions:** Overall risk under 0.35 acts (if the entity is capable or the task is simple), 0.35 to 0.65 goes to human review, 0.65 and above escalates. Incident-response tasks always escalate; entities with more than 2 prior violations never get autonomous action. Each decision is logged with rationale and confidence. Feedback produces threshold suggestions, not automatic changes.
 - **Acceptance criteria:** The 8 files in `test_scenarios/` each set an expected decision, risk level and minimum confidence.
 - **What is tested:** 16 pytest tests: auth, health, query and rules endpoints, the agent with a patched LLM client, and one demo flow that needs a running server. `frontend/tests/` holds 34 further UI contract and sanity checks, not part of the recorded run. Not tested: risk weights, the live-LLM loop.
 - **Known limitations:** Demo credentials, default JWT secret, SQLite, no RBAC. Live-LLM runs take 30 to 90 seconds.
@@ -88,9 +88,10 @@ Evaluates compliance tasks across six weighted dimensions to determine autonomy 
 | **Impact Severity** | 10% | Stakeholder count, financial consequences |
 
 **Outcome Mapping:**
-- Risk < 0.4 → **AUTONOMOUS** (Agent proceeds independently)
-- Risk 0.4-0.7 → **REVIEW_REQUIRED** (Human approval needed)
-- Risk > 0.7 → **ESCALATE** (Expert involvement required)
+- Overall risk < 0.35 → **AUTONOMOUS** (agent proceeds; drops to review if entity capability is low and the task is not simple)
+- Overall risk 0.35 to 0.65 → **REVIEW_REQUIRED** (human approval needed)
+- Overall risk ≥ 0.65 → **ESCALATE** (expert involvement required)
+- Overrides: incident-response tasks always escalate; more than 2 prior violations removes autonomous action
 
 ### 2. Entity Memory System
 
