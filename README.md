@@ -1,41 +1,49 @@
-<div align="center">
+Status: Prototype
 
-# 🤖 AI Agentic Compliance Assistant
+# AI Agentic Compliance Assistant
 
-**Status:** working prototype with mock mode. Not production-hardened; see Production notes.
+Working prototype with mock mode. Not production-hardened; see Production notes.
 
-### *Intelligent compliance automation with human oversight*
+*Compliance task triage with human oversight*
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Coverage](https://img.shields.io/badge/coverage-27%25-lightgrey.svg)]()
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Features](#-core-agentic-features) • [🏗️ Architecture](#-architecture)
+[Quick Start](#quick-start) • [Documentation](#documentation) • [Features](#core-agentic-features) • [Architecture](#architecture)
 
 ---
 
-</div>
+**One-liner:** Agentic FastAPI + Streamlit prototype that analyzes compliance tasks, decides when to escalate, and logs every decision with plan/execute/reflect traces.
 
-**One-liner:** Agentic FastAPI + Streamlit stack that analyzes compliance tasks, decides when to escalate, and logs every decision with transparent plan/execute/reflect traces.
+## Executive Summary
 
-## 📋 Executive Summary
+The **AI Agentic Compliance Assistant** is a prototype that handles routine compliance tasks on its own and escalates higher-risk tasks to a human reviewer. It combines a **6-factor risk assessment engine**, **entity memory**, **human feedback capture**, **proactive suggestions**, and **what-if analysis**, and records each decision with its rationale in an audit trail.
 
-The **AI Agentic Compliance Assistant** is an intelligent system that autonomously handles routine compliance tasks while intelligently escalating high-risk scenarios to human experts. Built with cutting-edge agentic AI capabilities, it combines a **6-factor risk assessment engine**, **persistent entity memory**, **human feedback learning**, **proactive recommendations**, and **counterfactual reasoning** to deliver transparent, auditable compliance decisions.
-
-**Current State (truthful):**
-- Demo-first build with mock-mode support (OpenAI key optional; real key recommended for production).
-- 8 curated scenario files in `test_scenarios/` plus an automated pytest suite: 16 tests passing (re-run 22 Sep 2026), measured coverage 27%. Expand before production use.
-- Default demo login: Username `demo`, Password `demo123` — replace with real auth + secrets in production.
-- Complete audit trail path is wired, but database/LLM configs must be supplied via env.
+**Current state:**
+- Demo-first build with mock-mode support (OpenAI key optional).
+- 8 scenario files in `test_scenarios/` plus a pytest suite of 16 tests (all passing on the last recorded run, 22 Sep 2026). Test depth is limited; see Project Management View.
+- Default demo login: Username `demo`, Password `demo123`. Replace with real authentication and secrets before any real use.
+- The audit trail path is wired, but database/LLM configs must be supplied via env.
 - Advanced features (EpisodicMemory, SemanticMemory, ScoreAssistant) are planned, not implemented.
 
-**Use it for:** Portfolio demos, architecture exploration, and a starting point for hardened deployments (add real secrets, DB, auth, and more tests before production).
+**Use it for:** Portfolio demos and architecture exploration. It is not ready to make real compliance decisions.
+
+## Project Management View
+
+- **Business problem:** Reviewers spend time on routine compliance tasks, while high-risk tasks need a logged reason to escalate.
+- **User:** Compliance analysts who submit tasks; reviewers who approve or override decisions.
+- **Scope:** In: 6-factor risk score, act / review / escalate decision, agent loop, audit trail, feedback, what-if, mock mode. Out: RBAC, multi-tenancy, integrations (see MVP Scope).
+- **Key requirements and decisions:** Risk under 0.4 acts, 0.4 to 0.7 goes to human review, over 0.7 escalates. Each decision is logged with rationale and confidence. Feedback produces threshold suggestions, not automatic changes.
+- **Acceptance criteria:** The 8 files in `test_scenarios/` each set an expected decision, risk level and minimum confidence.
+- **What is tested:** 16 pytest tests: auth, health, query and rules endpoints, the agent with a patched LLM client, and one demo flow that needs a running server. `frontend/tests/` holds 34 further UI contract and sanity checks, not part of the recorded run. Not tested: risk weights, the live-LLM loop.
+- **Known limitations:** Demo credentials, default JWT secret, SQLite, no RBAC. Live-LLM runs take 30 to 90 seconds.
+- **What production would need:** Real authentication and RBAC, secret management, a production database, risk-engine tests, and decisions checked against reviewed cases.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### System Overview
 
@@ -64,9 +72,9 @@ The system implements a **Plan → Execute → Reflect** agentic loop:
 
 ---
 
-## ✨ Core Agentic Features
+## Core Agentic Features
 
-### 1. 🎯 6-Factor Risk Assessment Engine
+### 1. 6-Factor Risk Assessment Engine
 
 Evaluates compliance tasks across six weighted dimensions to determine autonomy level:
 
@@ -80,47 +88,47 @@ Evaluates compliance tasks across six weighted dimensions to determine autonomy 
 | **Impact Severity** | 10% | Stakeholder count, financial consequences |
 
 **Outcome Mapping:**
-- Risk < 0.4 → **AUTONOMOUS** ✅ (Agent proceeds independently)
-- Risk 0.4-0.7 → **REVIEW_REQUIRED** ⚠️ (Human approval needed)
-- Risk > 0.7 → **ESCALATE** 🚨 (Expert involvement required)
+- Risk < 0.4 → **AUTONOMOUS** (Agent proceeds independently)
+- Risk 0.4-0.7 → **REVIEW_REQUIRED** (Human approval needed)
+- Risk > 0.7 → **ESCALATE** (Expert involvement required)
 
-### 2. 🧠 Entity Memory System
+### 2. Entity Memory System
 
-Maintains persistent memory of every organization's compliance journey:
-- **Compliance History** — All past decisions and outcomes
-- **Violation Records** — Previous failures with remediation tracking
-- **Risk Evolution** — Score progression over time
-- **Trend Analysis** — Improving vs. declining compliance patterns
-- **Personalized Adjustments** — Entity-specific risk calibration
+Stores each organization's compliance history in the local database:
+- **Compliance History:** past decisions and outcomes
+- **Violation Records:** previous failures with remediation tracking
+- **Risk Evolution:** score progression over time
+- **Trend Analysis:** improving vs. declining compliance patterns
+- **Personalized Adjustments:** entity-specific risk calibration
 
-### 3. 🔄 Human Feedback Loop
+### 3. Human Feedback Loop
 
-Continuous learning mechanism that improves from human corrections:
-- **Decision Overrides** — Track when humans change AI decisions
-- **Factor Corrections** — Capture specific risk factor adjustments
-- **Pattern Recognition** — Identify systematic assessment gaps
-- **Threshold Tuning** — Auto-adjust autonomy thresholds based on accuracy
-- **Memory Updates** — Store feedback for future reference
+Captures human corrections for later review:
+- **Decision Overrides:** track when humans change AI decisions
+- **Factor Corrections:** capture specific risk factor adjustments
+- **Pattern Recognition:** identify systematic assessment gaps
+- **Threshold Suggestions:** flag when overrides suggest a threshold change; thresholds are not changed automatically
+- **Memory Updates:** store feedback for future reference
 
-### 4. 💡 Proactive Suggestion Engine
+### 4. Proactive Suggestion Engine
 
-Shifts compliance from reactive to predictive:
+Generates suggestions from data already stored in the app. There is no live regulatory feed.
 
 | Type | Trigger | Example |
 |------|---------|---------|
 | **Deadline Monitoring** | Obligation within 30 days | "SOX audit due in 14 days" |
-| **Regulatory Changes** | New law published | "GDPR amendments effective March 2025" |
+| **Regulatory Patterns** | Pattern of regulatory filings in stored entity history | "Several regulatory filings logged for this entity" |
 | **Risk Patterns** | Multiple similar incidents | "3 data breaches in 30 days - suggest training" |
 | **Preventive Actions** | Rising risk trend | "Entity risk up 25% - schedule audit" |
 | **Violations** | Recent violations detected | "2 violations in 60 days - escalate review" |
 
-### 5. 🔍 Counterfactual Reasoning (What-If Analysis)
+### 5. Counterfactual Reasoning (What-If Analysis)
 
 Generates "what-if" scenarios to explain decision boundaries:
-- **Factor Deltas** — Shows how changing one factor affects the score
-- **Decision Boundaries** — Identifies threshold values that change decisions
-- **Scenario Comparison** — Compare multiple scenarios side-by-side
-- **Transparency** — Explains why decisions were made
+- **Factor Deltas:** shows how changing one factor affects the score
+- **Decision Boundaries:** identifies threshold values that change decisions
+- **Scenario Comparison:** compare multiple scenarios side-by-side
+- **Transparency:** explains why decisions were made
 
 **Example:**
 ```
@@ -132,7 +140,7 @@ Changed Factors: [regulatory_oversight +0.3, impact_severity +0.2]
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -213,7 +221,7 @@ cd /path/to/agentic-compliance-agent
 streamlit run frontend/Home.py --server.port 8501
 ```
 
-### ✅ Verify Installation
+### Verify Installation
 
 1. **Backend Health Check:**
    ```bash
@@ -237,15 +245,15 @@ streamlit run frontend/Home.py --server.port 8501
    Navigate to http://localhost:8501 in your browser
 
 3. **Login:**
-   - Default credentials: Username `demo`, Password `demo123` (update for production)
+   - Default credentials: Username `demo`, Password `demo123` (change before any real use)
 
 4. **Run Tests (Optional):**
    ```bash
    pytest -v
    ```
-   Test suite: 16 tests passing (re-run 22 Sep 2026). The API tests log in with the demo credentials and send a bearer token; the agent tests patch the LLM client, so no network call is made.
+   Test suite: 16 tests (all passing on the last recorded run, 22 Sep 2026). The API tests log in with the demo credentials and send a bearer token; the agent tests patch the LLM client, so no network call is made. `tests/test_demo_flow.py` calls the backend at `localhost:8000`, so start the server first.
 
-### 🎯 Quick Demo (2 minutes)
+### Quick Demo (2 minutes)
 
 1. **Login** with Username `demo`, Password `demo123`
 2. Click **"Analyze Task"** in the sidebar
@@ -256,19 +264,19 @@ streamlit run frontend/Home.py --server.port 8501
    - Employee count: 50
    - Task: "Review privacy policy for GDPR compliance"
 4. Click **"Analyze Task"**
-5. See AI decision in seconds! ✨
+5. Review the decision, risk score and rationale on the results page.
 
-### 🔗 Access Points
+### Access Points
 
-- **🎨 Dashboard:** http://localhost:8501
-- **🔌 Backend API:** http://localhost:8000
-- **📚 Interactive API Docs:** http://localhost:8000/docs
-- **📖 API Reference:** http://localhost:8000/redoc
-- **🔐 Demo login:** Username `demo`, Password `demo123`
+- **Dashboard:** http://localhost:8501
+- **Backend API:** http://localhost:8000
+- **Interactive API Docs:** http://localhost:8000/docs
+- **API Reference:** http://localhost:8000/redoc
+- **Demo login:** Username `demo`, Password `demo123`
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 Screenshots are not included in this release. Run the app locally (`make start`) to explore the UI. The dashboard focuses on 5 core pages:
 - **Home** - Project overview and quick start
@@ -279,7 +287,7 @@ Screenshots are not included in this release. Run the app locally (`make start`)
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Authentication
 
@@ -314,12 +322,12 @@ POST   /api/v1/agentic/recovery           # Error recovery simulation
 ```
 
 **Agentic Analysis Features:**
-- 🎯 Strategic task planning (3-7 steps)
-- ⚙️ Tool-augmented execution (Entity, Calendar, Task, HTTP)
-- 🔍 Quality reflection and iteration
-- 🧠 Memory systems integration
-- 💡 Transparent reasoning chains
-- 🔄 Replanning on low quality scores
+- Task planning (3-7 steps)
+- Tool-augmented execution (Entity, Calendar, Task, HTTP)
+- Quality reflection and iteration
+- Memory systems integration
+- Visible reasoning chains
+- Replanning on low quality scores
 
 ### Entity Management
 
@@ -382,7 +390,7 @@ GET    /redoc                              # ReDoc (alternative API docs)
 
 ---
 
-## 🧪 Demo Instructions
+## Demo Instructions
 
 ### Basic Demo (5 minutes)
 
@@ -462,27 +470,27 @@ The system works in **mock mode** without an OpenAI API key:
 
 ---
 
-## ⚠️ Disclaimers
+## Disclaimers
 
 ### MVP Scope
 
-This is a **Minimum Viable Product (MVP)** with the following scope:
+This is a **prototype** with the following scope:
 
-**✅ Included:**
+**Included:**
 - Core 6-factor risk assessment engine
 - Basic agentic AI workflow (plan-execute-reflect)
 - Entity memory system
-- Human feedback loop
+- Human feedback capture
 - Proactive suggestions
 - What-if analysis
-- Complete audit trail
+- Audit trail
 - Streamlit dashboard (5 core pages focused on agentic AI)
 - FastAPI backend with JWT auth
-- SQLite database (PostgreSQL-ready)
-- 16 pytest tests in `tests/` passing (re-run 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 27%
+- SQLite database via SQLAlchemy
+- 16 pytest tests in `tests/` (all passing on the last recorded run, 22 Sep 2026); 8 scenario files in `test_scenarios/`
 - Mock mode for testing without API key
 
-**❌ Not Included (Future Roadmap):**
+**Not Included (Future Roadmap):**
 - Security hardening beyond the demo defaults
 - Role-based access control (RBAC)
 - Multi-tenant architecture
@@ -498,18 +506,22 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 
 ### Security Notice
 
-**⚠️ This is a demonstration/portfolio project.**
+**This is a demonstration/portfolio project.**
 
 **Current Security Status:**
-- ✅ JWT authentication implemented
-- ✅ Password hashing (bcrypt)
-- ✅ Rate limiting (SlowAPI)
-- ✅ CORS configuration
-- ⚠️ Default JWT secret (change in production)
-- ⚠️ No RBAC (all users have same permissions)
-- ⚠️ No input sanitization for all endpoints
-- ⚠️ No API key rotation
-- ⚠️ No audit log encryption
+
+In place:
+- JWT authentication
+- Password hashing (bcrypt)
+- Rate limiting (SlowAPI)
+- CORS configuration
+
+Gaps:
+- Default JWT secret (change before any real use)
+- No RBAC (all users have same permissions)
+- No input sanitization for all endpoints
+- No API key rotation
+- No audit log encryption
 
 ### Production notes
 
@@ -530,21 +542,20 @@ This is a **Minimum Viable Product (MVP)** with the following scope:
 - **Database:** SQLite by default (file-based, local)
 - **No external data sharing:** All data stays local
 - **Audit logs:** Stored locally, not transmitted
-- **OpenAI API:** Only sends task descriptions (no PII in prompts)
-- **Compliance:** Follows data minimization principles
+- **OpenAI API:** When a key is set, user queries and task text are sent to OpenAI. Do not enter real personal data.
 
 ### Limitations
 
-1. **AI Accuracy:** Decisions are AI-generated and should be reviewed by humans
-2. **Regulatory Coverage:** Supports major frameworks but not exhaustive
-3. **Scalability:** SQLite suitable for small-medium deployments; PostgreSQL recommended for large scale
+1. **AI Accuracy:** Decisions are AI-generated, have not been measured for accuracy, and should be reviewed by humans
+2. **Regulatory Coverage:** Covers a limited set of frameworks; not exhaustive and not legal advice
+3. **Scalability:** SQLite only; not load-tested
 4. **Performance:** Agentic analysis can take 30-90 seconds (LLM calls)
 5. **Mock Mode:** Limited functionality without real API key
-6. **Browser Support:** Tested on Chrome, Firefox, Safari (latest versions)
+6. **Browser Support:** Built for current Chrome, Firefox and Safari; no automated browser tests
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Timeout Configuration
 
@@ -562,7 +573,7 @@ All timeout values are defined in `backend/config/settings.py` and `frontend/com
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Agentic Analysis Timeout
 
@@ -605,7 +616,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 
@@ -617,7 +628,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 | **OpenAI API** | 1.10+ | GPT-4o-mini for AI reasoning (optional) |
 | **SQLAlchemy** | 2.0+ | Database ORM with async support |
 | **Pydantic** | 2.7+ | Data validation and settings |
-| **Uvicorn** | 0.24+ | ASGI server for production |
+| **Uvicorn** | 0.24+ | ASGI server |
 | **JWT** | 2.8+ | Authentication tokens |
 | **bcrypt** | 4.0+ | Password hashing |
 
@@ -633,14 +644,14 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 | Tool | Purpose |
 |------|---------|
-| **Pytest** | Test framework. 16 tests passing (re-run 22 Sep 2026); 8 curated scenario files in `test_scenarios/`; measured coverage 27% |
+| **Pytest** | Test framework. 16 tests (all passing on the last recorded run, 22 Sep 2026); 8 scenario files in `test_scenarios/` |
 | **Black** | Code formatting (PEP 8) |
 | **MyPy** | Static type checking |
 | **Make** | Build automation |
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 ### Essential Reading
 - **[Architecture Overview](docs/ARCHITECTURE_v2.md)** - Complete system design, architecture, LLM Gateway, Agent Loop, and Reasoning Engine (v2.0)
@@ -659,7 +670,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -677,39 +688,29 @@ Please ensure:
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 👤 Author
+## Author
 
 **Nikita Walvekar**  
-*AI Product Manager | GenAI & Agentic Systems*
+*AI Project Manager | Automation & Operations Delivery*
 
-Building intelligent systems that augment human expertise.
+### Connect
 
-### 🔗 Connect
-
-- 💼 **LinkedIn:** [linkedin.com/in/nikitaw3](https://www.linkedin.com/in/nikitaw3)
-- 📧 **Email:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
-- 🐙 **GitHub:** [github.com/walvekarn](https://github.com/walvekarn)
+- **LinkedIn:** [linkedin.com/in/nikitaw3](https://www.linkedin.com/in/nikitaw3)
+- **Email:** [walvekarn@gmail.com](mailto:walvekarn@gmail.com)
+- **GitHub:** [github.com/walvekarn](https://github.com/walvekarn)
 
 ---
 
-<div align="center">
+Built with Python, FastAPI, LangChain, and OpenAI.
 
-### ⭐ If you find this project useful, please give it a star!
-
-**Built with ❤️ using Python, FastAPI, LangChain, and OpenAI**
-
-[⬆ Back to Top](#-ai-agentic-compliance-assistant)
-
----
+[Back to Top](#ai-agentic-compliance-assistant)
 
 *This is a portfolio/demonstration project. Not intended for production use without additional security hardening.*
 
 **Last Updated:** 22 Sep 2026 | **Status:** Working prototype with mock mode
-
-</div>
